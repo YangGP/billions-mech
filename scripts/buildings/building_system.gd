@@ -42,8 +42,14 @@ func get_placement_error(definition_id: StringName, origin: Vector2i) -> String:
 	var definition: BuildingDefinition = definitions.get(key)
 	if definition == null:
 		return "未知建筑类型：%s" % key
+	if definition.unique and _has_instance_of(key):
+		return "该建筑只能建造一座"
 	if not _grid.can_place(origin, definition.footprint):
 		return "无法放置：越界、地形阻挡或已被占用"
+
+	var capacity_error := _get_capacity_error(definition)
+	if capacity_error != "":
+		return capacity_error
 	if not _economy.can_afford(definition.build_cost):
 		return "资源不足：%s" % _format_resources(definition.build_cost)
 	return ""
@@ -88,6 +94,11 @@ func remove_building(instance_id: StringName) -> bool:
 		last_error = "建筑不存在：%s" % instance_id
 		return false
 
+	var definition := get_definition(instance.definition_id)
+	if definition != null and not definition.demolishable:
+		last_error = "该建筑不可拆除"
+		return false
+
 	_grid.release(instance.cells)
 	instances.erase(instance.instance_id)
 	_recompute_capacity()
@@ -108,12 +119,57 @@ func get_definitions() -> Array[BuildingDefinition]:
 	return result
 
 
+## 建造菜单只显示 buildable = true 的定义；指挥中心等初始建筑不在其中。
+func get_buildable_definitions() -> Array[BuildingDefinition]:
+	var result: Array[BuildingDefinition] = []
+	for key in definitions:
+		var definition: BuildingDefinition = definitions[key]
+		if definition.buildable:
+			result.append(definition)
+	result.sort_custom(_sort_definitions)
+	return result
+
+
 func _sort_definitions(a: BuildingDefinition, b: BuildingDefinition) -> bool:
+	if a.palette_order != b.palette_order:
+		return a.palette_order < b.palette_order
 	return String(a.building_id) < String(b.building_id)
 
 
 func get_building_count() -> int:
 	return instances.size()
+
+
+## 容量检查按“建成后”的总量判断：新增建筑自身的供给也算进去。
+func _get_capacity_error(definition: BuildingDefinition) -> String:
+	var next_workers_used := _economy.workers_used + definition.required_workers
+	var next_workers_total := _economy.workers_total + definition.housing_capacity
+	if next_workers_used > next_workers_total:
+		return "工人不足：需要 %d 名工人（当前 %d/%d）" % [
+			definition.required_workers, _economy.workers_used, _economy.workers_total
+		]
+
+	var next_food_demand := _economy.food_demand + definition.food_demand
+	var next_food_supply := _economy.food_supply + definition.food_capacity
+	if next_food_demand > next_food_supply:
+		return "食物不足：需要 %d 食物供给（当前 %d/%d）" % [
+			definition.food_demand, _economy.food_demand, _economy.food_supply
+		]
+
+	var next_energy_demand := _economy.energy_demand + definition.energy_demand
+	var next_energy_supply := _economy.energy_supply + definition.energy_supply
+	if next_energy_demand > next_energy_supply:
+		return "能源不足：需要 %d 能源供给（当前 %d/%d）" % [
+			definition.energy_demand, _economy.energy_demand, _economy.energy_supply
+		]
+	return ""
+
+
+func _has_instance_of(definition_id: StringName) -> bool:
+	for instance in instances.values():
+		if instance.definition_id == definition_id:
+			return true
+	return false
 
 
 func _make_instance_id() -> StringName:

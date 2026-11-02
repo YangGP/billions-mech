@@ -16,7 +16,7 @@ func setup(game_state: GameState, world: World, hud: HUD) -> void:
 	_hud = hud
 
 	hud.build_palette.building_selected.connect(select_definition)
-	hud.build_palette.setup(game_state.buildings.get_definitions())
+	hud.build_palette.setup(game_state.buildings.get_buildable_definitions())
 	hud.set_status("选择建筑开始建造；右键拆除建筑")
 
 
@@ -133,10 +133,12 @@ func _select_by_hotkey(event: InputEventKey) -> bool:
 			index = 1
 		KEY_3:
 			index = 2
+		KEY_4:
+			index = 3
 	if index < 0:
 		return false
 
-	var definitions := _game_state.buildings.get_definitions()
+	var definitions := _game_state.buildings.get_buildable_definitions()
 	if index >= definitions.size():
 		return false
 	select_definition(definitions[index].building_id)

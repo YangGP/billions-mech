@@ -7,14 +7,20 @@
 script = ExtResource("1_script")
 building_id = &"lumberyard"
 display_name = "伐木场"
-description = "2×2 占地，占用 2 名工人，每个经济 tick 产出木材。"
+description = "2×2 占地，占用 2 名工人，每个 tick 产出木材，消耗 1 食物、1 能源、1 金币维护。"
 texture = ExtResource("2_texture")
+palette_order = 30
 footprint = Vector2i(2, 2)
 build_cost = {
 "gold": 80,
 "wood": 60
 }
+upkeep_per_tick = {
+"gold": 1
+}
 output_per_tick = {
 "wood": 3
 }
 required_workers = 2
+food_demand = 1
+energy_demand = 1

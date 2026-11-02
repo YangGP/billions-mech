@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="BuildingDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/buildings/building_definition.gd" id="1_script"]
+[ext_resource type="Texture2D" path="res://art/placeholder/buildings/power_tower.png" id="2_texture"]
+
+[resource]
+script = ExtResource("1_script")
+building_id = &"power_tower"
+display_name = "电力中继塔"
+description = "1×1 占地，提供 10 点能源供给，并扩大可建造范围（M1-05 生效），每 tick 消耗 1 金币维护。"
+texture = ExtResource("2_texture")
+palette_order = 40
+footprint = Vector2i(1, 1)
+build_cost = {
+"gold": 70,
+"wood": 30
+}
+upkeep_per_tick = {
+"gold": 1
+}
+energy_supply = 10
+build_range_radius = 6

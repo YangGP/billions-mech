@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="BuildingDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/buildings/building_definition.gd" id="1_script"]
+[ext_resource type="Texture2D" path="res://art/placeholder/buildings/farm.png" id="2_texture"]
+
+[resource]
+script = ExtResource("1_script")
+building_id = &"farm"
+display_name = "农场"
+description = "2×2 占地，占用 2 名工人，提供 10 点食物供给。"
+texture = ExtResource("2_texture")
+palette_order = 20
+footprint = Vector2i(2, 2)
+build_cost = {
+"gold": 60,
+"wood": 30
+}
+required_workers = 2
+food_capacity = 10
+energy_demand = 1

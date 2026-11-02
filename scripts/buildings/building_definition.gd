@@ -13,6 +13,14 @@ extends Resource
 @export var display_name: String = ""
 @export_multiline var description: String = ""
 @export var scene: PackedScene
+## 是否出现在建造菜单中（指挥中心等初始建筑设为 false）。
+@export var buildable: bool = true
+## 全局唯一，最多存在一座。
+@export var unique: bool = false
+## 是否允许手动拆除（指挥中心设为 false）。
+@export var demolishable: bool = true
+## 建造菜单排序，数值小的在前。
+@export var palette_order: int = 0
 
 @export_group("占地")
 ## 以逻辑格为单位的占地大小，与建筑图片像素尺寸无关。

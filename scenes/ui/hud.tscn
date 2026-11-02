@@ -21,7 +21,7 @@ unique_name_in_owner = true
 layout_mode = 0
 offset_left = 16.0
 offset_top = 16.0
-offset_right = 816.0
+offset_right = 1056.0
 offset_bottom = 64.0
 script = ExtResource("2_resource_panel")
 
@@ -63,13 +63,31 @@ vertical_alignment = 1
 [node name="Separator3" type="VSeparator" parent="Root/ResourcePanel/Margin/Row"]
 layout_mode = 2
 
+[node name="FoodLabel" type="Label" parent="Root/ResourcePanel/Margin/Row"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "食物 0/0"
+vertical_alignment = 1
+
+[node name="Separator4" type="VSeparator" parent="Root/ResourcePanel/Margin/Row"]
+layout_mode = 2
+
+[node name="EnergyLabel" type="Label" parent="Root/ResourcePanel/Margin/Row"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "能源 0/0"
+vertical_alignment = 1
+
+[node name="Separator5" type="VSeparator" parent="Root/ResourcePanel/Margin/Row"]
+layout_mode = 2
+
 [node name="BuildingLabel" type="Label" parent="Root/ResourcePanel/Margin/Row"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "建筑 0 · 占地 0"
 vertical_alignment = 1
 
-[node name="Separator4" type="VSeparator" parent="Root/ResourcePanel/Margin/Row"]
+[node name="Separator6" type="VSeparator" parent="Root/ResourcePanel/Margin/Row"]
 layout_mode = 2
 
 [node name="CursorLabel" type="Label" parent="Root/ResourcePanel/Margin/Row"]
@@ -78,7 +96,7 @@ layout_mode = 2
 text = "光标 --"
 vertical_alignment = 1
 
-[node name="Separator5" type="VSeparator" parent="Root/ResourcePanel/Margin/Row"]
+[node name="Separator7" type="VSeparator" parent="Root/ResourcePanel/Margin/Row"]
 layout_mode = 2
 
 [node name="TimeLabel" type="Label" parent="Root/ResourcePanel/Margin/Row"]
@@ -101,7 +119,7 @@ anchors_preset = 2
 anchor_top = 1.0
 anchor_bottom = 1.0
 offset_left = 16.0
-offset_top = -268.0
+offset_top = -316.0
 offset_right = 336.0
 offset_bottom = -16.0
 grow_vertical = 0
@@ -142,7 +160,7 @@ autowrap_mode = 2
 [node name="PaletteHint" type="Label" parent="Root/BuildPalette/Margin/Column"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 12
-text = "1/2 选择 · 右键拆除 · Esc 取消"
+text = "1-4 选择 · 右键拆除 · Esc 取消"
 modulate = Color(0.75, 0.78, 0.8, 1)
 
 [node name="HintLabel" type="Label" parent="Root"]

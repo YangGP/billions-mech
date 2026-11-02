@@ -40,13 +40,19 @@ func set_status(text: String) -> void:
 
 
 func _on_resources_changed(resources: Dictionary) -> void:
-	resource_panel.display_resources(resources)
+	if _game_state == null:
+		return
+	resource_panel.display_resources(resources, _game_state.economy.get_net_rates())
 
 
 func _on_capacity_changed() -> void:
 	if _game_state == null:
 		return
 	resource_panel.display_capacity(_game_state.economy)
+	resource_panel.display_resources(
+		_game_state.economy.get_resources(),
+		_game_state.economy.get_net_rates()
+	)
 
 
 func _on_buildings_changed() -> void:

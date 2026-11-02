@@ -1,9 +1,9 @@
 class_name EconomySystem
 extends Node
-## 全局经济：库存资源 + 容量约束。
+## 全局经济：库存资源 + 容量约束 + 每 tick 收支。
 ##
 ## 金币/木材是库存（会积累、会消耗）；工人/食物/能源是容量约束（供给 vs 占用）。
-## 建筑不会直接修改库存，所有资源变化都必须经过这里，方便统一结算与 UI 通知。
+## 建筑的产出与维护费统一在这里按 tick 结算，建筑视图不得直接改库存。
 
 signal resources_changed(resources: Dictionary)
 signal capacity_changed()
@@ -18,6 +18,12 @@ var food_demand: int = 0
 var energy_supply: int = 0
 var energy_demand: int = 0
 
+## 每 tick 的资源收入 / 维护费，由 recompute_capacity() 从建筑定义汇总。
+var income_per_tick: Dictionary = {}
+var upkeep_per_tick: Dictionary = {}
+## income - upkeep，供 UI 直接显示净变化。
+var _net_rates: Dictionary = {}
+
 
 func setup(initial_resources: Dictionary) -> void:
 	resources.clear()
@@ -25,6 +31,7 @@ func setup(initial_resources: Dictionary) -> void:
 		resources[String(key)] = int(initial_resources[key])
 	_ensure_resource("gold")
 	_ensure_resource("wood")
+	_rebuild_net_rates()
 	resources_changed.emit(get_resources())
 
 
@@ -59,32 +66,36 @@ func spend(cost: Dictionary) -> bool:
 	return true
 
 
+func get_net_rate(resource_id: String) -> int:
+	return int(_net_rates.get(resource_id, 0))
+
+
+func get_net_rates() -> Dictionary:
+	return _net_rates.duplicate(true)
+
+
 ## 每个模拟 tick 结算一次所有建筑的产出与维护费。
-func process_tick(instances: Dictionary, definitions: Dictionary) -> void:
-	if instances.is_empty():
+func process_tick() -> void:
+	if income_per_tick.is_empty() and upkeep_per_tick.is_empty():
 		return
 
 	var changed: bool = false
-	for instance in instances.values():
-		var definition: BuildingDefinition = definitions.get(instance.definition_id)
-		if definition == null:
-			continue
-		for resource_id in definition.output_per_tick:
-			var output: int = int(definition.output_per_tick[resource_id])
-			if output != 0:
-				add_resource(String(resource_id), output)
-				changed = true
-		for resource_id in definition.upkeep_per_tick:
-			var upkeep: int = int(definition.upkeep_per_tick[resource_id])
-			if upkeep != 0:
-				add_resource(String(resource_id), -upkeep)
-				changed = true
+	for resource_id in income_per_tick:
+		var income: int = int(income_per_tick[resource_id])
+		if income != 0:
+			add_resource(String(resource_id), income)
+			changed = true
+	for resource_id in upkeep_per_tick:
+		var upkeep: int = int(upkeep_per_tick[resource_id])
+		if upkeep != 0:
+			add_resource(String(resource_id), -upkeep)
+			changed = true
 
 	if changed:
 		resources_changed.emit(get_resources())
 
 
-## 建造/拆除后全量重算容量，避免长期累加产生漂移。
+## 建造/拆除后全量重算容量与每 tick 收支，避免长期累加产生漂移。
 func recompute_capacity(instances: Dictionary, definitions: Dictionary) -> void:
 	var new_workers_total: int = 0
 	var new_workers_used: int = 0
@@ -92,6 +103,8 @@ func recompute_capacity(instances: Dictionary, definitions: Dictionary) -> void:
 	var new_food_demand: int = 0
 	var new_energy_supply: int = 0
 	var new_energy_demand: int = 0
+	income_per_tick.clear()
+	upkeep_per_tick.clear()
 
 	for instance in instances.values():
 		var definition: BuildingDefinition = definitions.get(instance.definition_id)
@@ -104,13 +117,37 @@ func recompute_capacity(instances: Dictionary, definitions: Dictionary) -> void:
 		new_energy_supply += definition.energy_supply
 		new_energy_demand += definition.energy_demand
 
+		for resource_id in definition.output_per_tick:
+			var output_key := String(resource_id)
+			income_per_tick[output_key] = (
+				int(income_per_tick.get(output_key, 0))
+				+ int(definition.output_per_tick[resource_id])
+			)
+		for resource_id in definition.upkeep_per_tick:
+			var upkeep_key := String(resource_id)
+			upkeep_per_tick[upkeep_key] = (
+				int(upkeep_per_tick.get(upkeep_key, 0))
+				+ int(definition.upkeep_per_tick[resource_id])
+			)
+
 	workers_total = new_workers_total
 	workers_used = new_workers_used
 	food_supply = new_food_supply
 	food_demand = new_food_demand
 	energy_supply = new_energy_supply
 	energy_demand = new_energy_demand
+	_rebuild_net_rates()
 	capacity_changed.emit()
+
+
+func _rebuild_net_rates() -> void:
+	_net_rates.clear()
+	for resource_id in income_per_tick:
+		var income_key := String(resource_id)
+		_net_rates[income_key] = int(_net_rates.get(income_key, 0)) + int(income_per_tick[resource_id])
+	for resource_id in upkeep_per_tick:
+		var upkeep_key := String(resource_id)
+		_net_rates[upkeep_key] = int(_net_rates.get(upkeep_key, 0)) - int(upkeep_per_tick[resource_id])
 
 
 func _ensure_resource(resource_id: String) -> void:
