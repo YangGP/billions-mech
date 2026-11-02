@@ -22,3 +22,4 @@ food_capacity = 4
 food_demand = 2
 energy_supply = 5
 energy_demand = 1
+build_range_radius = 6

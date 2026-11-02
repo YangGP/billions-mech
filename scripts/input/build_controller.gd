@@ -8,6 +8,7 @@ var _game_state: GameState
 var _world: World
 var _hud: HUD
 var _selected: BuildingDefinition
+var _last_info_id: StringName = &""
 
 
 func setup(game_state: GameState, world: World, hud: HUD) -> void:
@@ -40,6 +41,25 @@ func cancel() -> void:
 func _process(_delta: float) -> void:
 	if _selected != null:
 		_update_preview()
+	_update_info_panel()
+
+
+func _update_info_panel() -> void:
+	var cell := _world.mouse_to_cell()
+	var instance_id: StringName = _game_state.grid.get_occupant(cell)
+	if instance_id == _last_info_id:
+		return
+	_last_info_id = instance_id
+
+	if instance_id == &"":
+		_hud.hide_building_info()
+		return
+
+	var instance: BuildingInstance = _game_state.buildings.instances.get(instance_id)
+	if instance == null:
+		_hud.hide_building_info()
+		return
+	_hud.show_building_info(_game_state.buildings.get_definition(instance.definition_id))
 
 
 func _unhandled_input(event: InputEvent) -> void:

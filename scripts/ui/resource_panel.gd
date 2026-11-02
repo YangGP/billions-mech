@@ -4,6 +4,7 @@ extends PanelContainer
 ## 只负责显示，所有按钮通过信号交给 HUD / GameState 处理。
 
 signal pause_requested()
+signal speed_requested()
 
 const DEFICIT_COLOR := Color(1.0, 0.45, 0.45)
 
@@ -15,11 +16,13 @@ const DEFICIT_COLOR := Color(1.0, 0.45, 0.45)
 @onready var _building_label: Label = %BuildingLabel
 @onready var _cursor_label: Label = %CursorLabel
 @onready var _time_label: Label = %TimeLabel
+@onready var _speed_button: Button = %SpeedButton
 @onready var _pause_button: Button = %PauseButton
 
 
 func _ready() -> void:
 	_pause_button.pressed.connect(_on_pause_pressed)
+	_speed_button.pressed.connect(_on_speed_pressed)
 	display_resources({})
 	display_time(0.0)
 
@@ -68,6 +71,10 @@ func set_paused(paused: bool) -> void:
 	_pause_button.text = "继续" if paused else "暂停"
 
 
+func set_speed_text(text: String) -> void:
+	_speed_button.text = text
+
+
 func _format_stock(
 	label: String, resources: Dictionary, rates: Dictionary, resource_id: String
 ) -> String:
@@ -81,3 +88,7 @@ func _format_stock(
 
 func _on_pause_pressed() -> void:
 	pause_requested.emit()
+
+
+func _on_speed_pressed() -> void:
+	speed_requested.emit()

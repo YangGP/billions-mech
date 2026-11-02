@@ -4,12 +4,14 @@ extends CanvasLayer
 
 @onready var resource_panel: ResourcePanel = %ResourcePanel
 @onready var build_palette: BuildPalette = %BuildPalette
+@onready var building_info: BuildingInfoPanel = %BuildingInfoPanel
 
 var _game_state: GameState
 
 
 func _ready() -> void:
 	resource_panel.pause_requested.connect(_on_pause_requested)
+	resource_panel.speed_requested.connect(_on_speed_requested)
 
 
 func bind(game_state: GameState) -> void:
@@ -21,12 +23,14 @@ func bind(game_state: GameState) -> void:
 	game_state.buildings_changed.connect(_on_buildings_changed)
 	game_state.clock.tick.connect(_on_clock_tick)
 	game_state.clock.paused_changed.connect(_on_paused_changed)
+	game_state.clock.speed_changed.connect(_on_speed_changed)
 
 	_on_resources_changed(game_state.economy.get_resources())
 	_on_capacity_changed()
 	_on_buildings_changed()
 	_on_clock_tick(0)
 	_on_paused_changed(game_state.clock.paused)
+	_on_speed_changed(game_state.clock.speed)
 
 
 ## 由 World 的悬停信号驱动，显示当前逻辑格坐标。
@@ -37,6 +41,15 @@ func show_cursor_cell(cell: Vector2i, inside: bool) -> void:
 ## 建造提示 / 错误原因，显示在建造菜单内。
 func set_status(text: String) -> void:
 	build_palette.set_status(text)
+
+
+## 悬停建筑时显示详情；M1-05 只读定义，不展示未实现的运转状态。
+func show_building_info(definition: BuildingDefinition) -> void:
+	building_info.show_definition(definition)
+
+
+func hide_building_info() -> void:
+	building_info.hide_info()
 
 
 func _on_resources_changed(resources: Dictionary) -> void:
@@ -77,3 +90,13 @@ func _on_paused_changed(paused: bool) -> void:
 func _on_pause_requested() -> void:
 	if _game_state != null:
 		_game_state.clock.toggle_pause()
+
+
+func _on_speed_requested() -> void:
+	if _game_state != null:
+		_game_state.clock.cycle_speed()
+
+
+func _on_speed_changed(_speed: float) -> void:
+	if _game_state != null:
+		resource_panel.set_speed_text(_game_state.clock.get_speed_label())

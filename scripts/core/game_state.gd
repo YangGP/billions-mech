@@ -67,7 +67,7 @@ func _place_starting_building() -> void:
 		maxi(0, floori((float(map_width) - float(definition.footprint.x)) * 0.5)),
 		maxi(0, floori((float(map_height) - float(definition.footprint.y)) * 0.5))
 	)
-	if not buildings.try_place_building(starting_building_id, origin):
+	if not buildings.place_initial_building(starting_building_id, origin):
 		push_warning("初始建筑放置失败：%s" % buildings.last_error)
 
 

@@ -13,6 +13,7 @@ const TILE_HEIGHT: float = 64.0
 const BUILDING_VIEW_SCENE: PackedScene = preload("res://scenes/buildings/building_view.tscn")
 
 @onready var ground: TileMapLayer = $Ground
+@onready var build_range_overlay: BuildRangeOverlay = $BuildRangeOverlay
 @onready var highlight: CellHighlight = $Highlight
 @onready var decorations: TileMapLayer = $Decorations
 @onready var buildings_root: Node2D = $Buildings
@@ -27,6 +28,7 @@ var _building_views: Dictionary = {}
 func setup(game_state: GameState) -> void:
 	_game_state = game_state
 	_build_ground()
+	build_range_overlay.setup(self, game_state)
 
 	game_state.buildings.building_placed.connect(_on_building_placed)
 	game_state.buildings.building_removed.connect(_on_building_removed)

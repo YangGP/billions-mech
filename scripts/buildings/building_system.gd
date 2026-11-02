@@ -18,6 +18,9 @@ var definitions: Dictionary = {}
 var instances: Dictionary = {}
 ## 最近一次失败原因，供 HUD / 调试面板直接显示。
 var last_error: String = ""
+## 全局可建造格集合，由带 build_range_radius 的建筑覆盖生成。
+## 键为 Vector2i，值为 true。
+var build_coverage: Dictionary = {}
 
 var _grid: GridState
 var _economy: EconomySystem
@@ -31,28 +34,12 @@ func setup(grid: GridState, economy: EconomySystem) -> void:
 	instances.clear()
 	_next_instance_number = 1
 	_load_definitions()
+	_recompute_build_coverage()
 
 
 ## 只做校验、不修改任何状态；供预览和 try_place_building 共用同一套规则。
 func get_placement_error(definition_id: StringName, origin: Vector2i) -> String:
-	if _grid == null or _economy == null:
-		return "建筑系统尚未初始化"
-
-	var key := StringName(definition_id)
-	var definition: BuildingDefinition = definitions.get(key)
-	if definition == null:
-		return "未知建筑类型：%s" % key
-	if definition.unique and _has_instance_of(key):
-		return "该建筑只能建造一座"
-	if not _grid.can_place(origin, definition.footprint):
-		return "无法放置：越界、地形阻挡或已被占用"
-
-	var capacity_error := _get_capacity_error(definition)
-	if capacity_error != "":
-		return capacity_error
-	if not _economy.can_afford(definition.build_cost):
-		return "资源不足：%s" % _format_resources(definition.build_cost)
-	return ""
+	return _validate_placement(StringName(definition_id), origin, false)
 
 
 func can_place_building(definition_id: StringName, origin: Vector2i) -> bool:
@@ -62,10 +49,50 @@ func can_place_building(definition_id: StringName, origin: Vector2i) -> bool:
 ## 统一的建造入口：全部校验通过后才扣费并写入占地，失败不产生半成品状态。
 func try_place_building(definition_id: StringName, origin: Vector2i) -> bool:
 	var key := StringName(definition_id)
-	last_error = get_placement_error(key, origin)
+	last_error = _validate_placement(key, origin, false)
 	if last_error != "":
 		return false
+	return _commit_placement(key, origin)
 
+
+## 开局初始建筑专用：此时还没有任何建造覆盖，跳过范围检查，其余规则一致。
+func place_initial_building(definition_id: StringName, origin: Vector2i) -> bool:
+	var key := StringName(definition_id)
+	last_error = _validate_placement(key, origin, true)
+	if last_error != "":
+		return false
+	return _commit_placement(key, origin)
+
+
+func is_in_build_range(cell: Vector2i) -> bool:
+	return build_coverage.has(cell)
+
+
+func _validate_placement(
+	key: StringName, origin: Vector2i, ignore_range: bool
+) -> String:
+	if _grid == null or _economy == null:
+		return "建筑系统尚未初始化"
+
+	var definition: BuildingDefinition = definitions.get(key)
+	if definition == null:
+		return "未知建筑类型：%s" % key
+	if definition.unique and _has_instance_of(key):
+		return "该建筑只能建造一座"
+	if not _grid.can_place(origin, definition.footprint):
+		return "无法放置：越界、地形阻挡或已被占用"
+	if not ignore_range and not _is_footprint_in_range(origin, definition.footprint):
+		return "超出建造范围：靠近指挥中心或电力中继塔后才能建造"
+
+	var capacity_error := _get_capacity_error(definition)
+	if capacity_error != "":
+		return capacity_error
+	if not _economy.can_afford(definition.build_cost):
+		return "资源不足：%s" % _format_resources(definition.build_cost)
+	return ""
+
+
+func _commit_placement(key: StringName, origin: Vector2i) -> bool:
 	var definition: BuildingDefinition = definitions.get(key)
 	var instance := BuildingInstance.new()
 	instance.instance_id = _make_instance_id()
@@ -82,6 +109,7 @@ func try_place_building(definition_id: StringName, origin: Vector2i) -> bool:
 	_grid.occupy(instance.cells, instance.instance_id)
 	instances[instance.instance_id] = instance
 	_recompute_capacity()
+	_recompute_build_coverage()
 	building_placed.emit(instance)
 	buildings_changed.emit()
 	return true
@@ -102,6 +130,7 @@ func remove_building(instance_id: StringName) -> bool:
 	_grid.release(instance.cells)
 	instances.erase(instance.instance_id)
 	_recompute_capacity()
+	_recompute_build_coverage()
 	building_removed.emit(instance)
 	buildings_changed.emit()
 	return true
@@ -181,6 +210,42 @@ func _make_instance_id() -> StringName:
 func _recompute_capacity() -> void:
 	if _economy != null:
 		_economy.recompute_capacity(instances, definitions)
+
+
+## 用带 build_range_radius 的建筑重算覆盖范围（欧氏半径，按占地所有格为圆心）。
+func _recompute_build_coverage() -> void:
+	build_coverage.clear()
+	if _grid == null:
+		return
+
+	for instance in instances.values():
+		var definition: BuildingDefinition = definitions.get(instance.definition_id)
+		if definition == null or definition.build_range_radius <= 0:
+			continue
+		var radius := definition.build_range_radius
+		var radius_squared := radius * radius
+		var source_cells: Array[Vector2i] = instance.cells
+		for source_cell in source_cells:
+			for offset_y in range(-radius, radius + 1):
+				for offset_x in range(-radius, radius + 1):
+					if offset_x * offset_x + offset_y * offset_y > radius_squared:
+						continue
+					var cell: Vector2i = source_cell + Vector2i(offset_x, offset_y)
+					if (
+						cell.x < 0
+						or cell.y < 0
+						or cell.x >= _grid.map_width
+						or cell.y >= _grid.map_height
+					):
+						continue
+					build_coverage[cell] = true
+
+
+func _is_footprint_in_range(origin: Vector2i, size: Vector2i) -> bool:
+	for cell in _grid.cells_for_footprint(origin, size):
+		if not build_coverage.has(cell):
+			return false
+	return true
 
 
 func _format_resources(cost: Dictionary) -> String:
