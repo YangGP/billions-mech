@@ -1,0 +1,15 @@
+# Godot 4 编辑器生成内容：导入缓存、全局类缓存、编辑器布局
+.godot/
+*.tmp
+*.translation
+
+# 导出产物
+/build/
+/export/
+
+# 编辑器 / 系统文件
+.vscode/
+.idea/
+*.swp
+Thumbs.db
+desktop.ini

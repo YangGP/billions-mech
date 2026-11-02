@@ -1,0 +1,18 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/world/world.gd" id="1_world"]
+
+[node name="World" type="Node2D"]
+y_sort_enabled = true
+script = ExtResource("1_world")
+
+[node name="Ground" type="TileMapLayer" parent="."]
+
+[node name="Decorations" type="TileMapLayer" parent="."]
+
+[node name="Buildings" type="Node2D" parent="."]
+y_sort_enabled = true
+
+[node name="BuildPreview" type="Node2D" parent="."]
+
+[node name="RegionOverlay" type="Node2D" parent="."]
