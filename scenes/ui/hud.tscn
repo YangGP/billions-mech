@@ -65,10 +65,19 @@ layout_mode = 2
 [node name="BuildingLabel" type="Label" parent="Root/ResourcePanel/Margin/Row"]
 unique_name_in_owner = true
 layout_mode = 2
-text = "建筑 0（占地 0 格）"
+text = "建筑 0 · 占地 0"
 vertical_alignment = 1
 
 [node name="Separator4" type="VSeparator" parent="Root/ResourcePanel/Margin/Row"]
+layout_mode = 2
+
+[node name="CursorLabel" type="Label" parent="Root/ResourcePanel/Margin/Row"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "光标 --"
+vertical_alignment = 1
+
+[node name="Separator5" type="VSeparator" parent="Root/ResourcePanel/Margin/Row"]
 layout_mode = 2
 
 [node name="TimeLabel" type="Label" parent="Root/ResourcePanel/Margin/Row"]
@@ -125,7 +134,7 @@ grow_horizontal = 0
 grow_vertical = 0
 horizontal_alignment = 2
 vertical_alignment = 1
-text = "WASD / 方向键 平移 · 滚轮缩放 · Space 暂停 · Esc 取消（M1-02 接入）"
+text = "WASD / 方向键 平移 · 滚轮缩放 · Space 暂停 · Esc 取消"
 
 [node name="RegionPanel" type="PanelContainer" parent="Root"]
 visible = false

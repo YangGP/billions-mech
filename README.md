@@ -4,7 +4,7 @@
 
 - 设计文档：[区域指挥型生存RTS_设计文档_v0.2.md](区域指挥型生存RTS_设计文档_v0.2.md)
 - 开发指南：[区域指挥生存RTS_基础开发指南_v0.1.md](区域指挥生存RTS_基础开发指南_v0.1.md)
-- 当前阶段：**M1-01 项目骨架已完成**，下一步 M1-02 等距地图与镜头。
+- 当前阶段：**M1-02 等距地图与镜头已完成**，下一步 M1-03 建筑放置。
 
 ## 环境
 
@@ -14,14 +14,18 @@
 | 语言 | GDScript |
 | 渲染 | GL Compatibility |
 | 视口 | 1600 × 900，`canvas_items` 缩放 |
-| 地图 | 32 × 32 逻辑格（`GameState` 可调） |
+| 地图 | 32 × 32 逻辑格，等距菱形 128 × 64 |
+| 经济 tick | 1.0 游戏秒 |
 
 运行方式：用 Godot 打开本目录的 `project.godot`，按 F5；或命令行：
 
 ```powershell
 godot --path .                      # 运行主场景
 godot --headless --path . --import  # 只导入资源
+godot --headless --path . --quit-after 90   # 冒烟校验（无渲染）
 ```
+
+操作：`WASD / 方向键` 平移，`滚轮` 缩放，`Space` 暂停，`Esc` 取消（M1-03 接入）。
 
 ## 目录结构
 
@@ -31,7 +35,7 @@ res://
   icon.svg
   scenes/
     main.tscn                 # 入口：GameState + World + Camera2D + HUD
-    world.tscn                # 视图层：Ground/Decorations/Buildings/BuildPreview/RegionOverlay
+    world.tscn                # Ground/Highlight/Decorations/Buildings/BuildPreview/RegionOverlay
     ui/hud.tscn               # 资源栏、建造菜单占位、区块面板占位
     buildings/                # 建筑视图场景（M1-03）
   scripts/
@@ -48,12 +52,15 @@ res://
     regions/region_system.gd  # 区块划分（M2 数据层，暂不统计）
     ui/
       hud.gd                  # 只读 GameState，通过信号刷新
-      resource_panel.gd       # 顶部资源栏
-    world/world.gd            # 逻辑格 <-> 世界坐标转换
-    input/                    # 建造/镜头输入控制（M1-02、M1-03）
+      resource_panel.gd       # 顶部资源栏 + 光标格子坐标
+    world/
+      world.gd                # 逻辑格 <-> 世界坐标、地面生成、悬停信号
+      cell_highlight.gd       # 悬停格菱形高亮（纯表现）
+      camera_controller.gd    # 平移/缩放/边界钳制
+    input/                    # 建造输入控制（M1-03）
   data/buildings/             # BuildingDefinition .tres（M1-04 填充）
-  tiles/                      # TileSet（M1-02）
-  art/placeholder/            # 占位美术
+  tiles/terrain_tileset.tres  # 等距 TileSet（isometric, 128×64, tile_layout=5）
+  art/placeholder/iso_ground.png  # 128×64 草地菱形（由「临时素材/地块.png」裁切）
   ui/fonts/                   # 中文系统字体（SystemFont，不打包字体文件）
   临时素材/                    # 用户提供的 AI 生成素材原图（1254×1254，待裁切）
 ```
@@ -68,7 +75,7 @@ GameState（唯一真实状态，主场景内持有）
 ├── BuildingSystem    建筑定义、实例、建造/拆除
 └── RegionSystem      区块划分（M2）
 
-视图层：World / HUD
+视图层：World / Camera2D / HUD
   只读 GameState，只接收信号，不修改模拟数据
 ```
 
@@ -90,15 +97,34 @@ GameState（唯一真实状态，主场景内持有）
         → SimulationClock.tick → EconomySystem.process_tick → resources_changed
 ```
 
-## 输入映射
+## 等距坐标（M1-02 已落地）
 
-| 动作 | 默认按键 | 用途 |
-|---|---|---|
-| `camera_left/right/up/down` | A/D/W/S 或方向键 | 镜头平移（M1-02 接入） |
-| `camera_zoom_in/out` | 鼠标滚轮上/下 | 镜头缩放（M1-02 接入） |
-| `cancel_action` | Esc / 鼠标右键 | 取消建造预览（M1-03 接入） |
-| `toggle_region_view` | Tab | 切换区块视图（M2 接入） |
-| `pause_game` | Space | 暂停/继续（已接入） |
+- 地面是 `TileMapLayer`，`TileSet` 为 **Isometric / 128×64**，`tile_layout = 5`。
+  > 必须显式设为 5（标准菱形排布）。默认的 stacked 布局会得到“横向条带”式坐标，
+  > 相机边界与高亮都会错位。
+- 映射由引擎负责，不要在项目里另写等距公式：
+
+  ```gdscript
+  cell_to_world(cell)  → ground.map_to_local(cell) → to_global()
+  mouse_to_cell()      → ground.local_to_map(to_local(鼠标))
+  ```
+
+- `map_to_local()` 返回**格中心**；128×64 瓦片的世界包围盒以该点为中心。
+- 32×32 地图的世界范围约为 `(-1984, -32)` 到 `(2112, 2080)`；相机以四角计算包围盒并外扩半格。
+- 悬停：`World` 每帧做一次 `local_to_map`，变化时更新 `CellHighlight` 并发出
+  `hovered_cell_changed(cell, inside)`，HUD 只负责显示坐标。
+
+坐标往返已用引擎实测（(0,0)/(1,0)/(0,1)/(2,2)/(31,0)/(0,31)/(31,31) 全部还原原格）。
+
+## 地面美术管线
+
+`临时素材/地块.png`（1254×1254，带透明通道）→ `art/placeholder/iso_ground.png`（128×64）：
+
+1. 取绿色草皮区域包围盒（97,345)–(1156,921)，缩放到 128×64；
+2. 用 128×64 菱形遮罩裁掉侧壁与背景，只保留顶面；
+3. 保留少量拼缝（暗线），目前当作建造网格的视觉参考。
+
+后续换正式美术时，保持“128×64、菱形顶面贴合贴图边界”即可直接替换。
 
 ## 新增建筑定义
 
@@ -122,15 +148,24 @@ M1-01（已完成）：
 - [x] 输入映射、暂停与游戏时间显示
 - [x] Git 初始化
 
-M1-02（下一步）：
+M1-02（已完成）：
 
-- [ ] 等距 `TileSet` 与 32×32 `Ground`
-- [ ] WASD 平移、滚轮缩放、相机边界
-- [ ] 鼠标悬停格子高亮与坐标显示
-- [ ] 用 `临时素材/地块.png` 裁切出 128×64 等距地砖
+- [x] 等距 `TileSet` 与 32×32 `Ground`
+- [x] WASD 平移、滚轮缩放、相机边界
+- [x] 鼠标悬停格子高亮与坐标显示
+- [x] 坐标往返校验（引擎实测）
+
+M1-03（下一步）：
+
+- [ ] 1×1 / 2×2 占位建筑场景与 `BuildingView`
+- [ ] 跟随鼠标的合法/非法预览
+- [ ] 左键放置、右键/Esc 取消、拆除
+- [ ] 边界/地形/重叠校验（`GridState` 已就绪）
+- [ ] 建筑 Y 排序与锚点校准
 
 ## 约定
 
 - 脚本文件用 **Tab** 缩进（见 `.editorconfig`），类名与文件名保持一致。
 - 节点/资源 ID 用 `StringName`；资源数量用 `String` 键（`"gold"`、`"wood"`）。
-- 不写测试脚本；每次改动用 `godot --headless --path . --quit-after 120` 验证无报错。
+- 不写测试脚本；每次改动用 `godot --headless --path . --quit-after 90` 验证无报错。
+- 提交前确认 `git status` 不含 `.godot/`。

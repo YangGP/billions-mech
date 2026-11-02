@@ -3,15 +3,23 @@ extends Node2D
 
 @onready var game_state: GameState = $GameState
 @onready var world: World = $World
+@onready var camera: CameraController = $Camera2D
 @onready var hud: HUD = $HUD
 
 
 func _ready() -> void:
-	hud.bind(game_state)
 	world.setup(game_state)
+	hud.bind(game_state)
+	world.hovered_cell_changed.connect(hud.show_cursor_cell)
+	camera.setup(world)
 	print(
-		"Billions Mech 启动：地图 %d×%d，经济 tick %.2f 秒"
-		% [game_state.map_width, game_state.map_height, game_state.clock.tick_seconds]
+		"Billions Mech 启动：地图 %d×%d，经济 tick %.2f 秒，世界范围 %s"
+		% [
+			game_state.map_width,
+			game_state.map_height,
+			game_state.clock.tick_seconds,
+			world.get_map_world_rect(),
+		]
 	)
 
 

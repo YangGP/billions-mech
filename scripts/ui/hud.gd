@@ -30,6 +30,11 @@ func bind(game_state: GameState) -> void:
 	_on_paused_changed(game_state.clock.paused)
 
 
+## 由 World 的悬停信号驱动，显示当前逻辑格坐标。
+func show_cursor_cell(cell: Vector2i, inside: bool) -> void:
+	resource_panel.display_cursor_cell(cell, inside)
+
+
 func _on_resources_changed(resources: Dictionary) -> void:
 	resource_panel.display_resources(resources)
 

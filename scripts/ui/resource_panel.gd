@@ -9,6 +9,7 @@ signal pause_requested()
 @onready var _wood_label: Label = %WoodLabel
 @onready var _worker_label: Label = %WorkerLabel
 @onready var _building_label: Label = %BuildingLabel
+@onready var _cursor_label: Label = %CursorLabel
 @onready var _time_label: Label = %TimeLabel
 @onready var _pause_button: Button = %PauseButton
 
@@ -29,7 +30,14 @@ func display_capacity(economy: EconomySystem) -> void:
 
 
 func display_buildings(count: int, occupied_cells: int) -> void:
-	_building_label.text = "建筑 %d（占地 %d 格）" % [count, occupied_cells]
+	_building_label.text = "建筑 %d · 占地 %d" % [count, occupied_cells]
+
+
+func display_cursor_cell(cell: Vector2i, inside: bool) -> void:
+	if inside:
+		_cursor_label.text = "光标 (%d, %d)" % [cell.x, cell.y]
+	else:
+		_cursor_label.text = "光标 --"
 
 
 func display_time(seconds: float) -> void:
