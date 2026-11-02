@@ -2,9 +2,11 @@
 
 以《亿万僵尸》式基地经济为起点、后续叠加区块指挥视图的 2D 等距 RTS 原型。
 
+![M1-03 建造预览](docs/screenshots/m1-03.png)
+
 - 设计文档：[区域指挥型生存RTS_设计文档_v0.2.md](区域指挥型生存RTS_设计文档_v0.2.md)
 - 开发指南：[区域指挥生存RTS_基础开发指南_v0.1.md](区域指挥生存RTS_基础开发指南_v0.1.md)
-- 当前阶段：**M1-02 等距地图与镜头已完成**，下一步 M1-03 建筑放置。
+- 当前阶段：**M1-03 建筑放置完成**，下一步 M1-04 资源与经济。
 
 ## 环境
 
@@ -17,7 +19,7 @@
 | 地图 | 32 × 32 逻辑格，等距菱形 128 × 64 |
 | 经济 tick | 1.0 游戏秒 |
 
-运行方式：用 Godot 打开本目录的 `project.godot`，按 F5；或命令行：
+运行：双击 [run.bat](run.bat)，或命令行：
 
 ```powershell
 godot --path .                      # 运行主场景
@@ -25,147 +27,148 @@ godot --headless --path . --import  # 只导入资源
 godot --headless --path . --quit-after 90   # 冒烟校验（无渲染）
 ```
 
-操作：`WASD / 方向键` 平移，`滚轮` 缩放，`Space` 暂停，`Esc` 取消（M1-03 接入）。
+## 操作
+
+| 操作 | 效果 |
+|---|---|
+| `WASD` / 方向键 | 平移镜头 |
+| 鼠标滚轮 | 缩放（0.45×–3×） |
+| `1` / `2` 或点击建造菜单 | 选择房屋 / 伐木场 |
+| 左键 | 放置（保持选中，可连续建造） |
+| 右键 / `Esc` | 取消当前建造 |
+| 右键（未选建筑时） | 拆除光标下建筑，不返还资源 |
+| `Space` | 暂停 / 继续 |
 
 ## 目录结构
 
 ```text
 res://
+  run.bat                     # 双击启动（透传参数给 godot）
   project.godot
-  icon.svg
   scenes/
-    main.tscn                 # 入口：GameState + World + Camera2D + HUD
+    main.tscn                 # GameState + World + Camera2D + HUD + BuildController
     world.tscn                # Ground/Highlight/Decorations/Buildings/BuildPreview/RegionOverlay
-    ui/hud.tscn               # 资源栏、建造菜单占位、区块面板占位
-    buildings/                # 建筑视图场景（M1-03）
+    ui/hud.tscn               # 资源栏、建造菜单、区块面板占位
+    world/build_preview.tscn  # 建造预览（贴图 + 占地菱形）
+    buildings/building_view.tscn
   scripts/
-    main.gd                   # 装配与全局输入
-    core/
-      game_state.gd           # 唯一世界状态持有者 / 系统装配
-      grid_state.gd           # 二维逻辑网格、占地、地形阻挡
-      simulation_clock.gd     # 固定步长模拟时钟（暂停/倍速）
-    economy/economy_system.gd # 库存资源 + 容量约束 + 周期结算
+    main.gd
+    core/                     # game_state / grid_state / simulation_clock
+    economy/economy_system.gd
     buildings/
-      building_definition.gd  # 建筑静态定义（.tres）
-      building_instance.gd    # 建筑运行时实例（纯数据）
-      building_system.gd      # 建造/拆除唯一入口
-    regions/region_system.gd  # 区块划分（M2 数据层，暂不统计）
+      building_definition.gd  # 静态定义（.tres）
+      building_instance.gd    # 运行时实例（纯数据）
+      building_system.gd      # 校验、扣费、占格、拆除
+      building_view.gd        # 单栋建筑视觉
+    input/build_controller.gd # 建造输入：选型/预览/放置/拆除
     ui/
-      hud.gd                  # 只读 GameState，通过信号刷新
-      resource_panel.gd       # 顶部资源栏 + 光标格子坐标
+      hud.gd
+      resource_panel.gd
+      build_palette.gd        # 由 BuildingDefinition 动态生成按钮
     world/
-      world.gd                # 逻辑格 <-> 世界坐标、地面生成、悬停信号
-      cell_highlight.gd       # 悬停格菱形高亮（纯表现）
-      camera_controller.gd    # 平移/缩放/边界钳制
-    input/                    # 建造输入控制（M1-03）
-  data/buildings/             # BuildingDefinition .tres（M1-04 填充）
-  tiles/terrain_tileset.tres  # 等距 TileSet（isometric, 128×64, tile_layout=5）
-  art/placeholder/iso_ground.png  # 128×64 草地菱形（由「临时素材/地块.png」裁切）
-  ui/fonts/                   # 中文系统字体（SystemFont，不打包字体文件）
-  临时素材/                    # 用户提供的 AI 生成素材原图（1254×1254，待裁切）
+      world.gd                # 坐标、地面、建筑视图生命周期、悬停信号
+      cell_highlight.gd
+      camera_controller.gd
+      build_preview.gd
+    regions/region_system.gd  # M2 区块划分
+  data/buildings/
+    house.tres                # 1×1，住房 + 金币
+    lumberyard.tres           # 2×2，工人 + 木材
+  tiles/terrain_tileset.tres  # Isometric, 128×64, tile_layout=5
+  art/placeholder/
+    iso_ground.png            # 128×64 草地菱形
+    buildings/house.png       # 145×148
+    buildings/lumberyard.png  # 262×237
+  docs/screenshots/m1-03.png
+  ui/fonts/system_cjk_font.tres
+  临时素材/                    # 用户提供的原图（1254×1254）
 ```
 
 ## 架构约定
 
 ```text
-GameState（唯一真实状态，主场景内持有）
+GameState（唯一真实状态）
 ├── SimulationClock   固定 tick，驱动经济结算
 ├── GridState         逻辑格、占地、地形阻挡
 ├── EconomySystem     库存（金币/木材）+ 容量（工人/食物/能源）
-├── BuildingSystem    建筑定义、实例、建造/拆除
+├── BuildingSystem    定义、实例、校验、建造/拆除
 └── RegionSystem      区块划分（M2）
 
-视图层：World / Camera2D / HUD
-  只读 GameState，只接收信号，不修改模拟数据
+视图层：World / Camera2D / HUD / BuildController
+  只读 GameState，接收信号；输入只调用 BuildingSystem 的公开接口
 ```
 
-必须遵守的几条：
+必须遵守：
 
-1. **二维逻辑网格是唯一空间真相。** 建筑占地只看 `origin_cell + footprint`，不看贴图尺寸。
-2. **数据先于表现。** 建造/拆除先改 `GridState` 与 `instances`，再发信号让视图创建/销毁节点；视图不得先行动画。
-3. **统一命令入口。** 手动建造与未来的规划层都调用 `BuildingSystem.try_place_building()` / `remove_building()`；UI 不自行判断合法性、不直接改资源。
-4. **经济按模拟时间结算。** 收益只在 `SimulationClock.tick` 里由 `EconomySystem.process_tick()` 计算，禁止在 `_process(delta)` 里按帧累加。
+1. **二维逻辑网格是唯一空间真相。** 占地只看 `origin_cell + footprint`，不看贴图尺寸。
+2. **数据先于表现。** `BuildingSystem` 先写 `GridState` / `instances` 并发信号，`World` 才创建/销毁 `BuildingView`。
+3. **统一命令入口。** 手动建造与未来规划层都调用 `try_place_building()` / `remove_building()`；预览调用只读的 `get_placement_error()`，共用同一套规则。
+4. **经济按模拟时间结算。** 收益只在 `SimulationClock.tick` 里由 `EconomySystem.process_tick()` 计算。
 5. **容量与库存分开。** 金币/木材是库存；工人/食物/能源是“供给 vs 占用”的容量约束。
-6. **区块不产生经济。** `RegionSystem` 只做格到区的映射与聚合，M2 的统计必须从建筑实例读取。
+6. **区块不产生经济。** M2 的统计必须从建筑实例聚合。
 
-数据流：
+## 等距坐标与建筑锚点
 
-```text
-玩家输入 → BuildingSystem（校验 → 扣费 → 占格 → 实例）
-        → 信号 buildings_changed / resources_changed / capacity_changed
-        → HUD 刷新显示（World 创建/销毁 BuildingView）
-        → SimulationClock.tick → EconomySystem.process_tick → resources_changed
-```
-
-## 等距坐标（M1-02 已落地）
-
-- 地面是 `TileMapLayer`，`TileSet` 为 **Isometric / 128×64**，`tile_layout = 5`。
-  > 必须显式设为 5（标准菱形排布）。默认的 stacked 布局会得到“横向条带”式坐标，
-  > 相机边界与高亮都会错位。
-- 映射由引擎负责，不要在项目里另写等距公式：
-
-  ```gdscript
-  cell_to_world(cell)  → ground.map_to_local(cell) → to_global()
-  mouse_to_cell()      → ground.local_to_map(to_local(鼠标))
+- `TileSet`：**Isometric / 128×64 / `tile_layout = 5`**。必须显式设为 5（标准菱形排布）；默认 stacked 会得到横向条带坐标。
+- `map_to_local()` 返回格中心；32×32 地图世界范围约 `(-1984, -32) ~ (2112, 2080)`。
+- 建筑占地块的前角（最下方顶点）：
+  ```text
+  anchor = cell_to_world(origin + footprint - 1) + (0, 32)
+  ```
+  贴图以底边中点对齐 anchor，节点 y 即用于 Y 排序；2×2 的 anchor 比 1×1 再低 32 像素。
+- 建造预览的占地菱形直接由 footprint 推导：
+  ```text
+  bottom = (0, 0)
+  right  = (sy*64, -sy*32)
+  top    = ((sy-sx)*64, -(sx+sy)*32)
+  left   = (-sx*64, -sx*32)
   ```
 
-- `map_to_local()` 返回**格中心**；128×64 瓦片的世界包围盒以该点为中心。
-- 32×32 地图的世界范围约为 `(-1984, -32)` 到 `(2112, 2080)`；相机以四角计算包围盒并外扩半格。
-- 悬停：`World` 每帧做一次 `local_to_map`，变化时更新 `CellHighlight` 并发出
-  `hovered_cell_changed(cell, inside)`，HUD 只负责显示坐标。
+## 地面与建筑美术管线
 
-坐标往返已用引擎实测（(0,0)/(1,0)/(0,1)/(2,2)/(31,0)/(0,31)/(31,31) 全部还原原格）。
+`临时素材/*.png`（1254×1254，透明背景）→ 裁切 alpha 包围盒 → 缩放：
 
-## 地面美术管线
+| 资产 | 处理 | 游戏内尺寸 |
+|---|---|---|
+| 地块 | 草皮包围盒 + 128×64 菱形遮罩 | 128×64 |
+| 房屋 | 内容宽 → 145（底宽≈1 格） | 145×148 |
+| 伐木场 | 内容宽 → 262（底宽≈2 格） | 262×237 |
 
-`临时素材/地块.png`（1254×1254，带透明通道）→ `art/placeholder/iso_ground.png`（128×64）：
+建筑贴图的底边中点 = 占地前角；换正式美术时保持这一锚点即可。
 
-1. 取绿色草皮区域包围盒（97,345)–(1156,921)，缩放到 128×64；
-2. 用 128×64 菱形遮罩裁掉侧壁与背景，只保留顶面；
-3. 保留少量拼缝（暗线），目前当作建造网格的视觉参考。
+## 新增建筑
 
-后续换正式美术时，保持“128×64、菱形顶面贴合贴图边界”即可直接替换。
-
-## 新增建筑定义
-
-在 `data/buildings/` 下新建 `.tres`，类型选 `BuildingDefinition`，必填 `building_id`、`display_name`、`footprint`，其余按需：
+在 `data/buildings/` 新建 `BuildingDefinition` 资源，必填 `building_id`、`display_name`、`footprint`、`texture`：
 
 - `build_cost` / `upkeep_per_tick` / `output_per_tick`：例 `{"gold": 20, "wood": 10}`
-- `housing_capacity` / `required_workers`：工人容量与占用
-- `food_capacity` / `food_demand`：食物供给与需求
-- `energy_supply` / `energy_demand`：能源供给与需求
-- `build_range_radius`：扩张设施的建设范围（M1-05）
+- `housing_capacity` / `required_workers`
+- `food_capacity` / `food_demand`
+- `energy_supply` / `energy_demand`
+- `build_range_radius`（M1-05）
+- `sprite_scale` / `sprite_offset`：贴图微调
 
-`BuildingSystem` 启动时会自动扫描该目录，按 `building_id` 注册。
+`BuildingSystem` 启动时扫描该目录并按 `building_id` 排序；建造菜单与 `1/2/3` 热键自动跟随定义数量。
 
 ## 已完成 / 下一步
 
-M1-01（已完成）：
+M1-01（已完成）：项目骨架、GameState、场景、输入、Git。
 
-- [x] Godot 项目、目录结构、主场景可运行
-- [x] `GameState` 集中装配时钟/网格/经济/建筑/区块
-- [x] `Main` / `World` / `HUD` 场景与信号绑定
-- [x] 输入映射、暂停与游戏时间显示
-- [x] Git 初始化
+M1-02（已完成）：等距 TileSet、32×32 地面、镜头平移/缩放/边界、悬停高亮与坐标。
 
-M1-02（已完成）：
+M1-03（已完成）：
 
-- [x] 等距 `TileSet` 与 32×32 `Ground`
-- [x] WASD 平移、滚轮缩放、相机边界
-- [x] 鼠标悬停格子高亮与坐标显示
-- [x] 坐标往返校验（引擎实测）
+- [x] 1×1 房屋、2×2 伐木场
+- [x] 跟随鼠标的预览，合法绿 / 非法红 + 占地菱形
+- [x] 左键放置、右键/Esc 取消、右键拆除
+- [x] 边界/重叠/资源校验，失败不扣费、不占格
+- [x] 建筑底边锚点与 Y 排序
+- [x] 实测：重叠/越界被拒绝；拆除后占地归零；可重复建造
 
-M1-03（下一步）：
-
-- [ ] 1×1 / 2×2 占位建筑场景与 `BuildingView`
-- [ ] 跟随鼠标的合法/非法预览
-- [ ] 左键放置、右键/Esc 取消、拆除
-- [ ] 边界/地形/重叠校验（`GridState` 已就绪）
-- [ ] 建筑 Y 排序与锚点校准
+M1-04（下一步）：指挥中心初始建筑、资源 UI 速率、经济 tick 产出/维护、食物与能源容量、拆除后容量回退。
 
 ## 约定
 
-- 脚本文件用 **Tab** 缩进（见 `.editorconfig`），类名与文件名保持一致。
-- 节点/资源 ID 用 `StringName`；资源数量用 `String` 键（`"gold"`、`"wood"`）。
-- 不写测试脚本；每次改动用 `godot --headless --path . --quit-after 90` 验证无报错。
+- 脚本用 **Tab** 缩进；类名与文件名一致。
+- 节点/资源 ID 用 `StringName`；资源键用 `String`（`"gold"`、`"wood"`）。
+- 不写测试脚本；改动用 `godot --headless --path . --quit-after 90` 验证无报错。
 - 提交前确认 `git status` 不含 `.godot/`。

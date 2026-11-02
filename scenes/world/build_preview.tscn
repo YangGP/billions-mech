@@ -1,0 +1,14 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/world/build_preview.gd" id="1_preview"]
+
+[node name="BuildPreview" type="Node2D"]
+z_index = 2
+script = ExtResource("1_preview")
+
+[node name="Footprint" type="Polygon2D" parent="."]
+
+[node name="Ghost" type="Sprite2D" parent="."]
+
+[node name="Outline" type="Line2D" parent="."]
+width = 2.0

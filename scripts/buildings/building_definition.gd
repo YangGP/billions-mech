@@ -18,6 +18,13 @@ extends Resource
 ## 以逻辑格为单位的占地大小，与建筑图片像素尺寸无关。
 @export var footprint: Vector2i = Vector2i.ONE
 
+@export_group("视觉")
+## 占位贴图：底边中点对齐占地菱形的前角。
+@export var texture: Texture2D
+@export var sprite_scale: float = 1.0
+## 贴图相对锚点的微调偏移（像素），正常情况下保持零。
+@export var sprite_offset: Vector2 = Vector2.ZERO
+
 @export_group("经济")
 @export var build_cost: Dictionary = {}
 @export var upkeep_per_tick: Dictionary = {}
@@ -39,4 +46,10 @@ func get_cell_count() -> int:
 
 
 func is_valid() -> bool:
-	return building_id != &"" and display_name != "" and footprint.x > 0 and footprint.y > 0
+	return (
+		building_id != &""
+		and display_name != ""
+		and footprint.x > 0
+		and footprint.y > 0
+		and texture != null
+	)

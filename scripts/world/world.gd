@@ -8,21 +8,30 @@ extends Node2D
 signal hovered_cell_changed(cell: Vector2i, inside: bool)
 
 const INVALID_CELL := Vector2i(-1, -1)
+const TILE_WIDTH: float = 128.0
+const TILE_HEIGHT: float = 64.0
+const BUILDING_VIEW_SCENE: PackedScene = preload("res://scenes/buildings/building_view.tscn")
 
 @onready var ground: TileMapLayer = $Ground
 @onready var highlight: CellHighlight = $Highlight
 @onready var decorations: TileMapLayer = $Decorations
 @onready var buildings_root: Node2D = $Buildings
-@onready var build_preview: Node2D = $BuildPreview
+@onready var build_preview: BuildPreview = $BuildPreview
 @onready var region_overlay: Node2D = $RegionOverlay
 
 var _game_state: GameState
 var _hovered_cell: Vector2i = INVALID_CELL
+var _building_views: Dictionary = {}
 
 
 func setup(game_state: GameState) -> void:
 	_game_state = game_state
 	_build_ground()
+
+	game_state.buildings.building_placed.connect(_on_building_placed)
+	game_state.buildings.building_removed.connect(_on_building_removed)
+	for instance in game_state.buildings.instances.values():
+		_spawn_building_view(instance)
 
 
 func _process(_delta: float) -> void:
@@ -57,6 +66,12 @@ func cell_to_world(cell: Vector2i) -> Vector2:
 	return ground.to_global(ground.map_to_local(cell))
 
 
+## 建筑视觉锚点：占地块菱形的最前端（最下方）顶点，也是 Y 排序使用的接地点。
+func get_footprint_anchor(origin: Vector2i, size: Vector2i) -> Vector2:
+	var last_cell := origin + size - Vector2i.ONE
+	return cell_to_world(last_cell) + Vector2(0.0, TILE_HEIGHT * 0.5)
+
+
 ## 地图在全局坐标中的矩形范围，供相机边界限制使用。
 ## 等距菱形地图的极值在四个角上，不能只取左上/右下两格。
 func get_map_world_rect() -> Rect2:
@@ -76,6 +91,25 @@ func get_map_world_rect() -> Rect2:
 		rect = rect.expand(corner)
 	# 菱形瓦片的四个角会超出中心点包围盒，按半格宽高外扩。
 	return rect.grow(64.0)
+
+
+func _spawn_building_view(instance: BuildingInstance) -> void:
+	var definition := _game_state.buildings.get_definition(instance.definition_id)
+	var view := BUILDING_VIEW_SCENE.instantiate() as BuildingView
+	buildings_root.add_child(view)
+	view.setup(instance, definition, get_footprint_anchor(instance.origin_cell, instance.footprint))
+	_building_views[instance.instance_id] = view
+
+
+func _on_building_placed(instance: BuildingInstance) -> void:
+	_spawn_building_view(instance)
+
+
+func _on_building_removed(instance: BuildingInstance) -> void:
+	var view: BuildingView = _building_views.get(instance.instance_id)
+	if view != null:
+		view.queue_free()
+	_building_views.erase(instance.instance_id)
 
 
 func _build_ground() -> void:

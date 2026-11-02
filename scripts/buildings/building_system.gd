@@ -33,25 +33,34 @@ func setup(grid: GridState, economy: EconomySystem) -> void:
 	_load_definitions()
 
 
-## 统一的建造入口：全部校验通过后才扣费并写入占地，失败不产生半成品状态。
-func try_place_building(definition_id: StringName, origin: Vector2i) -> bool:
-	last_error = ""
+## 只做校验、不修改任何状态；供预览和 try_place_building 共用同一套规则。
+func get_placement_error(definition_id: StringName, origin: Vector2i) -> String:
 	if _grid == null or _economy == null:
-		last_error = "建筑系统尚未初始化"
-		return false
+		return "建筑系统尚未初始化"
 
 	var key := StringName(definition_id)
 	var definition: BuildingDefinition = definitions.get(key)
 	if definition == null:
-		last_error = "未知建筑类型：%s" % key
-		return false
+		return "未知建筑类型：%s" % key
 	if not _grid.can_place(origin, definition.footprint):
-		last_error = "无法放置：越界、地形阻挡或已被占用"
-		return false
+		return "无法放置：越界、地形阻挡或已被占用"
 	if not _economy.can_afford(definition.build_cost):
-		last_error = "资源不足：%s" % _format_resources(definition.build_cost)
+		return "资源不足：%s" % _format_resources(definition.build_cost)
+	return ""
+
+
+func can_place_building(definition_id: StringName, origin: Vector2i) -> bool:
+	return get_placement_error(definition_id, origin) == ""
+
+
+## 统一的建造入口：全部校验通过后才扣费并写入占地，失败不产生半成品状态。
+func try_place_building(definition_id: StringName, origin: Vector2i) -> bool:
+	var key := StringName(definition_id)
+	last_error = get_placement_error(key, origin)
+	if last_error != "":
 		return false
 
+	var definition: BuildingDefinition = definitions.get(key)
 	var instance := BuildingInstance.new()
 	instance.instance_id = _make_instance_id()
 	instance.definition_id = key
@@ -95,7 +104,12 @@ func get_definitions() -> Array[BuildingDefinition]:
 	var result: Array[BuildingDefinition] = []
 	for key in definitions:
 		result.append(definitions[key])
+	result.sort_custom(_sort_definitions)
 	return result
+
+
+func _sort_definitions(a: BuildingDefinition, b: BuildingDefinition) -> bool:
+	return String(a.building_id) < String(b.building_id)
 
 
 func get_building_count() -> int:

@@ -3,8 +3,7 @@ extends CanvasLayer
 ## HUD 只读取 GameState，并通过信号刷新显示；不直接修改资源或建筑数据。
 
 @onready var resource_panel: ResourcePanel = %ResourcePanel
-@onready var hint_label: Label = %HintLabel
-@onready var build_palette: PanelContainer = %BuildPalette
+@onready var build_palette: BuildPalette = %BuildPalette
 
 var _game_state: GameState
 
@@ -33,6 +32,11 @@ func bind(game_state: GameState) -> void:
 ## 由 World 的悬停信号驱动，显示当前逻辑格坐标。
 func show_cursor_cell(cell: Vector2i, inside: bool) -> void:
 	resource_panel.display_cursor_cell(cell, inside)
+
+
+## 建造提示 / 错误原因，显示在建造菜单内。
+func set_status(text: String) -> void:
+	build_palette.set_status(text)
 
 
 func _on_resources_changed(resources: Dictionary) -> void:

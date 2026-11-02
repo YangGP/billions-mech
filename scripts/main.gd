@@ -5,6 +5,7 @@ extends Node2D
 @onready var world: World = $World
 @onready var camera: CameraController = $Camera2D
 @onready var hud: HUD = $HUD
+@onready var build_controller: BuildController = $BuildController
 
 
 func _ready() -> void:
@@ -12,6 +13,8 @@ func _ready() -> void:
 	hud.bind(game_state)
 	world.hovered_cell_changed.connect(hud.show_cursor_cell)
 	camera.setup(world)
+	build_controller.setup(game_state, world, hud)
+
 	print(
 		"Billions Mech 启动：地图 %d×%d，经济 tick %.2f 秒，世界范围 %s"
 		% [
