@@ -13,6 +13,17 @@ var _world: World
 var _game_state: GameState
 
 
+## 只有进入建造模式时才显示覆盖范围。
+func _ready() -> void:
+	visible = false
+
+
+func set_active(active: bool) -> void:
+	visible = active
+	if active:
+		queue_redraw()
+
+
 func setup(world: World, game_state: GameState) -> void:
 	_world = world
 	_game_state = game_state

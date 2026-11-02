@@ -18,6 +18,7 @@ func setup(game_state: GameState, world: World, hud: HUD) -> void:
 
 	hud.build_palette.building_selected.connect(select_definition)
 	hud.build_palette.setup(game_state.buildings.get_buildable_definitions())
+	world.build_range_overlay.set_active(false)
 	hud.set_status("选择建筑开始建造；右键拆除建筑")
 
 
@@ -27,6 +28,7 @@ func select_definition(definition_id: StringName) -> void:
 		return
 	_selected = definition
 	_hud.build_palette.set_selected(definition_id)
+	_world.build_range_overlay.set_active(true)
 	_hud.set_status("放置 %s：左键确定，右键/Esc 取消" % definition.display_name)
 	_update_preview()
 
@@ -34,6 +36,7 @@ func select_definition(definition_id: StringName) -> void:
 func cancel() -> void:
 	_selected = null
 	_world.build_preview.hide_preview()
+	_world.build_range_overlay.set_active(false)
 	_hud.build_palette.clear_selection()
 	_hud.set_status("选择建筑开始建造；右键拆除建筑")
 
