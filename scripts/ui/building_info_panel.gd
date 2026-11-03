@@ -74,6 +74,10 @@ func _format_definition(
 		for line in capacity_lines:
 			lines.append("· " + line)
 
+	if not definition.storage_capacity.is_empty():
+		lines.append("")
+		lines.append("仓储：%s" % _format_resources(definition.storage_capacity))
+
 	if definition.max_hp > 0:
 		lines.append("")
 		if instance != null:

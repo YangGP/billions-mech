@@ -7,6 +7,7 @@ signal pause_requested()
 signal speed_requested()
 
 const DEFICIT_COLOR := Color(1.0, 0.45, 0.45)
+const FULL_COLOR := Color(1.0, 0.82, 0.4)
 
 @onready var _gold_label: Label = %GoldLabel
 @onready var _wood_label: Label = %WoodLabel
@@ -28,11 +29,13 @@ func _ready() -> void:
 	display_time(0.0)
 
 
-func display_resources(resources: Dictionary, rates: Dictionary = {}) -> void:
-	_gold_label.text = _format_stock("金币", resources, rates, "gold")
-	_wood_label.text = _format_stock("木材", resources, rates, "wood")
-	_gold_label.modulate = DEFICIT_COLOR if int(resources.get("gold", 0)) < 0 else Color.WHITE
-	_wood_label.modulate = DEFICIT_COLOR if int(resources.get("wood", 0)) < 0 else Color.WHITE
+func display_resources(
+	resources: Dictionary, rates: Dictionary = {}, capacities: Dictionary = {}
+) -> void:
+	_gold_label.text = _format_stock("金币", resources, rates, capacities, "gold")
+	_wood_label.text = _format_stock("木材", resources, rates, capacities, "wood")
+	_gold_label.modulate = _stock_color(resources, capacities, "gold")
+	_wood_label.modulate = _stock_color(resources, capacities, "wood")
 
 
 func display_capacity(economy: EconomySystem) -> void:
@@ -82,14 +85,33 @@ func set_speed_text(text: String) -> void:
 
 
 func _format_stock(
-	label: String, resources: Dictionary, rates: Dictionary, resource_id: String
+	label: String,
+	resources: Dictionary,
+	rates: Dictionary,
+	capacities: Dictionary,
+	resource_id: String
 ) -> String:
 	var amount := int(resources.get(resource_id, 0))
+	var capacity := int(capacities.get(resource_id, 0))
+	var stock_text := str(amount)
+	if capacity > 0:
+		stock_text = "%d/%d" % [amount, capacity]
+
 	var rate := int(rates.get(resource_id, 0))
 	if rate == 0:
-		return "%s %d" % [label, amount]
+		return "%s %s" % [label, stock_text]
 	var rate_text := (" (+%d)" % rate) if rate > 0 else (" (%d)" % rate)
-	return "%s %d%s" % [label, amount, rate_text]
+	return "%s %s%s" % [label, stock_text, rate_text]
+
+
+func _stock_color(resources: Dictionary, capacities: Dictionary, resource_id: String) -> Color:
+	var amount := int(resources.get(resource_id, 0))
+	var capacity := int(capacities.get(resource_id, 0))
+	if amount < 0:
+		return DEFICIT_COLOR
+	if capacity > 0 and amount >= capacity:
+		return FULL_COLOR
+	return Color.WHITE
 
 
 func _on_pause_pressed() -> void:

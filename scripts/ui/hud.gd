@@ -96,7 +96,11 @@ func hide_region_stats() -> void:
 func _on_resources_changed(resources: Dictionary) -> void:
 	if _game_state == null:
 		return
-	resource_panel.display_resources(resources, _game_state.economy.get_net_rates())
+	resource_panel.display_resources(
+		resources,
+		_game_state.economy.get_net_rates(),
+		_game_state.economy.storage_capacity
+	)
 
 
 func _on_capacity_changed() -> void:
@@ -105,7 +109,8 @@ func _on_capacity_changed() -> void:
 	resource_panel.display_capacity(_game_state.economy)
 	resource_panel.display_resources(
 		_game_state.economy.get_resources(),
-		_game_state.economy.get_net_rates()
+		_game_state.economy.get_net_rates(),
+		_game_state.economy.storage_capacity
 	)
 
 

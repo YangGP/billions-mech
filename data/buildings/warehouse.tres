@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="BuildingDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/buildings/building_definition.gd" id="1_script"]
+[ext_resource type="Texture2D" path="res://art/placeholder/buildings/warehouse.png" id="2_texture"]
+
+[resource]
+script = ExtResource("1_script")
+building_id = &"warehouse"
+display_name = "仓库"
+description = "2×2 占地，提高金币与木材的存储上限；不消耗工人或能源。"
+texture = ExtResource("2_texture")
+palette_order = 45
+footprint = Vector2i(2, 2)
+build_cost = {
+"gold": 80,
+"wood": 100
+}
+max_hp = 200
+operation_priority = 50
+storage_capacity = {
+"gold": 700,
+"wood": 700
+}

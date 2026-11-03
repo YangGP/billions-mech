@@ -45,6 +45,8 @@ extends Resource
 @export var food_demand: int = 0
 @export var energy_supply: int = 0
 @export var energy_demand: int = 0
+## 仓储上限增量，例：{"gold": 700, "wood": 700}。
+@export var storage_capacity: Dictionary = {}
 
 @export_group("运营")
 ## 供给不足时的保障优先级，数值越大越优先（防御 > 食物 > 核心 > 木材 > 住房）。

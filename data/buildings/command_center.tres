@@ -26,3 +26,7 @@ build_range_radius = 6
 max_hp = 1000
 is_core = true
 operation_priority = 70
+storage_capacity = {
+"gold": 800,
+"wood": 400
+}

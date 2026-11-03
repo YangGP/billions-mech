@@ -24,7 +24,7 @@ unique_name_in_owner = true
 layout_mode = 0
 offset_left = 16.0
 offset_top = 16.0
-offset_right = 1200.0
+offset_right = 1584.0
 offset_bottom = 64.0
 script = ExtResource("2_resource_panel")
 
@@ -42,7 +42,7 @@ theme_override_constants/separation = 12
 [node name="GoldLabel" type="Label" parent="Root/ResourcePanel/Margin/Row"]
 unique_name_in_owner = true
 layout_mode = 2
-tooltip_text = "库存（每 tick 净变化）"
+tooltip_text = "库存/上限；满仓时产出溢出"
 text = "金币 0"
 vertical_alignment = 1
 
@@ -52,6 +52,7 @@ layout_mode = 2
 [node name="WoodLabel" type="Label" parent="Root/ResourcePanel/Margin/Row"]
 unique_name_in_owner = true
 layout_mode = 2
+tooltip_text = "库存/上限；满仓时产出溢出"
 text = "木材 0"
 vertical_alignment = 1
 
@@ -145,7 +146,7 @@ anchors_preset = 2
 anchor_top = 1.0
 anchor_bottom = 1.0
 offset_left = 16.0
-offset_top = -396.0
+offset_top = -420.0
 offset_right = 336.0
 offset_bottom = -16.0
 grow_vertical = 0
@@ -186,7 +187,7 @@ autowrap_mode = 2
 [node name="PaletteHint" type="Label" parent="Root/BuildPalette/Margin/Column"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 12
-text = "1-6 选择 · 右键拆除 · Esc 取消"
+text = "1-7 选择 · 右键拆除 · Esc 取消"
 modulate = Color(0.75, 0.78, 0.8, 1)
 
 [node name="HintLabel" type="Label" parent="Root"]
@@ -215,9 +216,9 @@ anchors_preset = 1
 anchor_left = 1.0
 anchor_right = 1.0
 offset_left = -392.0
-offset_top = 16.0
+offset_top = 76.0
 offset_right = -16.0
-offset_bottom = 340.0
+offset_bottom = 400.0
 grow_horizontal = 0
 script = ExtResource("5_region")
 
@@ -311,9 +312,9 @@ anchors_preset = 1
 anchor_left = 1.0
 anchor_right = 1.0
 offset_left = -392.0
-offset_top = 80.0
+offset_top = 76.0
 offset_right = -16.0
-offset_bottom = 372.0
+offset_bottom = 368.0
 grow_horizontal = 0
 script = ExtResource("4_info")
 

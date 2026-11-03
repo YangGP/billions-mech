@@ -20,6 +20,8 @@ var energy_supply: int = 0
 var energy_demand: int = 0
 ## 因缺工/缺电/缺食物而完全停产的建筑数。
 var stopped_building_count: int = 0
+## 各库存资源的仓储上限，由指挥中心与仓库汇总；0 表示不限。
+var storage_capacity: Dictionary = {}
 
 ## 每 tick 的资源收入 / 维护费，由 recompute_capacity() 从建筑定义汇总。
 var income_per_tick: Dictionary = {}
@@ -30,6 +32,7 @@ var _net_rates: Dictionary = {}
 
 func setup(initial_resources: Dictionary) -> void:
 	resources.clear()
+	storage_capacity.clear()
 	for key in initial_resources:
 		resources[String(key)] = int(initial_resources[key])
 	_ensure_resource("gold")
@@ -69,6 +72,15 @@ func spend(cost: Dictionary) -> bool:
 	return true
 
 
+func get_storage_capacity(resource_id: String) -> int:
+	return int(storage_capacity.get(resource_id, 0))
+
+
+func is_resource_full(resource_id: String) -> bool:
+	var capacity := get_storage_capacity(resource_id)
+	return capacity > 0 and get_amount(resource_id) >= capacity
+
+
 func get_net_rate(resource_id: String) -> int:
 	return int(_net_rates.get(resource_id, 0))
 
@@ -85,8 +97,16 @@ func process_tick() -> void:
 	var changed: bool = false
 	for resource_id in income_per_tick:
 		var income: int = int(income_per_tick[resource_id])
-		if income != 0:
-			add_resource(String(resource_id), income)
+		if income == 0:
+			continue
+		var key := String(resource_id)
+		var capacity := get_storage_capacity(key)
+		var gain := income
+		if capacity > 0:
+			# 仓库已满时，多出的产出直接溢出。
+			gain = mini(income, maxi(0, capacity - get_amount(key)))
+		if gain != 0:
+			add_resource(key, gain)
 			changed = true
 	for resource_id in upkeep_per_tick:
 		var upkeep: int = int(upkeep_per_tick[resource_id])
@@ -106,6 +126,7 @@ func recompute_capacity(instances: Dictionary, definitions: Dictionary) -> void:
 	var new_food_demand: int = 0
 	var new_energy_supply: int = 0
 	var new_energy_demand: int = 0
+	var new_storage: Dictionary = {}
 
 	for instance in instances.values():
 		var building: BuildingInstance = instance
@@ -118,6 +139,12 @@ func recompute_capacity(instances: Dictionary, definitions: Dictionary) -> void:
 		new_food_demand += definition.food_demand
 		new_energy_supply += definition.energy_supply
 		new_energy_demand += definition.energy_demand
+		for resource_id in definition.storage_capacity:
+			var storage_key := String(resource_id)
+			new_storage[storage_key] = (
+				int(new_storage.get(storage_key, 0))
+				+ int(definition.storage_capacity[resource_id])
+			)
 
 	workers_total = new_workers_total
 	workers_used = new_workers_used
@@ -125,6 +152,7 @@ func recompute_capacity(instances: Dictionary, definitions: Dictionary) -> void:
 	food_demand = new_food_demand
 	energy_supply = new_energy_supply
 	energy_demand = new_energy_demand
+	storage_capacity = new_storage
 
 	_compute_operation(instances, definitions)
 	_rebuild_rates(instances, definitions)
