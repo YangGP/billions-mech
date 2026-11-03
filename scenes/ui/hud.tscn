@@ -59,11 +59,21 @@ vertical_alignment = 1
 [node name="Separator2" type="VSeparator" parent="Root/ResourcePanel/Margin/Row"]
 layout_mode = 2
 
+[node name="PopulationLabel" type="Label" parent="Root/ResourcePanel/Margin/Row"]
+unique_name_in_owner = true
+layout_mode = 2
+tooltip_text = "人口 / 住房；食物不足会饥饿减员"
+text = "人口 5/5"
+vertical_alignment = 1
+
+[node name="Separator2b" type="VSeparator" parent="Root/ResourcePanel/Margin/Row"]
+layout_mode = 2
+
 [node name="WorkerLabel" type="Label" parent="Root/ResourcePanel/Margin/Row"]
 unique_name_in_owner = true
 layout_mode = 2
-tooltip_text = "占用 / 工人容量"
-text = "工人 0/0"
+tooltip_text = "岗位占用 / 当前人口"
+text = "工人 0/5"
 vertical_alignment = 1
 
 [node name="Separator3" type="VSeparator" parent="Root/ResourcePanel/Margin/Row"]

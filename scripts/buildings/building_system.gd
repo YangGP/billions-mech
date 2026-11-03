@@ -199,20 +199,12 @@ func get_building_count() -> int:
 	return instances.size()
 
 
-## 容量检查按“建成后”的总量判断：新增建筑自身的供给也算进去。
+## 容量检查：工人来自当前人口，食物由人口随时间消耗，不在这里卡建造。
 func _get_capacity_error(definition: BuildingDefinition) -> String:
 	var next_workers_used := _economy.workers_used + definition.required_workers
-	var next_workers_total := _economy.workers_total + definition.housing_capacity
-	if next_workers_used > next_workers_total:
+	if next_workers_used > _economy.workers_total:
 		return "工人不足：需要 %d 名工人（当前 %d/%d）" % [
 			definition.required_workers, _economy.workers_used, _economy.workers_total
-		]
-
-	var next_food_demand := _economy.food_demand + definition.food_demand
-	var next_food_supply := _economy.food_supply + definition.food_capacity
-	if next_food_demand > next_food_supply:
-		return "食物不足：需要 %d 食物供给（当前 %d/%d）" % [
-			definition.food_demand, _economy.food_demand, _economy.food_supply
 		]
 
 	var next_energy_demand := _economy.energy_demand + definition.energy_demand

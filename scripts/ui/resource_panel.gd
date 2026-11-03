@@ -11,6 +11,7 @@ const FULL_COLOR := Color(1.0, 0.82, 0.4)
 
 @onready var _gold_label: Label = %GoldLabel
 @onready var _wood_label: Label = %WoodLabel
+@onready var _population_label: Label = %PopulationLabel
 @onready var _worker_label: Label = %WorkerLabel
 @onready var _food_label: Label = %FoodLabel
 @onready var _energy_label: Label = %EnergyLabel
@@ -39,6 +40,11 @@ func display_resources(
 
 
 func display_capacity(economy: EconomySystem) -> void:
+	_population_label.text = "人口 %d/%d" % [economy.population, economy.housing_capacity]
+	_population_label.modulate = (
+		DEFICIT_COLOR if economy.is_starving() else Color.WHITE
+	)
+
 	_worker_label.text = "工人 %d/%d" % [economy.workers_used, economy.workers_total]
 	_worker_label.modulate = (
 		DEFICIT_COLOR if economy.workers_used > economy.workers_total else Color.WHITE

@@ -4,8 +4,8 @@ extends Resource
 ##
 ## 字段语义（M1 简化模型）：
 ## - build_cost / upkeep_per_tick / output_per_tick：库存资源收支（金币、木材……）。
-## - housing_capacity：提供工人容量；required_workers：占用工人。
-## - food_capacity / food_demand：食物供给与需求（容量约束，不是库存）。
+## - housing_capacity：提供住房（人口上限）；required_workers：占用工人岗位。
+## - food_capacity：食物供给；人口的食物需求由 EconomySystem 按人口计算。
 ## - energy_supply / energy_demand：能源供给与需求（容量约束，不是库存）。
 
 @export_group("基础信息")
@@ -42,7 +42,6 @@ extends Resource
 @export var required_workers: int = 0
 @export var housing_capacity: int = 0
 @export var food_capacity: int = 0
-@export var food_demand: int = 0
 @export var energy_supply: int = 0
 @export var energy_demand: int = 0
 ## 仓储上限增量，例：{"gold": 700, "wood": 700}。

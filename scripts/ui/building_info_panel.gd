@@ -54,13 +54,11 @@ func _format_definition(
 
 	var capacity_lines := PackedStringArray()
 	if definition.housing_capacity != 0:
-		capacity_lines.append("工人容量 +%d" % definition.housing_capacity)
+		capacity_lines.append("住房 +%d" % definition.housing_capacity)
 	if definition.required_workers != 0:
 		capacity_lines.append("占用工人 %d" % definition.required_workers)
 	if definition.food_capacity != 0:
 		capacity_lines.append("食物供给 +%d" % definition.food_capacity)
-	if definition.food_demand != 0:
-		capacity_lines.append("食物需求 +%d" % definition.food_demand)
 	if definition.energy_supply != 0:
 		capacity_lines.append("能源供给 +%d" % definition.energy_supply)
 	if definition.energy_demand != 0:

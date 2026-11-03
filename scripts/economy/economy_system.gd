@@ -9,9 +9,21 @@ extends Node
 signal resources_changed(resources: Dictionary)
 signal capacity_changed()
 
+const FOOD_PER_PERSON: float = 0.5
+const POPULATION_GROWTH_TICKS: int = 5
+const POPULATION_STARVATION_TICKS: int = 5
+const MIN_POPULATION: int = 1
+
 var resources: Dictionary = {}
 
+## 人口 / 住房 / 劳动力。
+var population: int = 5
+var housing_capacity: int = 0
+var _growth_progress: int = 0
+var _starvation_progress: int = 0
+
 # 容量类数据：total/supply 为供给，used/demand 为占用（需求总量，不代表都被满足）。
+## workers_total 等于当前人口；住房只决定人口上限。
 var workers_total: int = 0
 var workers_used: int = 0
 var food_supply: int = 0
@@ -30,15 +42,53 @@ var upkeep_per_tick: Dictionary = {}
 var _net_rates: Dictionary = {}
 
 
-func setup(initial_resources: Dictionary) -> void:
+func setup(initial_resources: Dictionary, starting_population: int = 5) -> void:
 	resources.clear()
 	storage_capacity.clear()
+	population = maxi(MIN_POPULATION, starting_population)
+	_growth_progress = 0
+	_starvation_progress = 0
 	for key in initial_resources:
 		resources[String(key)] = int(initial_resources[key])
 	_ensure_resource("gold")
 	_ensure_resource("wood")
 	_rebuild_net_rates()
 	resources_changed.emit(get_resources())
+
+
+## 每个经济 tick 调用一次；人口增长/饥饿减员，返回是否发生变化。
+func population_tick() -> bool:
+	var changed := false
+
+	if housing_capacity > population:
+		var next_demand := ceili(float(population + 1) * FOOD_PER_PERSON)
+		if food_supply >= next_demand:
+			_growth_progress += 1
+			if _growth_progress >= POPULATION_GROWTH_TICKS:
+				_growth_progress = 0
+				population += 1
+				changed = true
+		else:
+			_growth_progress = 0
+	else:
+		_growth_progress = 0
+
+	if food_supply < food_demand:
+		_starvation_progress += 1
+		if _starvation_progress >= POPULATION_STARVATION_TICKS and population > MIN_POPULATION:
+			_starvation_progress = 0
+			population -= 1
+			changed = true
+	else:
+		_starvation_progress = 0
+
+	if changed:
+		food_demand = ceili(float(population) * FOOD_PER_PERSON)
+	return changed
+
+
+func is_starving() -> bool:
+	return food_supply < food_demand
 
 
 func get_resources() -> Dictionary:
@@ -120,10 +170,9 @@ func process_tick() -> void:
 
 ## 建造/拆除/建筑被毁后全量重算：容量、运营状态、每 tick 收支。
 func recompute_capacity(instances: Dictionary, definitions: Dictionary) -> void:
-	var new_workers_total: int = 0
+	var new_housing_capacity: int = 0
 	var new_workers_used: int = 0
 	var new_food_supply: int = 0
-	var new_food_demand: int = 0
 	var new_energy_supply: int = 0
 	var new_energy_demand: int = 0
 	var new_storage: Dictionary = {}
@@ -133,10 +182,9 @@ func recompute_capacity(instances: Dictionary, definitions: Dictionary) -> void:
 		var definition: BuildingDefinition = definitions.get(building.definition_id)
 		if definition == null:
 			continue
-		new_workers_total += definition.housing_capacity
+		new_housing_capacity += definition.housing_capacity
 		new_workers_used += definition.required_workers
 		new_food_supply += definition.food_capacity
-		new_food_demand += definition.food_demand
 		new_energy_supply += definition.energy_supply
 		new_energy_demand += definition.energy_demand
 		for resource_id in definition.storage_capacity:
@@ -146,10 +194,11 @@ func recompute_capacity(instances: Dictionary, definitions: Dictionary) -> void:
 				+ int(definition.storage_capacity[resource_id])
 			)
 
-	workers_total = new_workers_total
+	housing_capacity = new_housing_capacity
+	workers_total = population
 	workers_used = new_workers_used
 	food_supply = new_food_supply
-	food_demand = new_food_demand
+	food_demand = ceili(float(population) * FOOD_PER_PERSON)
 	energy_supply = new_energy_supply
 	energy_demand = new_energy_demand
 	storage_capacity = new_storage

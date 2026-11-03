@@ -14,6 +14,7 @@ signal buildings_changed()
 @export var map_height: int = 32
 @export var economy_tick_seconds: float = 1.0
 @export var starting_resources: Dictionary = {"gold": 500, "wood": 200}
+@export var starting_population: int = 5
 ## 开局自动放置的初始建筑；空字符串表示不放置。
 @export var starting_building_id: StringName = &"command_center"
 
@@ -39,7 +40,7 @@ func _initialize() -> void:
 
 	grid = GridState.new(map_width, map_height)
 	regions.setup(map_width, map_height)
-	economy.setup(starting_resources)
+	economy.setup(starting_resources, starting_population)
 	buildings.setup(grid, economy)
 	_place_starting_building()
 	clock.setup(economy_tick_seconds)
@@ -82,6 +83,8 @@ func get_occupied_cell_count() -> int:
 
 func _on_clock_tick(_tick_index: int) -> void:
 	economy.process_tick()
+	if economy.population_tick():
+		economy.recompute_capacity(buildings.instances, buildings.definitions)
 
 
 func _on_economy_resources_changed(resources: Dictionary) -> void:
