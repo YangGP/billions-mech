@@ -7,15 +7,19 @@ extends Node
 var _game_state: GameState
 var _world: World
 var _hud: HUD
+var _camera: CameraController
 var _selected: BuildingDefinition
 var _last_info_id: StringName = &""
 var input_enabled: bool = true
 
 
-func setup(game_state: GameState, world: World, hud: HUD) -> void:
+func setup(
+	game_state: GameState, world: World, hud: HUD, camera: CameraController
+) -> void:
 	_game_state = game_state
 	_world = world
 	_hud = hud
+	_camera = camera
 
 	hud.build_palette.building_selected.connect(select_definition)
 	hud.build_palette.setup(game_state.buildings.get_buildable_definitions())
@@ -93,11 +97,12 @@ func _unhandled_input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 		elif (
 			event is InputEventMouseButton
-			and event.pressed
+			and not event.pressed
 			and event.button_index == MOUSE_BUTTON_LEFT
 		):
-			_try_place()
-			get_viewport().set_input_as_handled()
+			# 拖动地图时不放置；松开事件继续交给相机重置拖动状态。
+			if not _camera.is_dragging():
+				_try_place()
 		return
 
 	if (

@@ -1,6 +1,6 @@
 class_name CameraController
 extends Camera2D
-## 跟随主相机的 RTS 镜头控制：WASD/方向键平移、滚轮缩放、地图边界限制。
+## 跟随主相机的 RTS 镜头控制：左键拖动 / WASD 平移、滚轮缩放、地图边界限制。
 ##
 ## 相机位置与缩放属于表现层，不写入 GameState。
 
@@ -11,9 +11,16 @@ signal zoom_changed(zoom_value: float)
 @export var zoom_min: float = 0.45
 @export var zoom_max: float = 3.0
 @export var zoom_smoothing: float = 12.0
+## 左键按住后移动超过该像素才视为拖动，避免和点击冲突。
+@export var drag_threshold: float = 6.0
 
 var _target_zoom: float = 1.0
 var _world: World
+var _left_pressed: bool = false
+var _dragging: bool = false
+## 本次左键手势是否为拖动；保持到下一次按下，避免点击处理器与相机顺序不同步。
+var _drag_consumed: bool = false
+var _press_position: Vector2 = Vector2.ZERO
 
 
 func _ready() -> void:
@@ -47,14 +54,56 @@ func _process(delta: float) -> void:
 		var next_zoom := lerpf(zoom.x, _target_zoom, clampf(delta * zoom_smoothing, 0.0, 1.0))
 		zoom = Vector2(next_zoom, next_zoom)
 
+	# 窗口外松开鼠标时收不到 release，这里兜底清理拖动状态。
+	if _left_pressed and not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+		_drag_consumed = _dragging
+		_end_drag()
+
 	_clamp_to_map_limits()
 
 
+## 本次左键手势是否为拖动（松开后仍保持到下一次按下）。
+func is_dragging() -> bool:
+	return _dragging or _drag_consumed
+
+
 func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton:
+		if event.button_index == MOUSE_BUTTON_LEFT:
+			if event.pressed:
+				_left_pressed = true
+				_dragging = false
+				_drag_consumed = false
+				_press_position = event.position
+			else:
+				_drag_consumed = _dragging
+				if _dragging:
+					get_viewport().set_input_as_handled()
+				_end_drag()
+			return
+
+	if event is InputEventMouseMotion and _left_pressed:
+		if not _dragging and (event.position - _press_position).length() >= drag_threshold:
+			_dragging = true
+			Input.set_default_cursor_shape(Input.CURSOR_DRAG)
+
+		if _dragging:
+			# 抓住地图拖动：鼠标向右拖，地图跟随向右，相机世界坐标反向移动。
+			position -= event.relative / zoom.x
+			_clamp_to_map_limits()
+			get_viewport().set_input_as_handled()
+		return
+
 	if event.is_action_pressed("camera_zoom_in"):
 		_set_target_zoom(_target_zoom * zoom_step)
 	elif event.is_action_pressed("camera_zoom_out"):
 		_set_target_zoom(_target_zoom / zoom_step)
+
+
+func _end_drag() -> void:
+	_left_pressed = false
+	_dragging = false
+	Input.set_default_cursor_shape(Input.CURSOR_ARROW)
 
 
 ## Camera2D 的 limit 只在绘制时裁剪，不会修正 position 本身；

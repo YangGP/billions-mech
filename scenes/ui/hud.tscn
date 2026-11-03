@@ -198,7 +198,7 @@ grow_horizontal = 0
 grow_vertical = 0
 horizontal_alignment = 2
 vertical_alignment = 1
-text = "WASD / 方向键 平移 · 滚轮缩放 · Tab 区块视图 · Space 暂停"
+text = "左键拖动 · WASD 平移 · 滚轮缩放 · Tab 区块 · Space 暂停"
 
 [node name="RegionPanel" type="PanelContainer" parent="Root"]
 unique_name_in_owner = true

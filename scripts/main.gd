@@ -17,8 +17,8 @@ func _ready() -> void:
 	hud.bind_threat(game_state.threat)
 	world.bind_threat(game_state.threat)
 	camera.setup(world)
-	build_controller.setup(game_state, world, hud)
-	region_view_controller.setup(game_state, world, hud, build_controller)
+	build_controller.setup(game_state, world, hud, camera)
+	region_view_controller.setup(game_state, world, hud, build_controller, camera)
 
 	print(
 		"Billions Mech 启动：地图 %d×%d，经济 tick %.2f 秒，世界范围 %s"

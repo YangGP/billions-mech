@@ -11,6 +11,7 @@ var _game_state: GameState
 var _world: World
 var _hud: HUD
 var _build_controller: BuildController
+var _camera: CameraController
 
 var active: bool = false
 var selected_region: Vector2i = INVALID_REGION
@@ -21,12 +22,14 @@ func setup(
 	game_state: GameState,
 	world: World,
 	hud: HUD,
-	build_controller: BuildController
+	build_controller: BuildController,
+	camera: CameraController
 ) -> void:
 	_game_state = game_state
 	_world = world
 	_hud = hud
 	_build_controller = build_controller
+	_camera = camera
 	_game_state.buildings.buildings_changed.connect(_on_buildings_changed)
 
 
@@ -50,11 +53,13 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not active:
 		return
 
-	if event is InputEventMouseButton and event.pressed:
+	if event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_LEFT:
-			_select_region_at_mouse()
-			get_viewport().set_input_as_handled()
-		elif event.button_index == MOUSE_BUTTON_RIGHT:
+			# 拖动地图时不选中；松开事件继续交给相机重置拖动状态。
+			if not event.pressed and not _camera.is_dragging():
+				_select_region_at_mouse()
+			return
+		if event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
 			clear_selection()
 			get_viewport().set_input_as_handled()
 		return
