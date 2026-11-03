@@ -1,4 +1,4 @@
-[gd_scene load_steps=11 format=3]
+[gd_scene load_steps=12 format=3]
 
 [ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
 [ext_resource type="PackedScene" path="res://scenes/world.tscn" id="2_world"]
@@ -10,6 +10,7 @@
 [ext_resource type="Script" path="res://scripts/regions/region_system.gd" id="8_regions"]
 [ext_resource type="Script" path="res://scripts/world/camera_controller.gd" id="9_camera"]
 [ext_resource type="Script" path="res://scripts/input/build_controller.gd" id="10_build"]
+[ext_resource type="Script" path="res://scripts/input/region_view_controller.gd" id="11_region"]
 
 [node name="Main" type="Node2D"]
 script = ExtResource("1_main")
@@ -38,3 +39,6 @@ script = ExtResource("9_camera")
 
 [node name="BuildController" type="Node" parent="."]
 script = ExtResource("10_build")
+
+[node name="RegionViewController" type="Node" parent="."]
+script = ExtResource("11_region")

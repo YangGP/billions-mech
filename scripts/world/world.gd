@@ -18,17 +18,19 @@ const BUILDING_VIEW_SCENE: PackedScene = preload("res://scenes/buildings/buildin
 @onready var decorations: TileMapLayer = $Decorations
 @onready var buildings_root: Node2D = $Buildings
 @onready var build_preview: BuildPreview = $BuildPreview
-@onready var region_overlay: Node2D = $RegionOverlay
+@onready var region_overlay: RegionOverlay = $RegionOverlay
 
 var _game_state: GameState
 var _hovered_cell: Vector2i = INVALID_CELL
 var _building_views: Dictionary = {}
+var _hover_highlight_enabled: bool = true
 
 
 func setup(game_state: GameState) -> void:
 	_game_state = game_state
 	_build_ground()
 	build_range_overlay.setup(self, game_state)
+	region_overlay.setup(self, game_state)
 
 	game_state.buildings.building_placed.connect(_on_building_placed)
 	game_state.buildings.building_removed.connect(_on_building_removed)
@@ -46,11 +48,18 @@ func _process(_delta: float) -> void:
 	_hovered_cell = cell
 
 	var inside := _game_state.grid.is_inside_map(cell)
-	if inside:
+	if inside and _hover_highlight_enabled:
 		highlight.show_at(cell_to_world(cell))
 	else:
 		highlight.hide_highlight()
 	hovered_cell_changed.emit(cell if inside else INVALID_CELL, inside)
+
+
+## 区块视图下关闭格子高亮，避免和区块边界抢注意力。
+func set_hover_highlight_enabled(value: bool) -> void:
+	_hover_highlight_enabled = value
+	if not value:
+		highlight.hide_highlight()
 
 
 ## 鼠标位置对应的逻辑格；地图瓦片尚未配置时返回 (-1, -1)。

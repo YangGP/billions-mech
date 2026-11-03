@@ -5,6 +5,8 @@ extends CanvasLayer
 @onready var resource_panel: ResourcePanel = %ResourcePanel
 @onready var build_palette: BuildPalette = %BuildPalette
 @onready var building_info: BuildingInfoPanel = %BuildingInfoPanel
+@onready var region_panel: RegionPanel = %RegionPanel
+@onready var view_banner: Label = %ViewBanner
 
 var _game_state: GameState
 
@@ -50,6 +52,22 @@ func show_building_info(definition: BuildingDefinition) -> void:
 
 func hide_building_info() -> void:
 	building_info.hide_info()
+
+
+## 区块视图下隐藏建造菜单与建筑信息，只保留资源栏与区块面板。
+func set_region_view_active(active: bool) -> void:
+	view_banner.visible = active
+	build_palette.visible = not active
+	if active:
+		building_info.hide_info()
+
+
+func show_region_stats(stats: Dictionary) -> void:
+	region_panel.show_stats(stats)
+
+
+func hide_region_stats() -> void:
+	region_panel.hide_stats()
 
 
 func _on_resources_changed(resources: Dictionary) -> void:

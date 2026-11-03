@@ -1,10 +1,11 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://scripts/world/world.gd" id="1_world"]
 [ext_resource type="TileSet" path="res://tiles/terrain_tileset.tres" id="2_tileset"]
 [ext_resource type="Script" path="res://scripts/world/cell_highlight.gd" id="3_highlight"]
 [ext_resource type="PackedScene" path="res://scenes/world/build_preview.tscn" id="4_preview"]
 [ext_resource type="Script" path="res://scripts/world/build_range_overlay.gd" id="5_range"]
+[ext_resource type="Script" path="res://scripts/world/region_overlay.gd" id="6_region"]
 
 [node name="World" type="Node2D"]
 y_sort_enabled = true
@@ -30,3 +31,6 @@ y_sort_enabled = true
 [node name="BuildPreview" parent="." instance=ExtResource("4_preview")]
 
 [node name="RegionOverlay" type="Node2D" parent="."]
+visible = false
+z_index = 5
+script = ExtResource("6_region")

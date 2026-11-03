@@ -2,11 +2,11 @@
 
 以《亿万僵尸》式基地经济为起点、后续叠加区块指挥视图的 2D 等距 RTS 原型。
 
-![M1-05 建造范围与信息面板](docs/screenshots/m1-05.png)
+![M2 区块视图](docs/screenshots/m2-region-view.png)
 
 - 设计文档：[区域指挥型生存RTS_设计文档_v0.2.md](区域指挥型生存RTS_设计文档_v0.2.md)
 - 开发指南：[区域指挥生存RTS_基础开发指南_v0.1.md](区域指挥生存RTS_基础开发指南_v0.1.md)
-- 当前阶段：**M1 全部完成（经济与建设原型可玩）**，下一步 M2 区块视图。
+- 当前阶段：**M1 经济与建设、M2 区块视图均已完成**，下一步待定（存档 / 体验打磨 / 后续原型）。
 
 ## 环境
 
@@ -41,6 +41,8 @@ godot --headless --path . --quit-after 90   # 冒烟校验（无渲染）
 | 速度按钮 | `1× → 0.5× → 0.25×` 循环，只降速不加速 |
 | 悬停建筑 | 右侧显示名称、说明、占地、成本、产出与容量 |
 | 选择建筑时 | 地图上显示可建造范围；取消建造后隐藏 |
+| `Tab` | 切换实体视图 / 区块视图 |
+| 区块视图左键 | 选中区块并显示统计；右键/Esc 取消选中 |
 
 ## 建筑
 
@@ -81,6 +83,20 @@ godot --headless --path . --quit-after 90   # 冒烟校验（无渲染）
 - 覆盖层**只在选择建造时显示**：`World/BuildRangeOverlay` 绘制 8% 绿色填充 + 边界描边，
   只读 `BuildingSystem.build_coverage`；取消建造/按 Esc 后立即隐藏。
 
+## 区块视图（M2）
+
+- 32×32 地图按 8×8 逻辑格划分为 4×4 = 16 个区块，编号 A1–D4。
+  > 这是开发指南的口径；设计文档里的“9–12 块”留作后续可调项，目前不改。
+- `Tab` 切换 A 实体视图 / B 区块视图；相机位置、缩放、游戏时间、资源与建筑状态完全不变。
+- B 视图绘制区块填充、边界、区块编号与建筑数量；选中区块黄色高亮，悬停白色描边。
+- 点击区块后，右侧面板显示：
+  - 建筑数量与类型（按建筑锚点 `origin_cell` 归属，跨区块建筑只计一次）；
+  - 占地格数（按每个被占用格子实际所属区块统计，跨区块建筑会分摊到多个区块）；
+  - 可建空地（未占用且地形可建）；
+  - 产出与维护（只汇总锚点属于该区块的建筑定义）。
+- B 视图只读：隐藏建造菜单、关闭建造输入与格子高亮；不暂停、不改变任何经济或建筑状态。
+- 统计在建造/拆除后通过 `buildings_changed` 即时刷新；区块本身不产生任何资源。
+
 ## 目录结构
 
 ```text
@@ -98,11 +114,12 @@ res://
     core/                     # game_state / grid_state / simulation_clock
     economy/economy_system.gd
     buildings/                # definition / instance / system / view
-    input/build_controller.gd
-    ui/                       # hud / resource_panel / build_palette / building_info_panel
+    input/                    # build_controller / region_view_controller
+    ui/                       # hud / resource_panel / build_palette /
+                              # building_info_panel / region_panel
     world/                    # world / cell_highlight / camera_controller /
-                              # build_preview / build_range_overlay
-    regions/region_system.gd  # M2 区块划分
+                              # build_preview / build_range_overlay / region_overlay
+    regions/region_system.gd  # 区块划分 + 只读统计聚合
   data/buildings/
     command_center.tres       # 3×3，初始核心，范围 6
     house.tres                # 1×1
@@ -213,13 +230,26 @@ M1-06（已完成，稳定性回归）：
 M1 验收：固定 32×32 等距地图上具备完整建设循环 —— 开局指挥中心、范围内建造、
 资源与容量约束、周期产出、慢速与暂停、建筑信息与建造范围展示。
 
-M2（下一步）区块视图：
+M2（已完成）区块视图：
 
-- [ ] `RegionId` 与 8×8 固定区块映射（`RegionSystem` 已预留）
-- [ ] 区块边界/选中高亮覆盖层
-- [ ] `Tab` 切换实体视图与区块视图，保留相机与时间状态
-- [ ] 区块内建筑统计、占地与产出聚合（只读建筑实例）
-- [ ] 点击区块显示统计面板；建造/拆除/停产即时刷新
+- [x] `RegionId` 与 8×8 固定区块映射（4×4 = 16 块，A1–D4）
+- [x] 区块边界/编号/建筑数量覆盖层，选中黄色、悬停白色
+- [x] `Tab` 切换 A/B，相机中心、缩放、时间、资源与建筑状态不变
+- [x] 点击区块显示建筑数量/类型、占地、空地、产出与维护
+- [x] 跨区建筑：建筑/产出按锚点计一次，占地按实际格数分摊
+- [x] B 视图只读：隐藏建造菜单、禁用建造输入与格子高亮，不暂停不结算
+
+实测：
+
+- 指挥中心 (14,14) 跨 B2/C2/B3/C3 四个区块：占地 4/2/2/1，建筑与金币产出只计 B2。
+- 伐木场 (15,17) 锚点 B3：B3 建筑 1、木材 +3；占地 B3 +2、C3 +2；总占地 13。
+- B 视图：`overlay=true`、`palette=false`、`build_input=false`，camera/clock 不变。
+- 切回 A：`overlay=false`、`palette=true`、`build_input=true`，camera/clock/resources/instances 不变。
+
+M2 验收：A 建造后 B 立即看到正确统计；B 选中区块再切回 A，世界状态完全不变；
+区块边界与逻辑格对齐；统计只读，不产生经济。
+
+下一步待定：JSON 存档、体验打磨，或按新的设计方向重排后续原型。
 
 ## 约定
 

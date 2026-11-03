@@ -9,6 +9,7 @@ var _world: World
 var _hud: HUD
 var _selected: BuildingDefinition
 var _last_info_id: StringName = &""
+var input_enabled: bool = true
 
 
 func setup(game_state: GameState, world: World, hud: HUD) -> void:
@@ -20,6 +21,17 @@ func setup(game_state: GameState, world: World, hud: HUD) -> void:
 	hud.build_palette.setup(game_state.buildings.get_buildable_definitions())
 	world.build_range_overlay.set_active(false)
 	hud.set_status("选择建筑开始建造；右键拆除建筑")
+
+
+## 区块视图期间关闭建造输入，返回实体视图时恢复。
+func set_input_enabled(value: bool) -> void:
+	if input_enabled == value:
+		return
+	input_enabled = value
+	if not value:
+		cancel()
+		_hud.hide_building_info()
+		_last_info_id = &""
 
 
 func select_definition(definition_id: StringName) -> void:
@@ -42,6 +54,8 @@ func cancel() -> void:
 
 
 func _process(_delta: float) -> void:
+	if not input_enabled:
+		return
 	if _selected != null:
 		_update_preview()
 	_update_info_panel()
@@ -66,6 +80,8 @@ func _update_info_panel() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if not input_enabled:
+		return
 	if event is InputEventKey and event.pressed and not event.echo:
 		if _select_by_hotkey(event):
 			get_viewport().set_input_as_handled()

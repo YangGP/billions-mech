@@ -1,9 +1,10 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/hud.gd" id="1_hud"]
 [ext_resource type="Script" path="res://scripts/ui/resource_panel.gd" id="2_resource_panel"]
 [ext_resource type="Script" path="res://scripts/ui/build_palette.gd" id="3_palette"]
 [ext_resource type="Script" path="res://scripts/ui/building_info_panel.gd" id="4_info"]
+[ext_resource type="Script" path="res://scripts/ui/region_panel.gd" id="5_region"]
 
 [node name="HUD" type="CanvasLayer"]
 script = ExtResource("1_hud")
@@ -199,27 +200,61 @@ vertical_alignment = 1
 text = "WASD / 方向键 平移 · 滚轮缩放 · Space 暂停 · Esc 取消"
 
 [node name="RegionPanel" type="PanelContainer" parent="Root"]
+unique_name_in_owner = true
 visible = false
 layout_mode = 1
 anchors_preset = 1
 anchor_left = 1.0
 anchor_right = 1.0
-offset_left = -376.0
+offset_left = -392.0
 offset_top = 16.0
 offset_right = -16.0
-offset_bottom = 16.0
+offset_bottom = 340.0
 grow_horizontal = 0
+script = ExtResource("5_region")
 
 [node name="Margin" type="MarginContainer" parent="Root/RegionPanel"]
 layout_mode = 2
-theme_override_constants/margin_left = 12
-theme_override_constants/margin_top = 8
-theme_override_constants/margin_right = 12
-theme_override_constants/margin_bottom = 8
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 10
 
-[node name="Label" type="Label" parent="Root/RegionPanel/Margin"]
+[node name="Column" type="VBoxContainer" parent="Root/RegionPanel/Margin"]
 layout_mode = 2
-text = "区块面板（M2）"
+theme_override_constants/separation = 8
+
+[node name="RegionTitle" type="Label" parent="Root/RegionPanel/Margin/Column"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 19
+text = "区块"
+
+[node name="RegionBody" type="Label" parent="Root/RegionPanel/Margin/Column"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_font_sizes/font_size = 13
+autowrap_mode = 2
+
+[node name="ViewBanner" type="Label" parent="Root"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -340.0
+offset_top = 72.0
+offset_right = 340.0
+offset_bottom = 104.0
+grow_horizontal = 2
+theme_override_colors/font_outline_color = Color(0, 0, 0, 0.85)
+theme_override_constants/outline_size = 4
+theme_override_font_sizes/font_size = 15
+text = "区块视图 · 点击区块查看统计 · Tab 返回实体视图"
+horizontal_alignment = 1
+vertical_alignment = 1
 
 [node name="BuildingInfoPanel" type="PanelContainer" parent="Root"]
 unique_name_in_owner = true
