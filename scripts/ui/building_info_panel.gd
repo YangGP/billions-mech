@@ -68,6 +68,18 @@ func _format_definition(definition: BuildingDefinition) -> String:
 		for line in capacity_lines:
 			lines.append("· " + line)
 
+	if definition.max_hp > 0:
+		lines.append("")
+		lines.append("生命：%d" % definition.max_hp)
+	if definition.attack_damage > 0:
+		lines.append("攻击：%d / %.1f 秒 · 射程 %d 格" % [
+			definition.attack_damage,
+			definition.attack_interval,
+			int(definition.attack_range),
+		])
+	if definition.is_core:
+		lines.append("核心：被摧毁则本局失败")
+
 	if not definition.demolishable:
 		lines.append("")
 		lines.append("不可拆除")

@@ -21,3 +21,4 @@ output_per_tick = {
 housing_capacity = 4
 food_demand = 2
 energy_demand = 1
+max_hp = 150

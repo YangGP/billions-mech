@@ -19,6 +19,7 @@ func setup(instance: BuildingInstance, definition: BuildingDefinition, anchor: V
 	sprite.texture = definition.texture
 	sprite.centered = false
 	sprite.scale = Vector2.ONE * definition.sprite_scale
+	sprite.modulate = definition.sprite_modulate
 
 	var texture_size := Vector2(definition.texture.get_width(), definition.texture.get_height())
 	var scaled_size := texture_size * definition.sprite_scale

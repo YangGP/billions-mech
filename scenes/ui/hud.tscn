@@ -1,10 +1,11 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/hud.gd" id="1_hud"]
 [ext_resource type="Script" path="res://scripts/ui/resource_panel.gd" id="2_resource_panel"]
 [ext_resource type="Script" path="res://scripts/ui/build_palette.gd" id="3_palette"]
 [ext_resource type="Script" path="res://scripts/ui/building_info_panel.gd" id="4_info"]
 [ext_resource type="Script" path="res://scripts/ui/region_panel.gd" id="5_region"]
+[ext_resource type="Script" path="res://scripts/ui/threat_panel.gd" id="6_threat"]
 
 [node name="HUD" type="CanvasLayer"]
 script = ExtResource("1_hud")
@@ -137,7 +138,7 @@ anchors_preset = 2
 anchor_top = 1.0
 anchor_bottom = 1.0
 offset_left = 16.0
-offset_top = -316.0
+offset_top = -396.0
 offset_right = 336.0
 offset_bottom = -16.0
 grow_vertical = 0
@@ -178,7 +179,7 @@ autowrap_mode = 2
 [node name="PaletteHint" type="Label" parent="Root/BuildPalette/Margin/Column"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 12
-text = "1-4 选择 · 右键拆除 · Esc 取消"
+text = "1-6 选择 · 右键拆除 · Esc 取消"
 modulate = Color(0.75, 0.78, 0.8, 1)
 
 [node name="HintLabel" type="Label" parent="Root"]
@@ -197,7 +198,7 @@ grow_horizontal = 0
 grow_vertical = 0
 horizontal_alignment = 2
 vertical_alignment = 1
-text = "WASD / 方向键 平移 · 滚轮缩放 · Space 暂停 · Esc 取消"
+text = "WASD / 方向键 平移 · 滚轮缩放 · Tab 区块视图 · Space 暂停"
 
 [node name="RegionPanel" type="PanelContainer" parent="Root"]
 unique_name_in_owner = true
@@ -237,6 +238,45 @@ size_flags_vertical = 3
 theme_override_font_sizes/font_size = 13
 autowrap_mode = 2
 
+[node name="ThreatPanel" type="PanelContainer" parent="Root"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -280.0
+offset_top = 72.0
+offset_right = 280.0
+offset_bottom = 110.0
+grow_horizontal = 2
+script = ExtResource("6_threat")
+
+[node name="Margin" type="MarginContainer" parent="Root/ThreatPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 6
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 6
+
+[node name="Row" type="HBoxContainer" parent="Root/ThreatPanel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="CoreLabel" type="Label" parent="Root/ThreatPanel/Margin/Row"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "核心 1000/1000"
+vertical_alignment = 1
+
+[node name="Separator" type="VSeparator" parent="Root/ThreatPanel/Margin/Row"]
+layout_mode = 2
+
+[node name="WaveLabel" type="Label" parent="Root/ThreatPanel/Margin/Row"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "第 1 波 · 40 秒"
+vertical_alignment = 1
+
 [node name="ViewBanner" type="Label" parent="Root"]
 unique_name_in_owner = true
 visible = false
@@ -245,9 +285,9 @@ anchors_preset = 5
 anchor_left = 0.5
 anchor_right = 0.5
 offset_left = -340.0
-offset_top = 72.0
+offset_top = 116.0
 offset_right = 340.0
-offset_bottom = 104.0
+offset_bottom = 148.0
 grow_horizontal = 2
 theme_override_colors/font_outline_color = Color(0, 0, 0, 0.85)
 theme_override_constants/outline_size = 4
@@ -293,3 +333,59 @@ layout_mode = 2
 size_flags_vertical = 3
 theme_override_font_sizes/font_size = 13
 autowrap_mode = 2
+
+[node name="DefeatOverlay" type="Control" parent="Root"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 0
+
+[node name="Dim" type="ColorRect" parent="Root/DefeatOverlay"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.02, 0.02, 0.03, 0.72)
+
+[node name="Center" type="VBoxContainer" parent="Root/DefeatOverlay"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -240.0
+offset_top = -130.0
+offset_right = 240.0
+offset_bottom = 130.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 18
+alignment = 1
+
+[node name="Title" type="Label" parent="Root/DefeatOverlay/Center"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 44
+text = "基地失守"
+horizontal_alignment = 1
+
+[node name="Hint" type="Label" parent="Root/DefeatOverlay/Center"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = "核心已被摧毁"
+horizontal_alignment = 1
+
+[node name="RestartButton" type="Button" parent="Root/DefeatOverlay/Center"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(200, 44)
+layout_mode = 2
+size_flags_horizontal = 4
+focus_mode = 0
+text = "重新开始 (R)"

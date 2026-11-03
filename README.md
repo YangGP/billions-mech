@@ -2,11 +2,11 @@
 
 以《亿万僵尸》式基地经济为起点、后续叠加区块指挥视图的 2D 等距 RTS 原型。
 
-![M2 区块视图](docs/screenshots/m2-region-view.png)
+![威胁与防守切片](docs/screenshots/threat-slice.png)
 
 - 设计文档：[区域指挥型生存RTS_设计文档_v0.2.md](区域指挥型生存RTS_设计文档_v0.2.md)
 - 开发指南：[区域指挥生存RTS_基础开发指南_v0.1.md](区域指挥生存RTS_基础开发指南_v0.1.md)
-- 当前阶段：**M1 经济与建设、M2 区块视图均已完成**，下一步待定（存档 / 体验打磨 / 后续原型）。
+- 当前阶段：**M1 经济与建设、M2 区块视图、威胁与防守切片均已完成**，下一步做波次/平衡打磨。
 
 ## 环境
 
@@ -33,7 +33,8 @@ godot --headless --path . --quit-after 90   # 冒烟校验（无渲染）
 |---|---|
 | `WASD` / 方向键 | 平移镜头 |
 | 鼠标滚轮 | 缩放（0.45×–3×） |
-| `1`–`4` 或点击建造菜单 | 选择房屋 / 农场 / 伐木场 / 电力中继塔 |
+| `1`–`6` 或点击建造菜单 | 选择房屋 / 农场 / 伐木场 / 电力中继塔 / 围墙 / 哨塔 |
+| 顶部威胁条 | 核心生命、下一波倒计时、存活敌人 |
 | 左键 | 放置（保持选中，可连续建造） |
 | 右键 / `Esc` | 取消当前建造 |
 | 右键（未选建筑时） | 拆除光标下建筑，不返还资源 |
@@ -43,16 +44,19 @@ godot --headless --path . --quit-after 90   # 冒烟校验（无渲染）
 | 选择建筑时 | 地图上显示可建造范围；取消建造后隐藏 |
 | `Tab` | 切换实体视图 / 区块视图 |
 | 区块视图左键 | 选中区块并显示统计；右键/Esc 取消选中 |
+| `R`（失败后） | 重新开始本局 |
 
 ## 建筑
 
-| 建筑 | 占地 | 成本 | 效果 |
-|---|---|---|---|
-| 指挥中心 | 3×3 | 开局自动放置 | +5 工人、+4 食物、+5 能源、+2 金币/tick、建造范围 6；不可拆除、唯一 |
-| 房屋 | 1×1 | 金 40 / 木 20 | +4 工人容量、+2 金币/tick；食物 2、能源 1 |
-| 农场 | 2×2 | 金 60 / 木 30 | +10 食物供给；占 2 工人、能源 1 |
-| 伐木场 | 2×2 | 金 80 / 木 60 | +3 木材/tick；占 2 工人、食物 1、能源 1、维护 1 金 |
-| 电力中继塔 | 1×1 | 金 70 / 木 30 | +10 能源供给、建造范围 6；维护 1 金 |
+| 建筑 | 占地 | 成本 | 生命 | 效果 |
+|---|---|---|---|---|
+| 指挥中心 | 3×3 | 开局自动放置 | 1000 | +5 工人、+4 食物、+5 能源、+2 金币/tick、建造范围 6；不可拆除、唯一、核心 |
+| 房屋 | 1×1 | 金 40 / 木 20 | 150 | +4 工人容量、+2 金币/tick；食物 2、能源 1 |
+| 农场 | 2×2 | 金 60 / 木 30 | 200 | +10 食物供给；占 2 工人、能源 1 |
+| 伐木场 | 2×2 | 金 80 / 木 60 | 250 | +3 木材/tick；占 2 工人、食物 1、能源 1、维护 1 金 |
+| 电力中继塔 | 1×1 | 金 70 / 木 30 | 150 | +10 能源供给、建造范围 6；维护 1 金 |
+| 围墙 | 1×1 | 木 10 | 400 | 阻挡敌人，吸收伤害；无经济 |
+| 哨塔 | 1×1 | 金 120 / 木 40 | 250 | 攻击 12 / 0.8 秒、射程 5 格；能源 1 |
 
 初始资源：金币 500、木材 200。
 
@@ -97,6 +101,16 @@ godot --headless --path . --quit-after 90   # 冒烟校验（无渲染）
 - B 视图只读：隐藏建造菜单、关闭建造输入与格子高亮；不暂停、不改变任何经济或建筑状态。
 - 统计在建造/拆除后通过 `buildings_changed` 即时刷新；区块本身不产生任何资源。
 
+## 威胁与防守切片
+
+- 第一波在 40 游戏秒后出现（6 名），之后每 50 秒一波，每波 +3；倒计时显示在顶部威胁条。
+- 敌人从地图下边缘三处出生，直线逼近核心。**没有寻路**：遇到第一座建筑就停下攻击，
+  因此围墙能挡住它们；这是刻意的切片简化。
+- 核心 1000 HP；被摧毁 → 暂停时钟、显示“基地失守”，按 `R` 或按钮重开。
+- 哨塔自动攻击射程 5 格内最近敌人（12 伤害 / 0.8 秒），有短暂射击光线；围墙 400 HP。
+- 暂停/慢速同步作用于波次、敌人移动和战斗；区块视图不暂停战斗。
+- 当前简化：敌人是灰盒圆点、无绕行/多路径、建筑没有血条与修复、波次奖励未做。
+
 ## 目录结构
 
 ```text
@@ -104,21 +118,24 @@ res://
   run.bat
   project.godot
   scenes/
-    main.tscn                 # GameState + World + Camera2D + HUD + BuildController
-    world.tscn                # Ground/BuildRangeOverlay/Highlight/.../BuildPreview
-    ui/hud.tscn               # 资源栏、建造菜单、建筑信息、区块占位
+    main.tscn                 # GameState + World + Camera2D + HUD + 控制器
+    world.tscn                # Ground/覆盖层/建筑/敌人/特效
+    ui/hud.tscn               # 资源栏、建造菜单、威胁条、信息/区块面板、失败界面
     world/build_preview.tscn
     buildings/building_view.tscn
+    units/enemy_view.tscn
   scripts/
     main.gd
     core/                     # game_state / grid_state / simulation_clock
     economy/economy_system.gd
     buildings/                # definition / instance / system / view
+    combat/                   # enemy_state / enemy_view / threat_system
     input/                    # build_controller / region_view_controller
     ui/                       # hud / resource_panel / build_palette /
-                              # building_info_panel / region_panel
+                              # building_info_panel / region_panel / threat_panel
     world/                    # world / cell_highlight / camera_controller /
-                              # build_preview / build_range_overlay / region_overlay
+                              # build_preview / build_range_overlay /
+                              # region_overlay / combat_effects
     regions/region_system.gd  # 区块划分 + 只读统计聚合
   data/buildings/
     command_center.tres       # 3×3，初始核心，范围 6
@@ -126,10 +143,12 @@ res://
     farm.tres                 # 2×2
     lumberyard.tres           # 2×2
     power_tower.tres          # 1×1，能源 + 扩建
+    wall.tres                 # 1×1，400 HP 阻挡
+    guard_tower.tres          # 1×1，哨塔
   tiles/terrain_tileset.tres
   art/placeholder/
     iso_ground.png
-    buildings/{command_center,house,farm,lumberyard,power_tower}.png
+    buildings/{command_center,house,farm,lumberyard,power_tower,wall}.png
   docs/screenshots/
   ui/fonts/system_cjk_font.tres
   临时素材/
@@ -142,8 +161,9 @@ GameState（唯一真实状态）
 ├── SimulationClock   固定 tick、暂停、慢速
 ├── GridState         逻辑格、占地、地形阻挡
 ├── EconomySystem     库存 + 容量 + 每 tick 收支
-├── BuildingSystem    定义、实例、校验、建造/拆除、建造覆盖
-└── RegionSystem      区块划分（M2）
+├── BuildingSystem    定义、实例、校验、建造/拆除、建造覆盖、伤害
+├── RegionSystem      区块划分 + 只读统计
+└── ThreatSystem      波次、敌人、核心生命、防御塔
 
 视图层：World / Camera2D / HUD / BuildController
   只读 GameState，接收信号；输入只调用 BuildingSystem 的公开接口
@@ -193,7 +213,8 @@ GameState（唯一真实状态）
 - 容量：`housing_capacity`、`required_workers`、`food_capacity`、`food_demand`、
   `energy_supply`、`energy_demand`
 - 范围：`build_range_radius`
-- 视觉：`sprite_scale`、`sprite_offset`
+- 战斗：`max_hp`、`is_core`、`attack_range`、`attack_damage`、`attack_interval`
+- 视觉：`sprite_scale`、`sprite_offset`、`sprite_modulate`
 
 `BuildingSystem` 启动时扫描该目录；建造菜单与 `1–4` 热键只列出 `buildable = true` 的定义。
 
@@ -249,7 +270,22 @@ M2（已完成）区块视图：
 M2 验收：A 建造后 B 立即看到正确统计；B 选中区块再切回 A，世界状态完全不变；
 区块边界与逻辑格对齐；统计只读，不产生经济。
 
-下一步待定：JSON 存档、体验打磨，或按新的设计方向重排后续原型。
+威胁与防守切片（新原型方向，已完成）：
+
+- [x] 第一波 40 秒倒计时、6 名敌人；之后每 50 秒一波、每波 +3
+- [x] 敌人从地图下边缘直线接近核心，遇到建筑停下攻击
+- [x] 核心 1000 HP；被毁即失败，失败覆盖层支持 `R` 或按钮重开
+- [x] 围墙 400 HP 阻挡；哨塔 12 伤害 / 0.8 秒、射程 5 格
+- [x] HUD 威胁条：核心生命 / 波次倒计时 / 存活敌人
+- [x] 暂停与慢速同步作用于波次、移动和战斗；区块视图不暂停战斗
+
+实测：
+
+- 1 哨塔 + 12 围墙：第一波 30 秒内清空，核心 1000，哨塔共射击 24 次。
+- 仅 12 围墙：30 秒核心无损；120 秒后 4 段墙被拆、核心降至 484。
+- 无防御第二波：90 秒后核心 0，`defeated=true`，失败覆盖层显示。
+
+下一步：波次/数值平衡、敌人出生提示与简单绕行、建筑受伤反馈、JSON 存档。
 
 ## 约定
 

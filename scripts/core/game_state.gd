@@ -21,6 +21,7 @@ signal buildings_changed()
 @onready var economy: EconomySystem = $EconomySystem
 @onready var buildings: BuildingSystem = $BuildingSystem
 @onready var regions: RegionSystem = $RegionSystem
+@onready var threat: ThreatSystem = $ThreatSystem
 
 var grid: GridState
 

@@ -1,4 +1,4 @@
-[gd_scene load_steps=12 format=3]
+[gd_scene load_steps=13 format=3]
 
 [ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
 [ext_resource type="PackedScene" path="res://scenes/world.tscn" id="2_world"]
@@ -11,6 +11,7 @@
 [ext_resource type="Script" path="res://scripts/world/camera_controller.gd" id="9_camera"]
 [ext_resource type="Script" path="res://scripts/input/build_controller.gd" id="10_build"]
 [ext_resource type="Script" path="res://scripts/input/region_view_controller.gd" id="11_region"]
+[ext_resource type="Script" path="res://scripts/combat/threat_system.gd" id="12_threat"]
 
 [node name="Main" type="Node2D"]
 script = ExtResource("1_main")
@@ -29,6 +30,9 @@ script = ExtResource("7_buildings")
 
 [node name="RegionSystem" type="Node" parent="GameState"]
 script = ExtResource("8_regions")
+
+[node name="ThreatSystem" type="Node" parent="GameState"]
+script = ExtResource("12_threat")
 
 [node name="World" parent="." instance=ExtResource("2_world")]
 

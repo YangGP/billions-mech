@@ -174,6 +174,10 @@ func _select_by_hotkey(event: InputEventKey) -> bool:
 			index = 2
 		KEY_4:
 			index = 3
+		KEY_5:
+			index = 4
+		KEY_6:
+			index = 5
 	if index < 0:
 		return false
 

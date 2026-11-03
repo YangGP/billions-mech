@@ -7,6 +7,9 @@ extends CanvasLayer
 @onready var building_info: BuildingInfoPanel = %BuildingInfoPanel
 @onready var region_panel: RegionPanel = %RegionPanel
 @onready var view_banner: Label = %ViewBanner
+@onready var threat_panel: ThreatPanel = %ThreatPanel
+@onready var defeat_overlay: Control = %DefeatOverlay
+@onready var restart_button: Button = %RestartButton
 
 var _game_state: GameState
 
@@ -14,6 +17,8 @@ var _game_state: GameState
 func _ready() -> void:
 	resource_panel.pause_requested.connect(_on_pause_requested)
 	resource_panel.speed_requested.connect(_on_speed_requested)
+	restart_button.pressed.connect(_on_restart_pressed)
+	defeat_overlay.visible = false
 
 
 func bind(game_state: GameState) -> void:
@@ -52,6 +57,22 @@ func show_building_info(definition: BuildingDefinition) -> void:
 
 func hide_building_info() -> void:
 	building_info.hide_info()
+
+
+## 绑定威胁系统：核心生命、波次倒计时与失败状态。
+func bind_threat(threat: ThreatSystem) -> void:
+	threat.core_hp_changed.connect(_on_core_hp_changed)
+	threat.wave_changed.connect(_on_wave_changed)
+	threat.defeat.connect(_on_defeat)
+
+	_on_core_hp_changed(threat.core_hp, threat.core_max_hp)
+	var snapshot := threat.get_wave_snapshot()
+	_on_wave_changed(
+		int(snapshot["wave"]),
+		float(snapshot["seconds"]),
+		int(snapshot["alive"]),
+		bool(snapshot["in_wave"])
+	)
 
 
 ## 区块视图下隐藏建造菜单与建筑信息，只保留资源栏与区块面板。
@@ -118,3 +139,24 @@ func _on_speed_requested() -> void:
 func _on_speed_changed(_speed: float) -> void:
 	if _game_state != null:
 		resource_panel.set_speed_text(_game_state.clock.get_speed_label())
+
+
+func _on_core_hp_changed(current: int, maximum: int) -> void:
+	threat_panel.display_core(current, maximum)
+
+
+func _on_wave_changed(
+	next_wave: int, seconds_to_next: float, alive: int, in_wave: bool
+) -> void:
+	threat_panel.display_wave(next_wave, seconds_to_next, alive, in_wave)
+
+
+func _on_defeat() -> void:
+	defeat_overlay.visible = true
+	build_palette.visible = false
+	building_info.hide_info()
+	region_panel.hide_stats()
+
+
+func _on_restart_pressed() -> void:
+	get_tree().reload_current_scene()

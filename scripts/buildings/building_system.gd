@@ -8,6 +8,7 @@ extends Node
 
 signal building_placed(instance: BuildingInstance)
 signal building_removed(instance: BuildingInstance)
+signal building_damaged(instance: BuildingInstance, amount: int)
 signal buildings_changed()
 
 const DEFINITION_DIR: String = "res://data/buildings"
@@ -100,6 +101,7 @@ func _commit_placement(key: StringName, origin: Vector2i) -> bool:
 	instance.origin_cell = origin
 	instance.footprint = definition.footprint
 	instance.cells = _grid.cells_for_footprint(origin, definition.footprint)
+	instance.hp = maxi(1, definition.max_hp)
 
 	# 扣费与占格都成功后才对外发信号，保证「数据先于表现」。
 	if not _economy.spend(definition.build_cost):
@@ -127,13 +129,41 @@ func remove_building(instance_id: StringName) -> bool:
 		last_error = "该建筑不可拆除"
 		return false
 
+	_remove_instance(instance)
+	return true
+
+
+## 战斗伤害入口：生命值归零时由数据层直接销毁建筑（不受 demolishable 限制）。
+func damage_building(instance_id: StringName, amount: int) -> void:
+	if amount <= 0:
+		return
+
+	var instance: BuildingInstance = instances.get(StringName(instance_id))
+	if instance == null:
+		return
+
+	instance.hp = maxi(0, instance.hp - amount)
+	building_damaged.emit(instance, amount)
+	if instance.hp <= 0:
+		_remove_instance(instance)
+
+
+func get_core_instance() -> BuildingInstance:
+	for instance in instances.values():
+		var building: BuildingInstance = instance
+		var definition: BuildingDefinition = definitions.get(building.definition_id)
+		if definition != null and definition.is_core:
+			return building
+	return null
+
+
+func _remove_instance(instance: BuildingInstance) -> void:
 	_grid.release(instance.cells)
 	instances.erase(instance.instance_id)
 	_recompute_capacity()
 	_recompute_build_coverage()
 	building_removed.emit(instance)
 	buildings_changed.emit()
-	return true
 
 
 func get_definition(definition_id: StringName) -> BuildingDefinition:

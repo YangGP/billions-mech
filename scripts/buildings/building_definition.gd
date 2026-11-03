@@ -32,6 +32,8 @@ extends Resource
 @export var sprite_scale: float = 1.0
 ## 贴图相对锚点的微调偏移（像素），正常情况下保持零。
 @export var sprite_offset: Vector2 = Vector2.ZERO
+## 贴图颜色调制，用于复用贴图区分建筑（例如哨塔）。
+@export var sprite_modulate: Color = Color.WHITE
 
 @export_group("经济")
 @export var build_cost: Dictionary = {}
@@ -43,6 +45,16 @@ extends Resource
 @export var food_demand: int = 0
 @export var energy_supply: int = 0
 @export var energy_demand: int = 0
+
+@export_group("生命与战斗")
+## 建筑生命值；<= 0 视为建筑定义未配置，放下时会取 100。
+@export var max_hp: int = 100
+## 核心建筑：被摧毁即本局失败。
+@export var is_core: bool = false
+## 防御塔攻击半径（逻辑格）；0 表示不攻击。
+@export var attack_range: float = 0.0
+@export var attack_damage: int = 0
+@export var attack_interval: float = 1.0
 
 @export_group("建设范围")
 ## 大于 0 时，建成后扩大可建造范围；具体规则在 M1-05 接入。

@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="BuildingDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/buildings/building_definition.gd" id="1_script"]
+[ext_resource type="Texture2D" path="res://art/placeholder/buildings/power_tower.png" id="2_texture"]
+
+[resource]
+script = ExtResource("1_script")
+building_id = &"guard_tower"
+display_name = "哨塔"
+description = "1×1 防御塔，自动攻击射程内的敌人；需要 1 点能源。"
+texture = ExtResource("2_texture")
+sprite_modulate = Color(1, 0.55, 0.42, 1)
+palette_order = 60
+footprint = Vector2i(1, 1)
+build_cost = {
+"gold": 120,
+"wood": 40
+}
+energy_demand = 1
+max_hp = 250
+attack_range = 5.0
+attack_damage = 12
+attack_interval = 0.8

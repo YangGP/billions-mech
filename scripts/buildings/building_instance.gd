@@ -18,6 +18,7 @@ var rotation: int = 0
 var construction_state: ConstructionState = ConstructionState.COMPLETE
 var active: bool = true
 var cells: Array[Vector2i] = []
+var hp: int = 0
 
 
 func get_display_name(definitions: Dictionary) -> String:

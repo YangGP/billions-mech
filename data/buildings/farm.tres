@@ -18,3 +18,4 @@ build_cost = {
 required_workers = 2
 food_capacity = 10
 energy_demand = 1
+max_hp = 200

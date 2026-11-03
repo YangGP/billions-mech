@@ -11,6 +11,7 @@ const INVALID_CELL := Vector2i(-1, -1)
 const TILE_WIDTH: float = 128.0
 const TILE_HEIGHT: float = 64.0
 const BUILDING_VIEW_SCENE: PackedScene = preload("res://scenes/buildings/building_view.tscn")
+const ENEMY_VIEW_SCENE: PackedScene = preload("res://scenes/units/enemy_view.tscn")
 
 @onready var ground: TileMapLayer = $Ground
 @onready var build_range_overlay: BuildRangeOverlay = $BuildRangeOverlay
@@ -18,11 +19,14 @@ const BUILDING_VIEW_SCENE: PackedScene = preload("res://scenes/buildings/buildin
 @onready var decorations: TileMapLayer = $Decorations
 @onready var buildings_root: Node2D = $Buildings
 @onready var build_preview: BuildPreview = $BuildPreview
+@onready var enemies_root: Node2D = $Enemies
+@onready var combat_effects: CombatEffects = $CombatEffects
 @onready var region_overlay: RegionOverlay = $RegionOverlay
 
 var _game_state: GameState
 var _hovered_cell: Vector2i = INVALID_CELL
 var _building_views: Dictionary = {}
+var _enemy_views: Dictionary = {}
 var _hover_highlight_enabled: bool = true
 
 
@@ -64,10 +68,15 @@ func set_hover_highlight_enabled(value: bool) -> void:
 
 ## 鼠标位置对应的逻辑格；地图瓦片尚未配置时返回 (-1, -1)。
 func mouse_to_cell() -> Vector2i:
+	return world_to_cell(get_global_mouse_position())
+
+
+## 世界坐标 -> 逻辑格；单位移动、碰撞查询都走这里。
+func world_to_cell(world_position: Vector2) -> Vector2i:
 	if ground.tile_set == null:
 		return INVALID_CELL
-	var local_mouse := ground.to_local(get_global_mouse_position())
-	return ground.local_to_map(local_mouse)
+	var local_position := ground.to_local(world_position)
+	return ground.local_to_map(local_position)
 
 
 ## 逻辑格中心对应的世界坐标（注意：这是格中心，不是建筑视觉中心）。
@@ -102,6 +111,29 @@ func get_map_world_rect() -> Rect2:
 		rect = rect.expand(corner)
 	# 菱形瓦片的四个角会超出中心点包围盒，按半格宽高外扩。
 	return rect.grow(64.0)
+
+
+## 连接威胁系统：敌人视图与防御塔射击特效。
+func bind_threat(threat: ThreatSystem) -> void:
+	threat.enemy_spawned.connect(_on_enemy_spawned)
+	threat.enemy_removed.connect(_on_enemy_removed)
+	threat.tower_fired.connect(combat_effects.add_shot)
+	for enemy in threat.enemies:
+		_on_enemy_spawned(enemy)
+
+
+func _on_enemy_spawned(enemy: EnemyState) -> void:
+	var view := ENEMY_VIEW_SCENE.instantiate() as EnemyView
+	enemies_root.add_child(view)
+	view.setup(enemy)
+	_enemy_views[enemy.enemy_id] = view
+
+
+func _on_enemy_removed(enemy: EnemyState) -> void:
+	var view: EnemyView = _enemy_views.get(enemy.enemy_id)
+	if view != null:
+		view.queue_free()
+	_enemy_views.erase(enemy.enemy_id)
 
 
 func _spawn_building_view(instance: BuildingInstance) -> void:

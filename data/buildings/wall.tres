@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="BuildingDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/buildings/building_definition.gd" id="1_script"]
+[ext_resource type="Texture2D" path="res://art/placeholder/buildings/wall.png" id="2_texture"]
+
+[resource]
+script = ExtResource("1_script")
+building_id = &"wall"
+display_name = "围墙"
+description = "1×1 低墙，阻挡敌人前进并吸收伤害，不提供经济。"
+texture = ExtResource("2_texture")
+palette_order = 50
+footprint = Vector2i(1, 1)
+build_cost = {
+"wood": 10
+}
+max_hp = 400
