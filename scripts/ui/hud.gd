@@ -50,9 +50,11 @@ func set_status(text: String) -> void:
 	build_palette.set_status(text)
 
 
-## 悬停建筑时显示详情；M1-05 只读定义，不展示未实现的运转状态。
-func show_building_info(definition: BuildingDefinition) -> void:
-	building_info.show_definition(definition)
+## 悬停建筑时显示详情；实例状态用于展示运转/停产原因。
+func show_building_info(
+	definition: BuildingDefinition, instance: BuildingInstance = null
+) -> void:
+	building_info.show_definition(definition, instance)
 
 
 func hide_building_info() -> void:

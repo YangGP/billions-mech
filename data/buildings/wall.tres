@@ -15,3 +15,4 @@ build_cost = {
 "wood": 10
 }
 max_hp = 400
+operation_priority = 10

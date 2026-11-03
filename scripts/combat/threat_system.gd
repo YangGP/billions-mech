@@ -206,6 +206,8 @@ func _update_towers(scaled_delta: float) -> void:
 		)
 		if definition == null or definition.attack_damage <= 0 or definition.attack_range <= 0.0:
 			continue
+		if not building.operating:
+			continue
 
 		var cooldown: float = float(_tower_timers.get(building.instance_id, 0.0)) - scaled_delta
 		var target := _find_tower_target(building, definition.attack_range)

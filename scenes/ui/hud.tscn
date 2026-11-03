@@ -24,7 +24,7 @@ unique_name_in_owner = true
 layout_mode = 0
 offset_left = 16.0
 offset_top = 16.0
-offset_right = 1120.0
+offset_right = 1200.0
 offset_bottom = 64.0
 script = ExtResource("2_resource_panel")
 
@@ -92,6 +92,13 @@ layout_mode = 2
 unique_name_in_owner = true
 layout_mode = 2
 text = "建筑 0 · 占地 0"
+vertical_alignment = 1
+
+[node name="StoppedLabel" type="Label" parent="Root/ResourcePanel/Margin/Row"]
+unique_name_in_owner = true
+layout_mode = 2
+tooltip_text = "缺工/缺电/缺食物导致停产或零效率的建筑数"
+text = "停产 0"
 vertical_alignment = 1
 
 [node name="Separator6" type="VSeparator" parent="Root/ResourcePanel/Margin/Row"]

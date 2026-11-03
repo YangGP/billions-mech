@@ -22,3 +22,4 @@ housing_capacity = 4
 food_demand = 2
 energy_demand = 1
 max_hp = 150
+operation_priority = 40

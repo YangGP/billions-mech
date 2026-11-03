@@ -23,6 +23,7 @@ func setup(
 
 	hud.build_palette.building_selected.connect(select_definition)
 	hud.build_palette.setup(game_state.buildings.get_buildable_definitions())
+	game_state.capacity_changed.connect(_on_capacity_changed)
 	world.build_range_overlay.set_active(false)
 	hud.set_status("选择建筑开始建造；右键拆除建筑")
 
@@ -80,7 +81,26 @@ func _update_info_panel() -> void:
 	if instance == null:
 		_hud.hide_building_info()
 		return
-	_hud.show_building_info(_game_state.buildings.get_definition(instance.definition_id))
+	_hud.show_building_info(
+		_game_state.buildings.get_definition(instance.definition_id), instance
+	)
+
+
+func _on_capacity_changed() -> void:
+	if not input_enabled or _last_info_id == &"":
+		return
+	_refresh_info_for_current()
+
+
+func _refresh_info_for_current() -> void:
+	var instance: BuildingInstance = _game_state.buildings.instances.get(_last_info_id)
+	if instance == null:
+		_hud.hide_building_info()
+		_last_info_id = &""
+		return
+	_hud.show_building_info(
+		_game_state.buildings.get_definition(instance.definition_id), instance
+	)
 
 
 func _unhandled_input(event: InputEvent) -> void:

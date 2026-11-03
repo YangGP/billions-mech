@@ -14,6 +14,7 @@ const DEFICIT_COLOR := Color(1.0, 0.45, 0.45)
 @onready var _food_label: Label = %FoodLabel
 @onready var _energy_label: Label = %EnergyLabel
 @onready var _building_label: Label = %BuildingLabel
+@onready var _stopped_label: Label = %StoppedLabel
 @onready var _cursor_label: Label = %CursorLabel
 @onready var _time_label: Label = %TimeLabel
 @onready var _speed_button: Button = %SpeedButton
@@ -48,6 +49,11 @@ func display_capacity(economy: EconomySystem) -> void:
 	_energy_label.text = "能源 %d/%d" % [economy.energy_demand, economy.energy_supply]
 	_energy_label.modulate = (
 		DEFICIT_COLOR if economy.energy_demand > economy.energy_supply else Color.WHITE
+	)
+
+	_stopped_label.text = "停产 %d" % economy.stopped_building_count
+	_stopped_label.modulate = (
+		DEFICIT_COLOR if economy.stopped_building_count > 0 else Color.WHITE
 	)
 
 

@@ -21,3 +21,4 @@ max_hp = 250
 attack_range = 5.0
 attack_damage = 12
 attack_interval = 0.8
+operation_priority = 100

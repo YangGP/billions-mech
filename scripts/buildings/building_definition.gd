@@ -46,6 +46,10 @@ extends Resource
 @export var energy_supply: int = 0
 @export var energy_demand: int = 0
 
+@export_group("运营")
+## 供给不足时的保障优先级，数值越大越优先（防御 > 食物 > 核心 > 木材 > 住房）。
+@export var operation_priority: int = 0
+
 @export_group("生命与战斗")
 ## 建筑生命值；<= 0 视为建筑定义未配置，放下时会取 100。
 @export var max_hp: int = 100

@@ -21,3 +21,4 @@ upkeep_per_tick = {
 energy_supply = 10
 build_range_radius = 6
 max_hp = 150
+operation_priority = 90

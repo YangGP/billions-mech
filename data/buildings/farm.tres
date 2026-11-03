@@ -19,3 +19,4 @@ required_workers = 2
 food_capacity = 10
 energy_demand = 1
 max_hp = 200
+operation_priority = 80

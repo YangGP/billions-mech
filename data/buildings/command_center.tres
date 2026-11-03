@@ -25,3 +25,4 @@ energy_demand = 1
 build_range_radius = 6
 max_hp = 1000
 is_core = true
+operation_priority = 70
