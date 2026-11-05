@@ -1,0 +1,48 @@
+[gd_scene load_steps=13 format=3]
+
+[ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
+[ext_resource type="PackedScene" path="res://scenes/world.tscn" id="2_world"]
+[ext_resource type="PackedScene" path="res://scenes/ui/hud.tscn" id="3_hud"]
+[ext_resource type="Script" path="res://scripts/core/game_state.gd" id="4_game_state"]
+[ext_resource type="Script" path="res://scripts/core/simulation_clock.gd" id="5_clock"]
+[ext_resource type="Script" path="res://scripts/economy/economy_system.gd" id="6_economy"]
+[ext_resource type="Script" path="res://scripts/buildings/building_system.gd" id="7_buildings"]
+[ext_resource type="Script" path="res://scripts/regions/region_system.gd" id="8_regions"]
+[ext_resource type="Script" path="res://scripts/world/camera_controller.gd" id="9_camera"]
+[ext_resource type="Script" path="res://scripts/input/build_controller.gd" id="10_build"]
+[ext_resource type="Script" path="res://scripts/input/region_view_controller.gd" id="11_region"]
+[ext_resource type="Script" path="res://scripts/combat/threat_system.gd" id="12_threat"]
+
+[node name="Main" type="Node2D"]
+script = ExtResource("1_main")
+
+[node name="GameState" type="Node" parent="."]
+script = ExtResource("4_game_state")
+
+[node name="SimulationClock" type="Node" parent="GameState"]
+script = ExtResource("5_clock")
+
+[node name="EconomySystem" type="Node" parent="GameState"]
+script = ExtResource("6_economy")
+
+[node name="BuildingSystem" type="Node" parent="GameState"]
+script = ExtResource("7_buildings")
+
+[node name="RegionSystem" type="Node" parent="GameState"]
+script = ExtResource("8_regions")
+
+[node name="ThreatSystem" type="Node" parent="GameState"]
+script = ExtResource("12_threat")
+
+[node name="World" parent="." instance=ExtResource("2_world")]
+
+[node name="Camera2D" type="Camera2D" parent="."]
+script = ExtResource("9_camera")
+
+[node name="HUD" parent="." instance=ExtResource("3_hud")]
+
+[node name="BuildController" type="Node" parent="."]
+script = ExtResource("10_build")
+
+[node name="RegionViewController" type="Node" parent="."]
+script = ExtResource("11_region")

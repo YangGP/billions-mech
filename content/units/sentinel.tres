@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="MechUnitDefinition" load_steps=2 format=3]
+[ext_resource type="Script" path="res://content/unit_definition.gd" id="1"]
+[resource]
+script = ExtResource("1")
+unit_id = &"sentinel"
+display_name = "卫兵"
+cost = Vector4i(20, 0, 0, 0)
+production_seconds = 20.0
+capacity_cost = 1
+max_hp = 100
+damage = 10
+attack_seconds = 0.8
+attack_range = 4.0
+acquisition_range = 6.0
+move_speed = 2.5

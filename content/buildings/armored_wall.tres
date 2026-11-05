@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="MechBuildingDefinition" load_steps=2 format=3]
+[ext_resource type="Script" path="res://content/building_definition.gd" id="1"]
+[resource]
+script = ExtResource("1")
+building_id = &"armored_wall"
+display_name = "装甲墙"
+cost = Vector4i(2, 0, 0, 0)
+construction_seconds = 8.0
+max_hp = 400

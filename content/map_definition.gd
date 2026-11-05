@@ -1,0 +1,80 @@
+@tool
+class_name MechMapDefinition
+extends Resource
+## Hand-authored rectangular terrain stamps, not a random map generator.
+
+@export var map_id: StringName = &"first_outpost"
+@export var display_name: String = "隘口前哨"
+@export var dimensions: Vector2i = Vector2i(48, 48)
+@export var obstacle_rects: Array[Rect2i] = []
+@export var rough_rects: Array[Rect2i] = []
+@export_range(1.0, 10.0, 0.1) var rough_movement_weight: float = 2.0
+@export var mainbrain_origin: Vector2i = Vector2i(23, 28)
+@export var mainbrain_footprint: Vector2i = Vector2i(3, 3)
+@export var probe_cell: Vector2i = Vector2i(21, 33)
+@export var main_gate: Vector2i = Vector2i(24, 11)
+@export var flank: Vector2i = Vector2i(46, 21)
+@export var minerals: Array[MechMineralDefinition] = []
+
+
+func validation_error() -> String:
+	if dimensions.x < 8 or dimensions.y < 8 or dimensions.x > 256 or dimensions.y > 256:
+		return "地图尺寸必须在 8–256 格之间"
+	var bounds := Rect2i(Vector2i.ZERO, dimensions)
+	if mainbrain_footprint.x < 1 or mainbrain_footprint.y < 1:
+		return "主脑占地无效"
+	if not bounds.encloses(Rect2i(mainbrain_origin, mainbrain_footprint)):
+		return "主脑占地超出地图"
+	for cell: Vector2i in [probe_cell, main_gate, flank]:
+		if not bounds.has_point(cell):
+			return "出生点或地图标记超出边界"
+	for rectangles: Array[Rect2i] in [obstacle_rects, rough_rects]:
+		for rectangle: Rect2i in rectangles:
+			if rectangle.size.x < 1 or rectangle.size.y < 1 or not bounds.encloses(rectangle):
+				return "地形区域超出地图或尺寸无效"
+	if not is_finite(rough_movement_weight) or rough_movement_weight < 1.0:
+		return "崎岖地移动权重无效"
+	var ids: Dictionary = {}
+	var occupied_cells: Dictionary = {}
+	var terrain: PackedByteArray = terrain_cells()
+	for mineral: MechMineralDefinition in minerals:
+		if mineral == null or mineral.mineral_id == &"" or mineral.amount < 1:
+			return "矿点定义或储量无效"
+		if not mineral.resource_kind in ["ore", "metal", "rare"]:
+			return "矿点类型无效"
+		if not bounds.has_point(mineral.cell) or Rect2i(mainbrain_origin, mainbrain_footprint).has_point(mineral.cell):
+			return "矿点超界或与主脑重叠"
+		if terrain[mineral.cell.y * dimensions.x + mineral.cell.x] != MechGridState.Terrain.OPEN:
+			return "矿点必须位于可建造地形"
+		if ids.has(mineral.mineral_id) or occupied_cells.has(mineral.cell):
+			return "矿点编号或位置重复"
+		ids[mineral.mineral_id] = true
+		occupied_cells[mineral.cell] = true
+	return ""
+
+
+func terrain_cells() -> PackedByteArray:
+	# Shared by the editor preview and the authoritative runtime grid.
+	var cells := PackedByteArray()
+	cells.resize(dimensions.x * dimensions.y)
+	cells.fill(MechGridState.Terrain.OPEN)
+	for kind: int in [MechGridState.Terrain.ROUGH, MechGridState.Terrain.OBSTACLE]:
+		var rectangles: Array[Rect2i] = rough_rects if kind == MechGridState.Terrain.ROUGH else obstacle_rects
+		for rectangle: Rect2i in rectangles:
+			for y: int in range(rectangle.position.y, rectangle.end.y):
+				for x: int in range(rectangle.position.x, rectangle.end.x):
+					cells[y * dimensions.x + x] = kind
+	return cells
+
+
+func terrain_snapshot() -> Dictionary:
+	return {"dimensions": dimensions, "terrain": terrain_cells(), "name": display_name,
+		"main_gate": main_gate, "flank": flank, "mainbrain_origin": mainbrain_origin,
+		"mainbrain_footprint": mainbrain_footprint, "minerals": mineral_snapshots()}
+
+
+func mineral_snapshots() -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	for mineral: MechMineralDefinition in minerals:
+		result.append(mineral.snapshot())
+	return result

@@ -1,0 +1,43 @@
+[gd_resource type="Resource" script_class="MechMapDefinition" load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://content/map_definition.gd" id="1"]
+[ext_resource type="Script" path="res://content/mineral_definition.gd" id="2"]
+
+[sub_resource type="Resource" id="Mineral_west"]
+script = ExtResource("2")
+mineral_id = &"ore_west"
+cell = Vector2i(20, 26)
+amount = 400
+
+[sub_resource type="Resource" id="Mineral_east"]
+script = ExtResource("2")
+mineral_id = &"ore_east"
+cell = Vector2i(29, 28)
+amount = 400
+
+[sub_resource type="Resource" id="Mineral_north"]
+script = ExtResource("2")
+mineral_id = &"ore_north"
+cell = Vector2i(31, 17)
+amount = 400
+
+[sub_resource type="Resource" id="Mineral_flank"]
+script = ExtResource("2")
+mineral_id = &"ore_flank"
+cell = Vector2i(40, 25)
+amount = 400
+
+[resource]
+script = ExtResource("1")
+map_id = &"first_outpost"
+display_name = "隘口前哨"
+dimensions = Vector2i(48, 48)
+obstacle_rects = Array[Rect2i]([Rect2i(0, 0, 21, 2), Rect2i(27, 0, 21, 2), Rect2i(0, 46, 48, 2), Rect2i(0, 0, 2, 48), Rect2i(46, 0, 2, 18), Rect2i(46, 24, 2, 24), Rect2i(2, 10, 18, 3), Rect2i(28, 10, 18, 3), Rect2i(7, 20, 7, 3), Rect2i(5, 28, 6, 8), Rect2i(34, 29, 5, 9), Rect2i(15, 39, 12, 3)])
+rough_rects = Array[Rect2i]([Rect2i(20, 7, 8, 3), Rect2i(20, 13, 8, 3), Rect2i(39, 18, 7, 6), Rect2i(5, 18, 9, 2), Rect2i(12, 28, 5, 8), Rect2i(29, 33, 5, 4), Rect2i(20, 22, 9, 2)])
+rough_movement_weight = 2.0
+mainbrain_origin = Vector2i(23, 28)
+mainbrain_footprint = Vector2i(3, 3)
+probe_cell = Vector2i(21, 33)
+main_gate = Vector2i(24, 11)
+flank = Vector2i(46, 21)
+minerals = Array[ExtResource("2")]([SubResource("Mineral_west"), SubResource("Mineral_east"), SubResource("Mineral_north"), SubResource("Mineral_flank")])

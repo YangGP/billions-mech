@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="MechBuildingDefinition" load_steps=2 format=3]
+[ext_resource type="Script" path="res://content/building_definition.gd" id="1"]
+[resource]
+script = ExtResource("1")
+building_id = &"sentry_tower"
+display_name = "哨戒炮塔"
+footprint = Vector2i(2, 2)
+cost = Vector4i(120, 20, 0, 0)
+construction_seconds = 60.0
+max_hp = 600
+capacity_cost = 2
+power_cost = 3

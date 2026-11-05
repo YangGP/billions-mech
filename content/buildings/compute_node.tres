@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="MechBuildingDefinition" load_steps=2 format=3]
+[ext_resource type="Script" path="res://content/building_definition.gd" id="1"]
+[resource]
+script = ExtResource("1")
+building_id = &"compute_node"
+display_name = "算力节点"
+footprint = Vector2i(2, 2)
+cost = Vector4i(30, 0, 0, 0)
+construction_seconds = 40.0
+max_hp = 250
+power_cost = 2
+capacity_provided = 6
+income_per_minute = 4

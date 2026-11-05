@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="MechBuildingDefinition" load_steps=2 format=3]
+[ext_resource type="Script" path="res://content/building_definition.gd" id="1"]
+[resource]
+script = ExtResource("1")
+building_id = &"mainbrain"
+display_name = "主脑"
+footprint = Vector2i(3, 3)
+max_hp = 4000
+capacity_provided = 10
+power_provided = 60
+coverage_radius = 12
+income_per_minute = 2
+is_core = true
+buildable = false

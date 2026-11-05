@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="MechFoundationSettings" load_steps=11 format=3]
+[ext_resource type="Script" path="res://content/foundation_settings.gd" id="1"]
+[ext_resource type="Resource" path="res://content/maps/first_outpost.tres" id="2"]
+[ext_resource type="Resource" path="res://content/buildings/mainbrain.tres" id="3"]
+[ext_resource type="Resource" path="res://content/buildings/compute_node.tres" id="4"]
+[ext_resource type="Resource" path="res://content/buildings/armored_wall.tres" id="5"]
+[ext_resource type="Resource" path="res://content/buildings/sentry_tower.tres" id="6"]
+[ext_resource type="Script" path="res://content/building_definition.gd" id="7"]
+[ext_resource type="Resource" path="res://content/buildings/mining_station.tres" id="8"]
+[ext_resource type="Resource" path="res://content/buildings/assembly_plant.tres" id="9"]
+[ext_resource type="Resource" path="res://content/units/sentinel.tres" id="10"]
+
+[resource]
+script = ExtResource("1")
+simulation_hz = 30
+map_definition = ExtResource("2")
+building_definitions = Array[ExtResource("7")]([ExtResource("3"), ExtResource("4"), ExtResource("5"), ExtResource("6"), ExtResource("8"), ExtResource("9")])
+unit_definition = ExtResource("10")
+scenario_name = "单位训练场"
+starting_resources = Vector4i(250, 50, 0, 0)
+starting_buildings = Dictionary[Vector2i, StringName]({Vector2i(26, 32): &"assembly_plant", Vector2i(20, 29): &"compute_node", Vector2i(20, 31): &"compute_node"})
+starting_unit_cells = Array[Vector2i]([Vector2i(23, 33), Vector2i(24, 33), Vector2i(23, 34), Vector2i(24, 34)])
+practice_target_cells = Array[Vector2i]([Vector2i(32, 26), Vector2i(31, 21)])
+probe_speed = 2.5
