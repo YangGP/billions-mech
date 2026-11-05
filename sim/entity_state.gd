@@ -2,6 +2,9 @@ class_name MechEntityState
 extends RefCounted
 ## Logical state only; never holds a Node or rendering resource.
 
+const PATH_POINT_TOLERANCE: float = 0.3
+const ARRIVAL_TOLERANCE: float = 0.08
+
 var entity_id: int = 0
 var kind: StringName = &""
 var display_name: String = ""
@@ -34,24 +37,30 @@ func set_move_path(points: PackedVector2Array) -> void:
 		move_target = points[points.size() - 1]
 
 
-func step(seconds: float, can_enter: Callable) -> void:
-	if not has_move_order:
-		return
-	var remaining: float = move_speed * seconds
-	while has_move_order and remaining > 0.0:
+func next_waypoint() -> Vector2:
+	return _waypoints[_waypoint_index] if has_move_order else position
+
+
+func preferred_velocity(speed: float, seconds: float, can_travel: Callable) -> Vector2:
+	while has_move_order:
 		var next_point: Vector2 = _waypoints[_waypoint_index]
 		var distance: float = position.distance_to(next_point)
-		var candidate: Vector2 = position.move_toward(next_point, remaining)
-		if not can_enter.call(candidate):
-			return
-		if distance <= remaining:
-			position = next_point
-			remaining -= distance
+		var intermediate: bool = _waypoint_index + 1 < _waypoints.size()
+		if intermediate and distance <= PATH_POINT_TOLERANCE and can_travel.call(position, _waypoints[_waypoint_index + 1]):
 			_waypoint_index += 1
-			has_move_order = _waypoint_index < _waypoints.size()
-		else:
-			position = candidate
-			remaining = 0.0
+			continue
+		# Only the committed RVO position may complete the final waypoint.
+		# Keep the active order/priority while native avoidance is still pending.
+		if not intermediate and distance <= ARRIVAL_TOLERANCE:
+			return Vector2.ZERO
+		return position.direction_to(next_point) * minf(speed, distance / seconds)
+	return Vector2.ZERO
+
+
+func finish_path_if_arrived() -> void:
+	if has_move_order and _waypoint_index == _waypoints.size() - 1 and position.distance_to(_waypoints[_waypoint_index]) <= ARRIVAL_TOLERANCE:
+		_waypoint_index = _waypoints.size()
+		has_move_order = false
 
 
 func snapshot() -> Dictionary:

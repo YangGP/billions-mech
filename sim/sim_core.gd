@@ -25,6 +25,18 @@ var _starting_resources := Vector4i.ZERO
 var _navigation_revision: int = -1
 
 
+func _init() -> void:
+	_registry.movement_finished.connect(_on_movement_finished)
+
+
+func shutdown() -> void:
+	_registry.clear()
+
+
+func _on_movement_finished() -> void:
+	state_changed.emit()
+
+
 func configure(settings: MechFoundationSettings) -> bool:
 	var settings_error: String = _settings_error(settings)
 	if not settings_error.is_empty():
@@ -45,9 +57,13 @@ func execute_command(command: MechCommand) -> Dictionary:
 	var result: Dictionary = validate_command(command)
 	if not result["ok"]:
 		return result
+	# Commands invalidate any native avoidance result submitted before the change.
+	_registry.cancel_pending_motion()
 	match command.type:
 		MechCommand.Type.SET_PAUSED:
 			_clock.set_paused(command.payload["paused"])
+			if command.payload["paused"]:
+				_registry.suspend_motion()
 		MechCommand.Type.MOVE_ENTITY:
 			_registry.set_move_path(command.payload["entity_id"], result["path"])
 		MechCommand.Type.LOAD_SCENARIO:
@@ -186,7 +202,6 @@ func advance_one_tick() -> void:
 		_recompute_economy()
 		_sync_navigation()
 	_registry.step(_clock.step_seconds(), _grid)
-	state_changed.emit()
 
 
 func snapshot() -> Dictionary:

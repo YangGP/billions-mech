@@ -4,6 +4,8 @@ extends RefCounted
 
 enum Terrain { OPEN, ROUGH, OBSTACLE }
 
+const MOBILE_RADIUS: float = 0.22
+
 var _dimensions: Vector2i = Vector2i.ZERO
 var _terrain := PackedByteArray()
 var _occupancy := PackedInt32Array()
@@ -78,6 +80,29 @@ func release(entity_id: int) -> void:
 
 func is_walkable(cell: Vector2i, include_buildings: bool = true) -> bool:
 	return contains(cell) and terrain_at(cell) != Terrain.OBSTACLE and (not include_buildings or occupant_at(cell) == 0)
+
+
+func mobile_position_clear(point: Vector2) -> bool:
+	# Match the native RVO circle, including at building corners.
+	var low := Vector2i((point - Vector2.ONE * MOBILE_RADIUS).floor())
+	var high := Vector2i((point + Vector2.ONE * MOBILE_RADIUS).floor())
+	for y: int in range(low.y, high.y + 1):
+		for x: int in range(low.x, high.x + 1):
+			var cell := Vector2i(x, y)
+			if is_walkable(cell):
+				continue
+			var closest: Vector2 = point.clamp(Vector2(cell), Vector2(cell + Vector2i.ONE))
+			if point.distance_squared_to(closest) < MOBILE_RADIUS * MOBILE_RADIUS:
+				return false
+	return true
+
+
+func mobile_segment_clear(from: Vector2, to: Vector2) -> bool:
+	var steps: int = maxi(1, ceili(from.distance_to(to) / 0.1))
+	for index: int in range(1, steps + 1):
+		if not mobile_position_clear(from.lerp(to, float(index) / steps)):
+			return false
+	return true
 
 
 func movement_weight(cell: Vector2i) -> float:

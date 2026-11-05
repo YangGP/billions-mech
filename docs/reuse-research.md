@@ -1,6 +1,6 @@
 # 模块复用：已有方案调研
 
-> 调研日期：2026-11-04～2026-11-05。版本：0.4。\
+> 调研日期：2026-11-04～2026-11-06。版本：0.4。\
 > 范围：支撑 architecture.md 的模块复用选型；本稿是来源核对和建议，不表示候选已接入或完成适配/性能验证。\
 > 已确认原则：新建项目，旧原型实现不再使用；外部模块能复用就复用，不能复用先找其他已有方案。开发顺序见 development-plan.md。
 > 历史口径：§4 记录 M3 单钱包实现时的选型依据；新版设计已加入多资源与采矿，扩展任务见开发计划。该记录不限定当前设计的资源范围。
@@ -56,3 +56,20 @@
 复核 [RTS Advanced Lite README](https://github.com/openclawaimac/godot-rts-advanced-lite#readme)（MIT，3D 选择/阵型/分离/生产）和高星项目 [OpenRA ProductionQueue](https://github.com/OpenRA/OpenRA/blob/bleed/OpenRA.Mods.Common/Traits/Player/ProductionQueue.cs)（GPL-3.0-or-later，C# Actor/Traits、独立队列与预付选项）。Lite 的地面拾取/影子节点仍依赖 3D 适配，OpenRA 依赖其世界与规则运行时，均不直接导入。
 
 选择继续复用原生 Rect2/Geometry2D、AStarGrid2D 与现有串行命令；新增纯数据生产队列、单位状态和客户端选择集合。移动复用原生 A*，局部占位用格桶，等待后暂时屏蔽其他单位格重新求路；生产扩展本项目已有账本及预留事务。未复制第三方源码，未产生新 vendor 或许可证依赖；未将 4 单位训练场视为最终规模性能验证。
+
+### 窄口拥堵：直接采用原生 RVO（2026-11-06）
+
+用户反馈主脑与组装厂之间易卡住。初版把友军当硬碰撞，堵塞后再封掉友军整格。此前修补仅参考设计、自写侧让和软分离，未达到直接使用成熟方案的要求，现已删除。
+
+| 比较来源 | 实现与依赖 | 本轮决定 |
+|---|---|---|
+| 高星、持续维护的 [Godot NavigationServer2D](https://docs.godotengine.org/en/stable/classes/class_navigationserver2d.html) | 引擎自带 RVO2；RID、物理帧速度回调与静态障碍接口；不要求单位成为场景节点 | **直接调用原生求解器**；继续直接使用原生 AStarGrid2D，不额外移植避让算法 |
+| 高星、持续维护的 [OpenRA Move](https://github.com/OpenRA/OpenRA/blob/bleed/OpenRA.Mods.Common/Activities/Move/Move.cs) | GPL-3.0，依赖 C# Actor/Locomotor 运行时 | 不导入；其等待/让路设计不能算作本项目已直接复用实现 |
+
+已核对 Godot 4.7 分支的 [NavAgent2D](https://github.com/godotengine/godot/blob/4.7-stable/modules/navigation_2d/nav_agent_2d.cpp) 与 [NavMap2D](https://github.com/godotengine/godot/blob/4.7-stable/modules/navigation_2d/nav_map_2d.cpp) 一手源码。实际运行依赖为本机 Godot 4.7.2 `ed1daf0bf`，引擎 MIT，内置 RVO2 为 Apache-2.0，见 [版权清单](https://github.com/godotengine/godot/blob/4.7-stable/COPYRIGHT.txt)。没有复制或修改求解器源码，也没有新增 vendor。
+
+`sim/crowd_navigation.gd` 是 API 适配层：提交逻辑坐标/期望速度，注册单位与建筑/地形障碍，收齐原生回调后批量落地。暂停停用专属地图；命令使旧批次失效；重开/退出释放 RID；仅瞬移时清零原生速度状态。指令、A* 路点跟随、地形减速和最终静态碰撞校验仍由项目负责，避让方向与速度由原生 RVO 求解，没有自写侧让/推挤回退。
+
+后续目标漂移反馈修正的是项目指令适配：友军临时占位不再替换点击格/阵型终点；最后路点在原生位移实际提交后确认，空路径重试原目标。单兵静态不可达时拒绝下令，不寻找附近替代终点。求路与避让仍分别直接调用原生 AStarGrid2D 与 RVO，没有新增避让或寻路算法。
+
+按 [官方回调时序](https://docs.godotengine.org/en/stable/tutorials/navigation/navigation_using_navigationservers.html)，提交发生在固定物理帧，移动提交和视图刷新在同帧的原生回调收齐后执行，不在每个单独回调中各自刷新。已知限制：RVO 不能保证所有拥堵场景都能解开，[官方说明](https://docs.godotengine.org/en/stable/tutorials/navigation/navigation_using_navigationagents.html) 提示完全对称的迎面情形可能失败。这里只完成 29 个脚本的语法核对，通行、暂停和资源生命周期仍须运行复验，不能把接入成熟求解器写成已通过玩法验收。

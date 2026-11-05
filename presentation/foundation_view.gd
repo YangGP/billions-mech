@@ -99,7 +99,7 @@ func _draw() -> void:
 	_draw_cursor()
 	var entities: Array = _state["entities"]
 	for entity: Dictionary in entities:
-		if entity["has_order"] and entity.get("id", 0) in _selection_ids:
+		if (entity["has_order"] or entity.get("order", &"idle") in [&"move", &"attack_move"]) and entity.get("id", 0) in _selection_ids:
 			_draw_target(entity)
 	entities.sort_custom(_visual_sort)
 	for entity: Dictionary in entities:
@@ -172,7 +172,8 @@ func _visual_sort(a: Dictionary, b: Dictionary) -> bool:
 
 
 func _draw_target(entity: Dictionary) -> void:
-	var target: Vector2 = _project(entity["target"])
+	var goal: Vector2 = entity["order_goal"] if entity.get("order", &"idle") in [&"move", &"attack_move"] else entity["target"]
+	var target: Vector2 = _project(goal)
 	var line := PackedVector2Array([_project(entity["position"])])
 	for waypoint: Vector2 in entity["path"]:
 		line.append(_project(waypoint))

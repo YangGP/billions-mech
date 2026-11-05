@@ -2,11 +2,28 @@ class_name MechEntityRegistry
 extends RefCounted
 ## Sim systems share owned states; presentation receives only value snapshots.
 
+signal movement_finished
+
+const CROWD_SCRIPT = preload("res://sim/crowd_navigation.gd")
+const MOBILE_SPACING: float = 0.52
+
 var _entities: Dictionary[int, MechEntityState] = {}
 var _next_id: int = 1
+var _crowd = CROWD_SCRIPT.new()
+var _pending_request: int = 0
+var _motion_grid: MechGridState
+var _motion_seconds: float = 0.0
+var _starting_positions: Dictionary[int, Vector2] = {}
+var _starting_waypoints: Dictionary[int, Vector2] = {}
+
+
+func _init() -> void:
+	_crowd.velocities_ready.connect(_apply_velocities)
 
 
 func clear() -> void:
+	cancel_pending_motion()
+	_crowd.dispose()
 	_entities.clear()
 	_next_id = 1
 
@@ -43,7 +60,7 @@ func all() -> Array[MechEntityState]:
 
 func mobile_space_free(point: Vector2, ignored: Dictionary = {}) -> bool:
 	for entity: MechEntityState in _entities.values():
-		if entity.move_speed > 0.0 and not ignored.has(entity.entity_id) and entity.position.distance_squared_to(point) < 0.52 * 0.52:
+		if entity.move_speed > 0.0 and not ignored.has(entity.entity_id) and entity.position.distance_squared_to(point) < MOBILE_SPACING * MOBILE_SPACING:
 			return false
 	return true
 
@@ -53,6 +70,7 @@ func position_of(entity_id: int) -> Vector2:
 
 
 func remove(entity_id: int) -> void:
+	_crowd.remove(entity_id)
 	_entities.erase(entity_id)
 
 
@@ -65,6 +83,7 @@ func teleport(entity_id: int, position: Vector2) -> void:
 	entity.position = position
 	entity.move_target = position
 	entity.set_move_path(PackedVector2Array())
+	_crowd.teleport(entity_id, position)
 
 
 func movable_snapshots() -> Array[Dictionary]:
@@ -81,37 +100,55 @@ func set_move_path(entity_id: int, path: PackedVector2Array) -> void:
 
 
 func step(seconds: float, grid: MechGridState) -> void:
-	var buckets: Dictionary[Vector2i, Array] = {}
+	_motion_grid = grid
+	_motion_seconds = seconds
+	_starting_positions.clear()
+	_starting_waypoints.clear()
+	var preferred: Dictionary[int, Vector2] = {}
 	for entity: MechEntityState in _entities.values():
-		if entity.move_speed > 0.0:
-			var cell := Vector2i(entity.position.floor())
-			if not buckets.has(cell):
-				buckets[cell] = []
-			buckets[cell].append(entity)
-	for entity: MechEntityState in _entities.values():
-		if entity.move_speed <= 0.0 or not entity.has_move_order:
+		if entity.move_speed <= 0.0 or not grid.is_walkable(Vector2i(entity.position.floor())):
 			continue
-		var old: Vector2 = entity.position
-		var cell := Vector2i(old.floor())
-		buckets[cell].erase(entity)
-		entity.step(seconds / grid.movement_weight(cell), _can_enter.bind(entity.entity_id, grid, buckets))
-		entity.blocked_ticks = entity.blocked_ticks + 1 if entity.position.is_equal_approx(old) else 0
-		cell = Vector2i(entity.position.floor())
-		if not buckets.has(cell):
-			buckets[cell] = []
-		buckets[cell].append(entity)
+		var speed: float = entity.move_speed / grid.movement_weight(Vector2i(entity.position.floor()))
+		preferred[entity.entity_id] = entity.preferred_velocity(speed, seconds, grid.mobile_segment_clear)
+		_starting_positions[entity.entity_id] = entity.position
+		_starting_waypoints[entity.entity_id] = entity.next_waypoint()
+	_pending_request = _crowd.request(all(), preferred, grid)
+	if _pending_request == 0:
+		movement_finished.emit()
 
 
-func _can_enter(point: Vector2, id: int, grid: MechGridState, buckets: Dictionary) -> bool:
-	var cell := Vector2i(point.floor())
-	if not grid.is_walkable(cell):
-		return false
-	for y: int in range(cell.y - 1, cell.y + 2):
-		for x: int in range(cell.x - 1, cell.x + 2):
-			for other: MechEntityState in buckets.get(Vector2i(x, y), []):
-				if other.entity_id != id and other.position.distance_squared_to(point) < 0.52 * 0.52:
-					return false
-	return true
+func cancel_pending_motion() -> void:
+	_pending_request = 0
+	_starting_positions.clear()
+	_starting_waypoints.clear()
+	_crowd.cancel_pending()
+
+
+func suspend_motion() -> void:
+	cancel_pending_motion()
+	_crowd.suspend()
+
+
+func _apply_velocities(request_id: int, velocities: Dictionary) -> void:
+	if request_id != _pending_request:
+		return
+	_pending_request = 0
+	for id: int in velocities:
+		var entity: MechEntityState = _entities.get(id)
+		if entity == null or not _starting_positions.has(id):
+			continue
+		var velocity: Vector2 = velocities[id]
+		var desired: Vector2 = entity.position + velocity * _motion_seconds
+		# Final static guard only; all dynamic avoidance is performed by native RVO.
+		if _motion_grid.mobile_segment_clear(entity.position, desired):
+			entity.position = desired
+		entity.finish_path_if_arrived()
+		var waypoint: Vector2 = _starting_waypoints[id]
+		var advanced: bool = not entity.has_move_order or entity.position.distance_to(waypoint) < _starting_positions[id].distance_to(waypoint) - 0.001
+		entity.blocked_ticks = 0 if advanced else entity.blocked_ticks + 1
+	_starting_positions.clear()
+	_starting_waypoints.clear()
+	movement_finished.emit()
 
 
 func snapshots() -> Array[Dictionary]:

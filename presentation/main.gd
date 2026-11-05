@@ -63,6 +63,10 @@ func _physics_process(_delta: float) -> void:
 	_sim.advance_one_tick()
 
 
+func _exit_tree() -> void:
+	_sim.shutdown()
+
+
 func _process(_delta: float) -> void:
 	_update_cursor()
 	_hud.present_zoom(_camera.zoom.x)

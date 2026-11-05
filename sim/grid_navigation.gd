@@ -3,9 +3,11 @@ extends RefCounted
 ## Reuses Godot AStarGrid2D for the probe/player path. Not a horde flow field.
 
 var _navigation := AStarGrid2D.new()
+var _grid: MechGridState
 
 
 func rebuild(grid: MechGridState) -> void:
+	_grid = grid
 	_navigation.region = Rect2i(Vector2i.ZERO, grid.dimensions())
 	_navigation.cell_size = Vector2.ONE
 	_navigation.diagonal_mode = AStarGrid2D.DIAGONAL_MODE_ONLY_IF_NO_OBSTACLES
@@ -25,19 +27,8 @@ func find_path(from: Vector2, target_cell: Vector2i) -> PackedVector2Array:
 	var points := PackedVector2Array()
 	for cell: Vector2i in cells:
 		points.append(Vector2(cell) + Vector2(0.5, 0.5))
+	# Replanning must not send a moving unit back to the start-cell centre.
+	# Retain that centre when it is needed to clear a building corner.
+	if points.size() > 1 and _grid.mobile_segment_clear(from, points[1]):
+		points.remove_at(0)
 	return points
-
-
-func find_path_avoiding(from: Vector2, target_cell: Vector2i, blocked: Array[Vector2i]) -> PackedVector2Array:
-	var changed: Array[Vector2i] = []
-	var source := Vector2i(from.floor())
-	for cell: Vector2i in blocked:
-		if cell != source and _navigation.is_in_boundsv(cell) and not _navigation.is_point_solid(cell):
-			_navigation.set_point_solid(cell, true)
-			changed.append(cell)
-	var result := PackedVector2Array()
-	if not _navigation.is_point_solid(target_cell):
-		result = find_path(from, target_cell)
-	for cell: Vector2i in changed:
-		_navigation.set_point_solid(cell, false)
-	return result
