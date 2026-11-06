@@ -17,6 +17,10 @@ var _enemies := MechEnemySystem.new()
 var _waves := MechWaveDirector.new()
 var _threat := MechThreatSystem.new()
 var _enemy_defs: Dictionary = {}
+var _tick_counter: int = 0
+
+## Marching player units emit weak movement noise every two seconds (staggered).
+const MOVEMENT_NOISE_EVERY_TICKS: int = 60
 var _settings: MechFoundationSettings
 var _unit_definition: MechUnitDefinition
 var _map_definition: MechMapDefinition
@@ -237,6 +241,11 @@ func advance_one_tick() -> void:
 		_recompute_economy()
 		_sync_navigation()
 	_registry.step(_clock.step_seconds(), _grid)
+	# Marching units hum: the expansion itself attracts wanderers (values.md §13).
+	_tick_counter += 1
+	for entity: MechEntityState in _registry.all():
+		if entity.team == 1 and entity.unit_definition != null and entity.has_move_order and (_tick_counter + entity.entity_id) % MOVEMENT_NOISE_EVERY_TICKS == 0:
+			_threat.note_movement(entity.position)
 
 
 func snapshot() -> Dictionary:

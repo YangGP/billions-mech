@@ -17,6 +17,9 @@ const VISION_SCAN_INTERVAL: int = 5
 const FIELD_HP_REFRESH_TICKS: int = 30
 const CONVERGE_REPATH_TICKS: int = 60
 const CONVERGE_ARRIVAL: float = 1.0
+const SHUFFLE_DECISION_TICKS: int = 120
+const SHUFFLE_RADIUS: int = 5
+const SHUFFLE_ATTEMPTS: int = 6
 
 var _field := MechMarchField.new()
 var _goal: Vector2i = Vector2i.ZERO
@@ -68,7 +71,7 @@ func create(registry: MechEntityRegistry, rules: MechEnemyDefinition, position: 
 	enemy.hp = rules.max_hp
 	enemy.max_hp = rules.max_hp
 	enemy.hp_last_tick = rules.max_hp
-	enemy.order = &"wandering" if rules.stationary else &"marching"
+	enemy.order = &"wandering" if not rules.marches_to_core else &"marching"
 	return id
 
 
@@ -140,17 +143,18 @@ func _advance_one(enemy: MechEntityState, registry: MechEntityRegistry, grid: Me
 		_advance_engaged(enemy, registry, grid, navigation, buildings_by_id, building_ids,
 			building_cells, unit_buckets, enemy_buckets, dt, hz, result)
 		return
-	# TAB-style wanderers hold position until seen, attacked, or called by noise.
-	if enemy.enemy_definition.stationary:
-		_advance_convergence(enemy, noises, grid, navigation, enemy_buckets, building_ids, dt)
+	# Wanderers never march to the core: noise convergence or TAB-style shuffling.
+	if not enemy.enemy_definition.marches_to_core:
+		_advance_wandering(enemy, noises, grid, navigation, enemy_buckets, building_ids, dt)
 		return
 	_advance_marching(enemy, grid, enemy_buckets, building_ids, dt)
 
 
-## Idle wanderers hearing a live noise event walk toward it ("闻声缓慢聚拢");
-## once the source goes quiet they stop where they are ("滞留游荡"). Loudest level
-## wins, nearest breaks ties; arrival within 1 cell holds them at the source.
-func _advance_convergence(enemy: MechEntityState, noises: Array[Dictionary], grid: MechGridState,
+## Idle wanderer behaviour: walk toward the loudest heard noise ("闻声缓慢聚拢")
+## and, with no noise, occasionally shuffle to a nearby cell at a slow decision
+## cadence; the current walk always finishes, so losing a noise source leaves
+## them lingering wherever they stopped.
+func _advance_wandering(enemy: MechEntityState, noises: Array[Dictionary], grid: MechGridState,
 		navigation: MechGridNavigation, enemy_buckets: Dictionary, building_ids: Dictionary, dt: float) -> void:
 	var heard: Dictionary = {}
 	var best_radius: float = 0.0
@@ -164,22 +168,27 @@ func _advance_convergence(enemy: MechEntityState, noises: Array[Dictionary], gri
 			heard = noise
 			best_radius = radius
 			best_distance = distance
-	if heard.is_empty():
-		if enemy.has_move_order:
+	if not heard.is_empty():
+		var goal: Vector2 = heard["position"]
+		if enemy.position.distance_to(goal) <= CONVERGE_ARRIVAL:
 			enemy.set_move_path(PackedVector2Array())
-		return
-	var goal: Vector2 = heard["position"]
-	if enemy.position.distance_to(goal) <= CONVERGE_ARRIVAL:
-		enemy.set_move_path(PackedVector2Array())
-		enemy.repath_ticks = CONVERGE_REPATH_TICKS
-		return
-	if enemy.repath_ticks == 0 and (not enemy.has_move_order or enemy.order_goal.distance_to(goal) > 1.0):
-		var path: PackedVector2Array = navigation.find_path(enemy.position, Vector2i(goal.floor()))
-		enemy.repath_ticks = CONVERGE_REPATH_TICKS
-		if path.is_empty():
+			enemy.repath_ticks = CONVERGE_REPATH_TICKS
 			return
-		enemy.order_goal = goal
-		enemy.set_move_path(path)
+		if enemy.repath_ticks == 0 and (not enemy.has_move_order or enemy.order_goal.distance_to(goal) > 1.0):
+			var path: PackedVector2Array = navigation.find_path(enemy.position, Vector2i(goal.floor()))
+			enemy.repath_ticks = CONVERGE_REPATH_TICKS
+			if not path.is_empty():
+				enemy.order_goal = goal
+				enemy.set_move_path(path)
+	elif enemy.repath_ticks == 0 and not enemy.has_move_order:
+		# TAB-style idle shuffle: sometimes drift to a random walkable cell nearby.
+		enemy.repath_ticks = SHUFFLE_DECISION_TICKS
+		var shuffle_target: Vector2i = _shuffle_cell(enemy, grid)
+		if shuffle_target.x >= 0:
+			var path: PackedVector2Array = navigation.find_path(enemy.position, shuffle_target)
+			if not path.is_empty():
+				enemy.order_goal = Vector2(shuffle_target) + Vector2(0.5, 0.5)
+				enemy.set_move_path(path)
 	if not enemy.has_move_order:
 		return
 	var cell: Vector2i = Vector2i(enemy.position.floor())
@@ -193,6 +202,15 @@ func _advance_convergence(enemy: MechEntityState, noises: Array[Dictionary], gri
 	var blended: Vector2 = Steering.combine(velocity, separation, FLOW_WEIGHT, SEPARATION_WEIGHT, speed)
 	_guarded_step(enemy, blended, direction, speed, dt, grid, building_ids)
 	enemy.finish_path_if_arrived()
+
+
+func _shuffle_cell(enemy: MechEntityState, grid: MechGridState) -> Vector2i:
+	var center: Vector2i = Vector2i(enemy.position.floor())
+	for attempt: int in range(SHUFFLE_ATTEMPTS):
+		var candidate: Vector2i = center + Vector2i(randi_range(-SHUFFLE_RADIUS, SHUFFLE_RADIUS), randi_range(-SHUFFLE_RADIUS, SHUFFLE_RADIUS))
+		if grid.is_walkable(candidate):
+			return candidate
+	return Vector2i(-1, -1)
 
 
 func _advance_marching(enemy: MechEntityState, grid: MechGridState, enemy_buckets: Dictionary, building_ids: Dictionary, dt: float) -> void:
@@ -308,8 +326,8 @@ func _engage(enemy: MechEntityState, target_id: int) -> void:
 
 
 func _disengage(enemy: MechEntityState) -> void:
-	# Stationary enemies idle where the chase ended (waves resume the march).
-	enemy.order = &"wandering" if enemy.enemy_definition.stationary else &"marching"
+	# Wanderers idle where the chase ended; wave enemies resume the core march.
+	enemy.order = &"wandering" if not enemy.enemy_definition.marches_to_core else &"marching"
 	enemy.attack_target_id = 0
 	enemy.set_move_path(PackedVector2Array())
 

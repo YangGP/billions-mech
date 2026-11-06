@@ -1,9 +1,9 @@
 class_name MechThreatSystem
 extends RefCounted
 ## Wanderer population, noise events and infection conversion (values.md
-## §13–§15). Wanderers: TAB-style stationary scatter outside core coverage,
-## slow edge backfill, and noise-driven convergence ("闻声缓慢聚拢", leave the
-## source and they linger where they stopped). Infection: assets with positive
+## §13–§15). Wanderers: TAB-style scattered placement outside core coverage with
+## idle shuffling (see MechEnemySystem), slow edge backfill, and noise-driven
+## convergence ("闻声缓慢聚拢"). Infection: assets with positive
 ## capacity destroyed by enemies spawn builders at the wreck (act-one
 ## composition) and emit a combat-level pulse. Noise is an event list, not a
 ## shared field: a few dozen live events at most, each wanderer walks its own
@@ -14,6 +14,7 @@ const BACKFILL_SECONDS: float = 60.0
 const COMBAT_NOISE_SECONDS: float = 3.0
 const CONSTRUCTION_NOISE_SECONDS: float = 5.0
 const OPERATION_NOISE_SECONDS: float = 5.0
+const MOVEMENT_NOISE_SECONDS: float = 2.5
 const OPERATION_EVERY_TICKS: int = 150
 
 var _active: bool = false
@@ -28,6 +29,7 @@ var _noises: Array[Dictionary] = []
 var _radius_combat: float = 24.0
 var _radius_construction: float = 12.0
 var _radius_operation: float = 6.0
+var _radius_movement: float = 8.0
 var _infection_divisor: float = 20.0
 var _tick_rate: int = 30
 
@@ -49,6 +51,7 @@ func configure(definitions: Array[MechEnemyDefinition], settings: MechFoundation
 	_radius_combat = maxf(1.0, settings.noise_radius_combat)
 	_radius_construction = maxf(1.0, settings.noise_radius_construction)
 	_radius_operation = maxf(1.0, settings.noise_radius_operation)
+	_radius_movement = maxf(1.0, settings.noise_radius_movement)
 	_infection_divisor = maxf(1.0, settings.infection_value_divisor)
 	_tick_rate = maxi(1, settings.simulation_hz)
 	return ""
@@ -137,6 +140,11 @@ func note_construction(position: Vector2) -> void:
 
 func note_operation(position: Vector2) -> void:
 	_emit(position, _radius_operation, OPERATION_NOISE_SECONDS)
+
+
+## Player units marching generate a weak continuous hum (TAB-style movement noise).
+func note_movement(position: Vector2) -> void:
+	_emit(position, _radius_movement, MOVEMENT_NOISE_SECONDS)
 
 
 func _emit(position: Vector2, radius: float, seconds: float) -> void:
