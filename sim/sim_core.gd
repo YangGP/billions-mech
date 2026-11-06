@@ -13,6 +13,7 @@ var _economy := MechEconomySystem.new()
 var _minerals := MechMineralSystem.new()
 var _production := MechProductionSystem.new()
 var _units := MechUnitSystem.new()
+var _enemies := MechEnemySystem.new()
 var _settings: MechFoundationSettings
 var _unit_definition: MechUnitDefinition
 var _map_definition: MechMapDefinition
@@ -199,6 +200,14 @@ func advance_one_tick() -> void:
 	for id: int in dead:
 		_remove_entity(id)
 	if not dead.is_empty():
+		_recompute_economy()
+		_sync_navigation()
+	var enemy_result: Dictionary = _enemies.advance(_registry, _grid, _navigation, _construction.all(), _tick_rate)
+	for hit: Dictionary in enemy_result["building_hits"]:
+		damage_building(hit["id"], hit["damage"])
+	for id: int in enemy_result["dead_units"]:
+		_remove_entity(id)
+	if not enemy_result["dead_units"].is_empty():
 		_recompute_economy()
 		_sync_navigation()
 	_registry.step(_clock.step_seconds(), _grid)
@@ -445,13 +454,18 @@ func _clear_building_footprint(building: MechBuildingState) -> bool:
 	var assignments: Dictionary[int, Vector2] = {}
 	var taken: Dictionary = {}
 	var displaced: Dictionary = {}
-	var units: Array[Dictionary] = _registry.movable_snapshots()
-	for unit: Dictionary in units:
-		taken[Vector2i(unit["position"].floor())] = true
-		if area.has_point(Vector2i(unit["position"].floor())):
-			displaced[unit["id"]] = true
-	for unit: Dictionary in units:
-		if not area.has_point(Vector2i(unit["position"].floor())):
+	# Player units and wave enemies are both displaced on completion.
+	var movers: Array[MechEntityState] = []
+	for entity: MechEntityState in _registry.all():
+		if entity.hp > 0 and (entity.unit_definition != null or entity.enemy_definition != null):
+			movers.append(entity)
+	for mover: MechEntityState in movers:
+		var cell := Vector2i(mover.position.floor())
+		taken[cell] = true
+		if area.has_point(cell):
+			displaced[mover.entity_id] = true
+	for mover: MechEntityState in movers:
+		if not area.has_point(Vector2i(mover.position.floor())):
 			continue
 		var nearest := Vector2i(-1, -1)
 		var best: float = INF
@@ -467,13 +481,13 @@ func _clear_building_footprint(building: MechBuildingState) -> bool:
 				var candidate: Vector2 = Vector2(cell) + Vector2(0.5, 0.5)
 				if not _registry.mobile_space_free(candidate, displaced):
 					continue
-				var distance: float = candidate.distance_squared_to(unit["position"])
+				var distance: float = candidate.distance_squared_to(mover.position)
 				if distance < best:
 					best = distance
 					nearest = cell
 		if nearest.x < 0:
 			return false
-		assignments[unit["id"]] = Vector2(nearest) + Vector2(0.5, 0.5)
+		assignments[mover.entity_id] = Vector2(nearest) + Vector2(0.5, 0.5)
 		taken[nearest] = true
 	for entity_id: int in assignments:
 		_registry.teleport(entity_id, assignments[entity_id])
@@ -525,6 +539,9 @@ func _reset() -> void:
 	_recompute_economy()
 	_navigation_revision = -1
 	_sync_navigation()
+	# Terrain-only march field toward the fixed mainbrain cell; one build per reset.
+	var brain: MechBuildingDefinition = _construction.definition(&"mainbrain")
+	_enemies.reset(_grid, _map_definition.mainbrain_origin + (brain.footprint - Vector2i.ONE) / 2)
 
 
 func _settings_error(settings: MechFoundationSettings) -> String:

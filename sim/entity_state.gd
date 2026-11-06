@@ -10,13 +10,18 @@ var kind: StringName = &""
 var display_name: String = ""
 var position: Vector2 = Vector2.ZERO
 var move_target: Vector2 = Vector2.ZERO
-var move_speed: float = 0.0
+## RVO/waypoint pipeline: 0 marks an entity the registry never submits to the
+## native solver. Units copy their definition speed here; enemies march on
+## enemy_definition.move_speed and keep this at 0.
+var rvo_speed: float = 0.0
 var has_move_order: bool = false
 var footprint: Vector2i = Vector2i.ONE
 var unit_definition: MechUnitDefinition
+var enemy_definition: MechEnemyDefinition
 var team: int = 1
 var hp: int = 0
 var max_hp: int = 0
+var hp_last_tick: int = -1
 var order: StringName = &"idle"
 var order_goal: Vector2 = Vector2.ZERO
 var attack_target_id: int = 0
@@ -68,6 +73,8 @@ func snapshot() -> Dictionary:
 		"position": position, "target": move_target, "has_order": has_move_order,
 		"footprint": footprint, "path": _waypoints.slice(_waypoint_index),
 		"is_unit": unit_definition != null, "team": team, "hp": hp, "max_hp": max_hp,
+		"is_enemy": enemy_definition != null,
+		"enemy_id": enemy_definition.enemy_id if enemy_definition != null else &"",
 		"order": order, "order_goal": order_goal, "attack_target_id": attack_target_id,
 		"shot_ticks": shot_ticks, "shot_target": shot_target,
 		"capacity_cost": unit_definition.capacity_cost if unit_definition != null else 0,

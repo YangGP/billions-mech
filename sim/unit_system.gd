@@ -105,7 +105,7 @@ func _formation_cells(goal: Vector2i, count: int, grid: MechGridState) -> Array[
 func spawn(building: MechBuildingState, rally: Vector2i, rules: MechUnitDefinition, registry: MechEntityRegistry, grid: MechGridState, navigation: MechGridNavigation) -> bool:
 	var occupied: Dictionary = {}
 	for entity: MechEntityState in registry.all():
-		if entity.move_speed > 0.0:
+		if entity.rvo_speed > 0.0:
 			occupied[Vector2i(entity.position.floor())] = true
 	var area := Rect2i(building.origin, building.definition.footprint)
 	var candidates: Array[Vector2i] = []
@@ -214,7 +214,7 @@ func _attack_path(unit: MechEntityState, target: MechEntityState, registry: Mech
 	var candidates: Array[Vector2i] = []
 	var occupied: Array[Vector2i] = []
 	for other: MechEntityState in registry.all():
-		if other.entity_id != unit.entity_id and other.move_speed > 0.0:
+		if other.entity_id != unit.entity_id and other.rvo_speed > 0.0:
 			occupied.append(Vector2i(other.position.floor()))
 			if other.attack_target_id == target.entity_id and other.has_move_order:
 				occupied.append(Vector2i(other.move_target.floor()))

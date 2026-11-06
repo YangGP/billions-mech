@@ -27,7 +27,7 @@ func request(entities: Array[MechEntityState], preferred: Dictionary[int, Vector
 	_sync_obstacles(grid)
 	var present: Dictionary[int, bool] = {}
 	for entity: MechEntityState in entities:
-		if entity.move_speed <= 0.0:
+		if entity.rvo_speed <= 0.0:
 			continue
 		var id: int = entity.entity_id
 		present[id] = true
@@ -39,7 +39,7 @@ func request(entities: Array[MechEntityState], preferred: Dictionary[int, Vector
 		NavigationServer2D.agent_set_paused(agent, paused)
 		if paused:
 			continue
-		var speed: float = entity.move_speed / grid.movement_weight(Vector2i(entity.position.floor()))
+		var speed: float = entity.rvo_speed / grid.movement_weight(Vector2i(entity.position.floor()))
 		NavigationServer2D.agent_set_max_speed(agent, speed)
 		# Native priority makes idle units yield while keeping their own order.
 		NavigationServer2D.agent_set_avoidance_priority(agent, 0.5 if entity.has_move_order else 0.2)

@@ -109,6 +109,14 @@ func movement_weight(cell: Vector2i) -> float:
 	return _rough_weight if terrain_at(cell) == Terrain.ROUGH else 1.0
 
 
+func terrain_line_clear(from: Vector2, to: Vector2) -> bool:
+	# Buildings never block sight (vision-fog.md §2); only obstacle terrain does.
+	for cell: Vector2i in Geometry2D.bresenham_line(Vector2i(from.floor()), Vector2i(to.floor())):
+		if terrain_at(cell) == Terrain.OBSTACLE:
+			return false
+	return true
+
+
 func inspect_cell(cell: Vector2i) -> Dictionary:
 	if not contains(cell):
 		return {"cell": cell, "inside": false, "terrain_name": "地图外", "reason": "超出地图边界"}

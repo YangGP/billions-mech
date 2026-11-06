@@ -28,7 +28,7 @@ func clear() -> void:
 	_next_id = 1
 
 
-func create(kind: StringName, display_name: String, position: Vector2, speed: float = 0.0, footprint: Vector2i = Vector2i.ONE) -> int:
+func create(kind: StringName, display_name: String, position: Vector2, rvo_speed: float = 0.0, footprint: Vector2i = Vector2i.ONE) -> int:
 	var entity := MechEntityState.new()
 	entity.entity_id = _next_id
 	entity.kind = kind
@@ -36,7 +36,7 @@ func create(kind: StringName, display_name: String, position: Vector2, speed: fl
 	entity.position = position
 	entity.move_target = position
 	entity.order_goal = position
-	entity.move_speed = speed
+	entity.rvo_speed = rvo_speed
 	entity.footprint = footprint
 	_entities[_next_id] = entity
 	_next_id += 1
@@ -45,7 +45,7 @@ func create(kind: StringName, display_name: String, position: Vector2, speed: fl
 
 func can_move(entity_id: int) -> bool:
 	var entity: MechEntityState = _entities.get(entity_id)
-	return entity != null and entity.move_speed > 0.0
+	return entity != null and entity.rvo_speed > 0.0
 
 
 func get_entity(entity_id: int) -> MechEntityState:
@@ -60,7 +60,7 @@ func all() -> Array[MechEntityState]:
 
 func mobile_space_free(point: Vector2, ignored: Dictionary = {}) -> bool:
 	for entity: MechEntityState in _entities.values():
-		if entity.move_speed > 0.0 and not ignored.has(entity.entity_id) and entity.position.distance_squared_to(point) < MOBILE_SPACING * MOBILE_SPACING:
+		if entity.rvo_speed > 0.0 and not ignored.has(entity.entity_id) and entity.position.distance_squared_to(point) < MOBILE_SPACING * MOBILE_SPACING:
 			return false
 	return true
 
@@ -89,7 +89,7 @@ func teleport(entity_id: int, position: Vector2) -> void:
 func movable_snapshots() -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
 	for entity: MechEntityState in _entities.values():
-		if entity.move_speed > 0.0:
+		if entity.rvo_speed > 0.0:
 			result.append(entity.snapshot())
 	return result
 
@@ -106,9 +106,9 @@ func step(seconds: float, grid: MechGridState) -> void:
 	_starting_waypoints.clear()
 	var preferred: Dictionary[int, Vector2] = {}
 	for entity: MechEntityState in _entities.values():
-		if entity.move_speed <= 0.0 or not grid.is_walkable(Vector2i(entity.position.floor())):
+		if entity.rvo_speed <= 0.0 or not grid.is_walkable(Vector2i(entity.position.floor())):
 			continue
-		var speed: float = entity.move_speed / grid.movement_weight(Vector2i(entity.position.floor()))
+		var speed: float = entity.rvo_speed / grid.movement_weight(Vector2i(entity.position.floor()))
 		preferred[entity.entity_id] = entity.preferred_velocity(speed, seconds, grid.mobile_segment_clear)
 		_starting_positions[entity.entity_id] = entity.position
 		_starting_waypoints[entity.entity_id] = entity.next_waypoint()

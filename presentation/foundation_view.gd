@@ -120,6 +120,8 @@ func _draw() -> void:
 			_draw_building(entity, point)
 		elif entity["kind"] == &"practice_target":
 			_draw_practice_target(entity, point)
+		elif entity.get("is_enemy", false):
+			_draw_enemy(entity, point)
 		elif entity.get("is_unit", false):
 			_draw_sentinel(entity, point)
 		else:
@@ -151,6 +153,17 @@ func _draw_practice_target(entity: Dictionary, point: Vector2) -> void:
 	draw_line(point + Vector2(9, -25), point + Vector2(-9, -8), Color("f27c78"), 3.0, true)
 	draw_rect(Rect2(point + Vector2(-23, -48), Vector2(46, 4)), Color("213540"))
 	draw_rect(Rect2(point + Vector2(-23, -48), Vector2(46.0 * float(entity["hp"]) / entity["max_hp"], 4)), Color("f27c78"))
+
+
+func _draw_enemy(entity: Dictionary, point: Vector2) -> void:
+	_draw_shadow(point, Vector2(16, 8))
+	var body := PackedVector2Array([point + Vector2(-10, -8), point + Vector2(-10, -24),
+		point + Vector2(0, -32), point + Vector2(10, -24), point + Vector2(10, -8), point])
+	draw_colored_polygon(body, Color("c9908b"))
+	draw_line(point + Vector2(-6, -21), point + Vector2(6, -21), Color("7a2e28"), 3.0, true)
+	draw_line(point + Vector2(-6, -13), point + Vector2(6, -13), Color("7a2e28"), 3.0, true)
+	draw_rect(Rect2(point + Vector2(-16, -42), Vector2(32, 3)), Color("213540"))
+	draw_rect(Rect2(point + Vector2(-16, -42), Vector2(32.0 * float(entity["hp"]) / entity["max_hp"], 3)), Color("f27c78"))
 
 
 func _draw_minerals() -> void:
