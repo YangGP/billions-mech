@@ -146,3 +146,13 @@ Godot 当前项目使用的 NavigationServer2D 与 AStarGrid2D 提供逐 agent �
 已比较 [Clipper2](https://github.com/AngusJohnson/Clipper2)（Boost Software License 1.0，C++/C#/Delphi 多边形布尔运算）与 [Godot Geometry2D](https://docs.godotengine.org/en/stable/classes/class_geometry2d.html)。单独接入 Clipper2 需要新增原生或 .NET 适配，而引擎已提供本次所需接口，因此直接调用原生 `is_point_in_polygon`、`intersect_polygons`、`get_closest_point_to_segment`、`triangulate_polygon`；不自写多边形判断或裁剪算法、不新增 vendor。
 
 保留既有等距投影，以地图 Resource 中的逻辑多边形定义可玩边界，投影后外轮廓为正方形。网格缓存范围掩码，玩家 A*、敌方加权场、放置/拾取与边缘出生共同读取；表现使用原生多边形裁剪。基地禁刷按主脑占地矩形的原生 `Rect2` 钳制距离过滤初始散布与回填候选，是项目玩法规则；后续正常行走、波次和感疫沿用原有规则。
+
+## 13. 扩图后的持续渲染性能
+
+使用原生 [Performance](https://docs.godotengine.org/en/stable/classes/class_performance.html) 监视器和 Time 计时定位：扩大后的地图全景约 28,341 次绘制调用/帧，本机 Compatibility/RTX 4080 SUPER 下稳定约 18–19 FPS；模拟每步约 0.7–0.8ms、界面脚本每帧约 0.54ms。CanvasItem 缓存绘制指令并不等于缓存渲染结果，千余地格/岩体仍持续提交绘制。
+
+先核对 [Godot 官方演示仓库](https://github.com/godotengine/godot-demo-projects)（MIT，viewport 示例）与引擎内置方案。TileMapLayer 原生分块适合已有图集的瓦片地图，本项目当前由多边形与文字绘制白模。此次直接复用 [SubViewport.UPDATE_ONCE](https://docs.godotengine.org/en/stable/classes/class_subviewport.html) + ViewportTexture + Sprite2D，把既有静态画面绘制一次后作为纹理显示；不复制外部源码、不自写渲染缓存算法。静态地图只在新会话/地图加载时更新，建造与移动不会触发重绘；动态实体与覆盖预览继续独立绘制。
+
+保留可选 `--perf` 日志，汇总真实帧率、绘制调用、模拟/表现脚本及原生导航耗时，用于后续定位。它不改变游戏数值或推进频率，不新增测试脚本。
+
+相同 1920×1080 标准开局全景、关闭垂直同步对照：缓存后绘制调用降至 272 次/帧，稳定约 440–470 FPS；默认镜头约 449–456 FPS。该结果只覆盖本机开局持续渲染，不等同于目标千级机潮或鼠标交互验收。

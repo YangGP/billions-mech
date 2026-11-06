@@ -32,9 +32,16 @@ var _last_threat_key: String = ""
 var _state: Dictionary = {}
 var _state_dirty: bool = true
 var _last_session_ended: bool = false
+var _perf_enabled: bool = false
+var _perf_seconds: float = 0.0
+var _perf_frames: int = 0
+var _perf_sim_usec: int = 0
+var _perf_sim_ticks: int = 0
+var _perf_view_usec: int = 0
 
 
 func _ready() -> void:
+	_perf_enabled = OS.get_cmdline_user_args().has("--perf")
 	var initial_settings: MechFoundationSettings = TRAINING_SETTINGS if OS.get_cmdline_user_args().has("--training") else SETTINGS
 	Engine.physics_ticks_per_second = initial_settings.simulation_hz
 	if not _sim.configure(initial_settings):
@@ -65,17 +72,37 @@ func _ready() -> void:
 
 
 func _physics_process(_delta: float) -> void:
+	var started: int = Time.get_ticks_usec() if _perf_enabled else 0
 	_sim.advance_one_tick()
+	if _perf_enabled:
+		_perf_sim_usec += Time.get_ticks_usec() - started
+		_perf_sim_ticks += 1
 
 
 func _exit_tree() -> void:
 	_sim.shutdown()
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
+	var started: int = Time.get_ticks_usec() if _perf_enabled else 0
 	_publish_state()
 	_update_cursor()
 	_hud.present_zoom(_camera.zoom.x)
+	if _perf_enabled:
+		_perf_view_usec += Time.get_ticks_usec() - started
+		_perf_frames += 1
+		_perf_seconds += delta
+		if _perf_seconds >= 2.0:
+			print("[perf] fps=%.1f draw_calls=%d sim_cpu_ms=%.3f view_cpu_ms=%.3f native_nav_ms=%.3f" % [
+				_perf_frames / _perf_seconds, Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME),
+				float(_perf_sim_usec) / maxi(1, _perf_sim_ticks) / 1000.0,
+				float(_perf_view_usec) / maxi(1, _perf_frames) / 1000.0,
+				Performance.get_monitor(Performance.TIME_NAVIGATION_PROCESS) * 1000.0])
+			_perf_seconds = 0.0
+			_perf_frames = 0
+			_perf_sim_usec = 0
+			_perf_sim_ticks = 0
+			_perf_view_usec = 0
 
 
 func _input(event: InputEvent) -> void:
@@ -476,7 +503,8 @@ func _publish_state() -> void:
 	_hud.present_state(state)
 	if _last_generation != state["generation"] or _last_map_revision != state["map_revision"]:
 		var map_state: Dictionary = _sim.map_snapshot()
-		_terrain.present_map(map_state)
+		if generation_changed:
+			_terrain.present_map(map_state)
 		_coverage.present_map(map_state)
 		_hud.present_map(map_state)
 		_dimensions = map_state["dimensions"]
