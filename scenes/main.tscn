@@ -1,4 +1,4 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=9 format=3]
 
 [ext_resource type="Script" path="res://presentation/main.gd" id="1"]
 [ext_resource type="Script" path="res://presentation/terrain_view.gd" id="2"]
@@ -7,6 +7,7 @@
 [ext_resource type="Script" path="res://presentation/map_camera.gd" id="5"]
 [ext_resource type="PackedScene" path="res://scenes/ui/map_hud.tscn" id="6"]
 [ext_resource type="Resource" path="res://content/maps/first_outpost.tres" id="7"]
+[ext_resource type="PackedScene" path="res://scenes/ui/settings_menu.tscn" id="8"]
 
 [node name="BillionsMech" type="Node2D"]
 script = ExtResource("1")
@@ -29,3 +30,5 @@ zoom = Vector2(0.78, 0.78)
 script = ExtResource("5")
 
 [node name="HUD" parent="." instance=ExtResource("6")]
+
+[node name="Settings" parent="." instance=ExtResource("8")]

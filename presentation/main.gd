@@ -11,6 +11,8 @@ var _commands := MechCommandQueue.new()
 @onready var _world: MechFoundationView = $Entities
 @onready var _camera: MechMapCamera = $MapCamera
 @onready var _hud: MechMapHud = $HUD
+@onready var _settings: MechSettingsMenu = $Settings
+var _resume_after_settings: bool = false
 var _last_generation: int = -1
 var _last_map_revision: int = -1
 var _selected := Vector2i(-1, -1)
@@ -60,6 +62,10 @@ func _ready() -> void:
 	_hud.production_requested.connect(_queue_unit)
 	_hud.production_cancelled.connect(_cancel_production)
 	_hud.scenario_requested.connect(_toggle_scenario)
+	_hud.settings_requested.connect(_open_settings)
+	_settings.close_requested.connect(_close_settings)
+	_settings.settings_applied.connect(_apply_camera_settings)
+	_apply_camera_settings(_settings.preferences())
 	get_window().focus_exited.connect(_cancel_wall_drag)
 	get_window().mouse_exited.connect(_cancel_wall_drag)
 	get_window().focus_exited.connect(_cancel_selection_drag)
@@ -68,6 +74,8 @@ func _ready() -> void:
 	_publish_state()
 	if OS.get_cmdline_user_args().has("--overview"):
 		_fit_map()
+	if OS.get_cmdline_user_args().has("--settings"):
+		_open_settings()
 	print("[Billions Mech] M5 threat and defense ready; 1920x1080; whitebox; ", initial_settings.scenario_name)
 
 
@@ -106,6 +114,11 @@ func _process(delta: float) -> void:
 
 
 func _input(event: InputEvent) -> void:
+	if _settings.is_open():
+		if event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == KEY_ESCAPE:
+			_close_settings()
+			get_viewport().set_input_as_handled()
+		return
 	if _selection_dragging:
 		if event is InputEventMouseMotion:
 			_selection_end = event.position
@@ -143,6 +156,8 @@ func _input(event: InputEvent) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if _settings.is_open():
+		return
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.physical_keycode >= KEY_1 and event.physical_keycode <= KEY_9:
 			_handle_group(event.physical_keycode - KEY_0, event.ctrl_pressed)
@@ -210,6 +225,8 @@ func _select_world_position(world_position: Vector2) -> void:
 
 func _handle_key(key: int) -> bool:
 	match key:
+		KEY_F10:
+			_open_settings()
 		KEY_Q:
 			_request_build(&"compute_node")
 		KEY_W:
@@ -249,6 +266,36 @@ func _handle_key(key: int) -> bool:
 
 func _toggle_pause() -> void:
 	_commands.submit(MechCommand.new(MechCommand.Type.SET_PAUSED, {"paused": not _sim.is_paused()}))
+
+
+func _open_settings() -> void:
+	if _settings.is_open():
+		return
+	_cancel_selection_drag()
+	_cancel_build()
+	_attack_move_mode = false
+	_hud.dismiss_dialogs()
+	_resume_after_settings = not _sim.is_paused() and not _sim.session_ended()
+	if _resume_after_settings:
+		_commands.submit(MechCommand.new(MechCommand.Type.SET_PAUSED, {"paused": true}))
+	_camera.input_blocked = true
+	_settings.open()
+
+
+func _close_settings() -> void:
+	if not _settings.is_open():
+		return
+	_settings.close()
+	_camera.input_blocked = false
+	if _resume_after_settings and not _sim.session_ended():
+		_commands.submit(MechCommand.new(MechCommand.Type.SET_PAUSED, {"paused": false}))
+	_resume_after_settings = false
+
+
+func _apply_camera_settings(preferences: Dictionary) -> void:
+	_camera.pan_speed_factor = preferences["pan_speed"]
+	_camera.zoom_speed_factor = preferences["zoom_speed"]
+	_camera.edge_scroll_enabled = preferences["edge_scroll"]
 
 
 func _restart() -> void:
@@ -579,7 +626,7 @@ func _wall_cells() -> Array[Vector2i]:
 
 func _update_cursor() -> void:
 	var mouse: Vector2 = get_viewport().get_mouse_position()
-	var cursor_visible: bool = get_window().has_focus() and get_viewport_rect().has_point(mouse) and not _hud.blocks_point(mouse)
+	var cursor_visible: bool = not _settings.is_open() and get_window().has_focus() and get_viewport_rect().has_point(mouse) and not _hud.blocks_point(mouse)
 	var cell: Vector2i = _mouse_cell()
 	var info: Dictionary = {}
 	if cursor_visible:

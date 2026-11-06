@@ -1,0 +1,277 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://presentation/settings_menu.gd" id="1"]
+
+[sub_resource type="SystemFont" id="Font"]
+font_names = PackedStringArray("Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC", "sans-serif")
+
+[sub_resource type="Theme" id="Theme"]
+default_font = SubResource("Font")
+default_font_size = 18
+
+[sub_resource type="StyleBoxFlat" id="Panel"]
+bg_color = Color(0.045, 0.09, 0.12, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.165, 0.40, 0.43, 1)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_left = 12
+corner_radius_bottom_right = 12
+
+[node name="Settings" type="CanvasLayer"]
+layer = 20
+script = ExtResource("1")
+
+[node name="Root" type="Control" parent="."]
+visible = false
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme = SubResource("Theme")
+
+[node name="Shade" type="ColorRect" parent="Root"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+color = Color(0.005, 0.015, 0.025, 0.82)
+
+[node name="Center" type="CenterContainer" parent="Root"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+
+[node name="Panel" type="PanelContainer" parent="Root/Center"]
+custom_minimum_size = Vector2(700, 0)
+layout_mode = 2
+theme_override_styles/panel = SubResource("Panel")
+
+[node name="Margin" type="MarginContainer" parent="Root/Center/Panel"]
+layout_mode = 2
+theme_override_constants/margin_left = 32
+theme_override_constants/margin_right = 32
+theme_override_constants/margin_top = 28
+theme_override_constants/margin_bottom = 28
+
+[node name="Content" type="VBoxContainer" parent="Root/Center/Panel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="Title" type="Label" parent="Root/Center/Panel/Margin/Content"]
+layout_mode = 2
+text = "基础设置"
+mouse_filter = 2
+theme_override_font_sizes/font_size = 30
+theme_override_colors/font_color = Color(0.447, 0.914, 0.816, 1)
+
+[node name="Subtitle" type="Label" parent="Root/Center/Panel/Margin/Content"]
+layout_mode = 2
+text = "调整显示与镜头操作，让战场更顺手。"
+mouse_filter = 2
+theme_override_font_sizes/font_size = 16
+theme_override_colors/font_color = Color(0.60, 0.71, 0.76, 1)
+
+[node name="Divider" type="HSeparator" parent="Root/Center/Panel/Margin/Content"]
+layout_mode = 2
+
+
+[node name="DisplayTitle" type="Label" parent="Root/Center/Panel/Margin/Content"]
+layout_mode = 2
+text = "显示"
+mouse_filter = 2
+theme_override_font_sizes/font_size = 20
+
+[node name="Display" type="GridContainer" parent="Root/Center/Panel/Margin/Content"]
+layout_mode = 2
+columns = 2
+theme_override_constants/h_separation = 36
+theme_override_constants/v_separation = 10
+
+[node name="WindowLabel" type="Label" parent="Root/Center/Panel/Margin/Content/Display"]
+layout_mode = 2
+text = "窗口模式"
+mouse_filter = 2
+custom_minimum_size = Vector2(220, 0)
+
+[node name="WindowMode" type="OptionButton" parent="Root/Center/Panel/Margin/Content/Display"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(360, 40)
+item_count = 2
+selected = 0
+popup/item_0/text = "窗口"
+popup/item_0/id = 0
+popup/item_1/text = "全屏"
+popup/item_1/id = 1
+
+[node name="VSyncLabel" type="Label" parent="Root/Center/Panel/Margin/Content/Display"]
+layout_mode = 2
+text = "垂直同步"
+mouse_filter = 2
+
+
+[node name="VSync" type="CheckButton" parent="Root/Center/Panel/Margin/Content/Display"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "开启"
+
+[node name="FrameLabel" type="Label" parent="Root/Center/Panel/Margin/Content/Display"]
+layout_mode = 2
+text = "帧率上限"
+mouse_filter = 2
+
+
+[node name="FrameCap" type="OptionButton" parent="Root/Center/Panel/Margin/Content/Display"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(360, 40)
+item_count = 5
+selected = 1
+popup/item_0/text = "60 FPS"
+popup/item_0/id = 0
+popup/item_1/text = "120 FPS"
+popup/item_1/id = 1
+popup/item_2/text = "144 FPS"
+popup/item_2/id = 2
+popup/item_3/text = "240 FPS"
+popup/item_3/id = 3
+popup/item_4/text = "不限帧"
+popup/item_4/id = 4
+
+[node name="Divider2" type="HSeparator" parent="Root/Center/Panel/Margin/Content"]
+layout_mode = 2
+
+
+[node name="CameraTitle" type="Label" parent="Root/Center/Panel/Margin/Content"]
+layout_mode = 2
+text = "镜头"
+mouse_filter = 2
+theme_override_font_sizes/font_size = 20
+
+[node name="Camera" type="GridContainer" parent="Root/Center/Panel/Margin/Content"]
+layout_mode = 2
+columns = 2
+theme_override_constants/h_separation = 36
+theme_override_constants/v_separation = 12
+
+[node name="PanLabel" type="Label" parent="Root/Center/Panel/Margin/Content/Camera"]
+layout_mode = 2
+text = "移动速度"
+mouse_filter = 2
+custom_minimum_size = Vector2(220, 0)
+
+[node name="PanRow" type="HBoxContainer" parent="Root/Center/Panel/Margin/Content/Camera"]
+layout_mode = 2
+custom_minimum_size = Vector2(360, 40)
+theme_override_constants/separation = 14
+
+[node name="PanSpeed" type="HSlider" parent="Root/Center/Panel/Margin/Content/Camera/PanRow"]
+unique_name_in_owner = true
+layout_mode = 2
+tooltip_text = "调整方向键和边缘滚屏的移动速度；中键拖图始终跟随鼠标。"
+size_flags_horizontal = 3
+size_flags_vertical = 4
+min_value = 0.5
+max_value = 2.0
+step = 0.05
+value = 1.0
+scrollable = false
+
+[node name="PanValue" type="Label" parent="Root/Center/Panel/Margin/Content/Camera/PanRow"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(60, 0)
+text = "100%"
+horizontal_alignment = 2
+
+[node name="ZoomLabel" type="Label" parent="Root/Center/Panel/Margin/Content/Camera"]
+layout_mode = 2
+text = "缩放灵敏度"
+mouse_filter = 2
+custom_minimum_size = Vector2(220, 0)
+
+[node name="ZoomRow" type="HBoxContainer" parent="Root/Center/Panel/Margin/Content/Camera"]
+layout_mode = 2
+custom_minimum_size = Vector2(360, 40)
+theme_override_constants/separation = 14
+
+[node name="ZoomSpeed" type="HSlider" parent="Root/Center/Panel/Margin/Content/Camera/ZoomRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+min_value = 0.5
+max_value = 2.0
+step = 0.05
+value = 1.0
+scrollable = false
+
+[node name="ZoomValue" type="Label" parent="Root/Center/Panel/Margin/Content/Camera/ZoomRow"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(60, 0)
+text = "100%"
+horizontal_alignment = 2
+
+[node name="EdgeLabel" type="Label" parent="Root/Center/Panel/Margin/Content/Camera"]
+layout_mode = 2
+text = "边缘滚屏"
+mouse_filter = 2
+
+
+[node name="EdgeScroll" type="CheckButton" parent="Root/Center/Panel/Margin/Content/Camera"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "开启"
+
+[node name="Hint" type="Label" parent="Root/Center/Panel/Margin/Content"]
+layout_mode = 2
+text = "设置期间游戏暂停，关闭后恢复原先状态。
+垂直同步开启时，实际帧率受显示器刷新率限制。"
+mouse_filter = 2
+theme_override_font_sizes/font_size = 15
+theme_override_colors/font_color = Color(0.60, 0.71, 0.76, 1)
+
+[node name="Status" type="Label" parent="Root/Center/Panel/Margin/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(0, 42)
+autowrap_mode = 2
+theme_override_font_sizes/font_size = 15
+theme_override_colors/font_color = Color(0.94, 0.74, 0.47, 1)
+
+[node name="Actions" type="HBoxContainer" parent="Root/Center/Panel/Margin/Content"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Defaults" type="Button" parent="Root/Center/Panel/Margin/Content/Actions"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(138, 44)
+text = "恢复默认"
+
+[node name="Spacer" type="Control" parent="Root/Center/Panel/Margin/Content/Actions"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+
+[node name="Cancel" type="Button" parent="Root/Center/Panel/Margin/Content/Actions"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(138, 44)
+text = "取消 [Esc]"
+
+[node name="Apply" type="Button" parent="Root/Center/Panel/Margin/Content/Actions"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(160, 44)
+text = "应用并返回"

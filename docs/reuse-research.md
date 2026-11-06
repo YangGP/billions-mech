@@ -156,3 +156,9 @@ Godot 当前项目使用的 NavigationServer2D 与 AStarGrid2D 提供逐 agent �
 保留可选 `--perf` 日志，汇总真实帧率、绘制调用、模拟/表现脚本及原生导航耗时，用于后续定位。它不改变游戏数值或推进频率，不新增测试脚本。
 
 相同 1920×1080 标准开局全景、关闭垂直同步对照：缓存后绘制调用降至 272 次/帧，稳定约 440–470 FPS；默认镜头约 449–456 FPS。该结果只覆盖本机开局持续渲染，不等同于目标千级机潮或鼠标交互验收。
+
+## 14. 基础设置页面
+
+先检索 [Maaack/Godot-Menus-Template](https://github.com/Maaack/Godot-Menus-Template)（MIT，持续维护的菜单模板）。其配套插件覆盖完整菜单与场景加载体系；本项目已有独立模拟暂停命令、HUD 和镜头，整套接入会引入重复的应用生命周期管理。此次直接复用引擎内置 Control/Container、[DisplayServer](https://docs.godotengine.org/en/stable/classes/class_displayserver.html)、[Engine.max_fps](https://docs.godotengine.org/en/stable/classes/class_engine.html) 和 [ConfigFile](https://docs.godotengine.org/en/stable/classes/class_configfile.html)，不复制或仿写模板代码、不新增依赖。
+
+项目代码仅负责设置字段校验、控件与原生 API 绑定、ConfigFile 读写，以及设置页与既有暂停/输入命令的衔接。首版提供窗口/全屏、垂直同步、帧率上限、镜头移动/缩放倍率与边缘滚屏；应用后保存，取消丢弃草稿，默认值须应用才生效。界面使用独立可编辑场景。

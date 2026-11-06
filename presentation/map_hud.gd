@@ -12,6 +12,7 @@ signal building_action_requested(action: int, entity_id: int)
 signal production_requested(factory_id: int)
 signal production_cancelled(factory_id: int, ticket: int)
 signal scenario_requested
+signal settings_requested
 
 const INK := Color("d5e6eb")
 const MUTED := Color("819ca9")
@@ -88,6 +89,7 @@ func _ready() -> void:
 	$Root/Toolbar/FocusCore.pressed.connect(focus_requested.emit)
 	$Root/Toolbar/Restart.pressed.connect(restart_requested.emit)
 	$Root/Header/Scenario.pressed.connect(scenario_requested.emit)
+	$Root/Header/Settings.pressed.connect(settings_requested.emit)
 	$Root/SessionResult/Restart.pressed.connect(restart_requested.emit)
 	$Root/SessionResult/Scenario.pressed.connect(scenario_requested.emit)
 	$Root/Inspector/Produce.pressed.connect(_produce_pressed)
@@ -107,6 +109,11 @@ func blocks_point(point: Vector2) -> bool:
 		if panel.is_visible_in_tree() and panel.get_global_rect().has_point(point):
 			return true
 	return false
+
+
+func dismiss_dialogs() -> void:
+	_pending_demolish = 0
+	_dialog.hide()
 
 
 func present_map(map_state: Dictionary) -> void:

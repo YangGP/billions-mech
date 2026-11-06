@@ -13,6 +13,14 @@ var _dragging: bool = false
 var _last_drag_position := Vector2.ZERO
 var _mouse_inside: bool = false
 var _external_gesture: bool = false
+var pan_speed_factor: float = 1.0
+var zoom_speed_factor: float = 1.0
+var edge_scroll_enabled: bool = true
+var input_blocked: bool = false:
+	set(value):
+		input_blocked = value
+		if value:
+			_stop_drag()
 
 
 func set_external_gesture(active: bool) -> void:
@@ -53,7 +61,7 @@ func fit_map() -> void:
 
 
 func handle_event(event: InputEvent) -> bool:
-	if _external_gesture:
+	if input_blocked or _external_gesture:
 		return false
 	if event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_MIDDLE and event.pressed:
@@ -62,7 +70,8 @@ func handle_event(event: InputEvent) -> bool:
 			return true
 		if event.pressed and event.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
 			var before: Vector2 = get_global_mouse_position()
-			var multiplier: float = 1.15 if event.button_index == MOUSE_BUTTON_WHEEL_UP else 1.0 / 1.15
+			var step: float = pow(1.15, zoom_speed_factor)
+			var multiplier: float = step if event.button_index == MOUSE_BUTTON_WHEEL_UP else 1.0 / step
 			zoom = Vector2.ONE * clampf(zoom.x * multiplier, MIN_ZOOM, MAX_ZOOM)
 			force_update_scroll()
 			position += before - get_global_mouse_position()
@@ -74,7 +83,7 @@ func handle_event(event: InputEvent) -> bool:
 func _input(event: InputEvent) -> void:
 	# Capture a world-originated middle drag even when it moves over the HUD.
 	# Left-button selection and building gestures belong to the input owner.
-	if not _dragging:
+	if input_blocked or not _dragging:
 		return
 	if event is InputEventMouseMotion:
 		position -= (event.position - _last_drag_position) / zoom
@@ -87,7 +96,7 @@ func _input(event: InputEvent) -> void:
 
 
 func _process(delta: float) -> void:
-	if _dragging or _external_gesture or not get_window().has_focus():
+	if input_blocked or _dragging or _external_gesture or not get_window().has_focus():
 		return
 	var direction := Vector2.ZERO
 	if Input.is_physical_key_pressed(KEY_LEFT):
@@ -98,7 +107,7 @@ func _process(delta: float) -> void:
 		direction.y -= 1.0
 	if Input.is_physical_key_pressed(KEY_DOWN):
 		direction.y += 1.0
-	if _mouse_inside and get_viewport().gui_get_hovered_control() == null:
+	if edge_scroll_enabled and _mouse_inside and get_viewport().gui_get_hovered_control() == null:
 		var mouse: Vector2 = get_viewport().get_mouse_position()
 		var extent: Vector2 = get_viewport_rect().size
 		if mouse.x >= 0.0 and mouse.x < EDGE_WIDTH:
@@ -110,7 +119,7 @@ func _process(delta: float) -> void:
 		elif mouse.y > extent.y - EDGE_WIDTH and mouse.y < extent.y:
 			direction.y += 1.0
 	if not direction.is_zero_approx():
-		position += direction.normalized() * PAN_SPEED * delta / zoom.x
+		position += direction.normalized() * PAN_SPEED * pan_speed_factor * delta / zoom.x
 		_clamp_position()
 
 
