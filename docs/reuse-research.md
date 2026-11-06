@@ -73,3 +73,32 @@
 后续目标漂移反馈修正的是项目指令适配：友军临时占位不再替换点击格/阵型终点；最后路点在原生位移实际提交后确认，空路径重试原目标。单兵静态不可达时拒绝下令，不寻找附近替代终点。求路与避让仍分别直接调用原生 AStarGrid2D 与 RVO，没有新增避让或寻路算法。
 
 按 [官方回调时序](https://docs.godotengine.org/en/stable/tutorials/navigation/navigation_using_navigationservers.html)，提交发生在固定物理帧，移动提交和视图刷新在同帧的原生回调收齐后执行，不在每个单独回调中各自刷新。已知限制：RVO 不能保证所有拥堵场景都能解开，[官方说明](https://docs.godotengine.org/en/stable/tutorials/navigation/navigation_using_navigationagents.html) 提示完全对称的迎面情形可能失败。这里只完成 29 个脚本的语法核对，通行、暂停和资源生命周期仍须运行复验，不能把接入成熟求解器写成已通过玩法验收。
+
+## 7. 是否改用 RTS Advanced Lite：核查与决定（2026-11-06）
+
+用户要求核查功能是否使用 RTS Advanced Lite，未使用则改为该框架实现。核查结果：全部 29 个脚本均为自有 `Mech*` 类（继承 Godot 原生 RefCounted/Node2D/Camera2D/CanvasLayer/Resource），无 vendor 目录与 Lite 引用；选择/编队、生产队列、单位战斗为自有 2D sim/客户端实现，寻路直接调用 AStarGrid2D，避让直接调用 NavigationServer2D RVO（§6）。
+
+经用户确认维持现状、不改用 Lite，决定依据记录如下：
+
+- 现行实现已直接复用引擎内置成熟方案（AStarGrid2D、NavigationServer2D/RVO2、Geometry2D、Camera2D），符合 AGENT.md"直接复用引擎内置能力"的要求。Lite 为 3D 场景节点基座，选择投影/地面拾取/单位模块接入 2D 等距项目须按本作改写；按 AGENT.md 口径，仅参考设计后自行重写不算复用。
+- Lite 不含本项目最大系统：建造、多资源经济、电力覆盖、容量、采矿、波次（§4 已核对"没有可直接接入的建造经济模块"）。
+- architecture.md 红线要求 SimCore 不 import 场景/节点类型（无头 sim）；Lite 单位与选择耦合场景节点，直接接入破坏该边界。
+- 主脑/组装厂窄口拥堵已用原生 RVO 修复（§6），换用 Lite 的分离避让会回退该修复。
+- 本地环境无 Godot，整框架替换后无法执行任何校验；不做不可验证的替换。
+- 后续未实现模块（键位重绑定、小地图等）仍按 §2 流程逐模块评估 Lite 与其他候选；采用前照常记录来源、许可证、版本与适配验证结果。
+
+## 8. Lite 源码通读核查（2026-11-06，本地参考副本）
+
+用户下载了 Lite 源码副本（main 分支 zip，HEAD `81e757ba`；版本 0.3.0，2026-10-15；MIT 见仓库 LICENSE 首行 SPDX 标识）。逐文件通读 14 个 addon 模块、demo 接线与测试模式，与本项目现有实现逐项对照，结论如下。
+
+**值得参考（按里程碑）**：
+
+- **M6 键位重绑定（§2 既定候选的首个一手核查）**：`rts_bindings.gd` 为纯 RefCounted + InputMap 操作，无 3D/场景依赖，可直接适配；提供注册默认动作、`conflict()` 冲突检测、`rebind()` 拒绝占用键、ConfigFile 存/读、`label()` 人类可读键名。本项目现状为 presentation/main.gd `_handle_key` 硬编码 KEY_* 分支与 map_camera.gd 直查物理键。适配点：动作集换成本项目热键（含 R 建造槽与重开键的既有冲突，开发计划 M6 待处理）；其"一动作一物理键"模型需确认与 Ctrl+数字编队等修饰键语义不冲突。
+- **M6 选择框实时计数（UX 参考）**：`RTSSelectionBox` 拖拽时经注入的 `count_provider`（每帧至多一次）在光标旁显示"N units"——本项目 HUD 拖框可参考；本项目已有点击/拖动区分、shift/ctrl、编队与失效剔除（selection_state.gd），无缺口。
+- **收敛印证**：`rts_grid_nav.gd` 同样直接用原生 AStarGrid2D + DIAGONAL_MODE_ONLY_IF_NO_OBSTACLES + OCTILE 启发式，且同样"首路点若可视直达则跳过"——与 grid_navigation.gd 两处做法一致，属独立收敛，不作改动。
+- **生产队列可选 QoL（设计未要求，不主动加）**：`rts_production.gd` 的 repeat（完工自动续订、可负担才续）、produced_tagged 标签、speed 乘数。若日后设计稿提出"连续生产"或"生产加速"，可参考其实现；本项目预付/占容/退款/受阻语义更完整，保持不动。
+- **测试 harness 模式**：`tests/harness.gd` 以 Logger 挂钩统计 SCRIPT ERROR、按 expected.json 严对账段数/检查数。本项目 AGENT.md 不写测试脚本，此模式仅供用户开发环境自行参考，不入库。
+
+**已核实的分歧（本项目保持不动）**：`nearest_open` 螺旋把目标吸附到最近可走格——本项目规则为"单兵静态不可达拒绝下令，不找替代终点"；`rts_separation.gd` O(n²) 自写分离——已被原生 RVO 替代（§6）；`rts_unit.gd` 为 Node3D 场景节点、战斗仅单位对单位——违反无头 sim 红线，且 M5 所需的建筑目标、流场行军、波次 Lite 均不提供；formation/orders 的贪心槽位分配——本项目已按"成组落点一次分配 + 保留原目的地"规则实现。camera（3D）、economy/resource_node（单币/可占领点模型）、loc（无 i18n 需求）、teams（关系表；本项目仅玩家/机潮两方，team 字段已够）均不适用。
+
+**副本位置**：副本已按用户指示移出项目目录，现位于 `d:\fish\godot-rts-advanced-lite-main\`（与其他参考仓库同级，不参与本项目 Godot 扫描与导入）。
