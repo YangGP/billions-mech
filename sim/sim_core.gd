@@ -52,12 +52,15 @@ func configure(settings: MechFoundationSettings) -> bool:
 	var wave_error: String = _waves.configure(settings)
 	if not wave_error.is_empty():
 		return _configuration_error(wave_error)
-	var threat_error: String = _threat.configure(settings.enemy_definitions)
+	var threat_error: String = _threat.configure(settings.enemy_definitions, settings)
 	if not threat_error.is_empty():
 		return _configuration_error(threat_error)
 	_enemy_defs.clear()
 	for rules: MechEnemyDefinition in settings.enemy_definitions:
 		_enemy_defs[rules.enemy_id] = rules
+	# Combat noise flows to the threat system from both firing sides.
+	_enemies.configure_noise(_threat.note_combat)
+	_units.combat_noise = _threat.note_combat
 	_probe_speed = maxf(0.1, settings.probe_speed)
 	_tick_rate = maxi(1, settings.simulation_hz)
 	_starting_resources = settings.starting_resources
@@ -102,6 +105,8 @@ func execute_command(command: MechCommand) -> Dictionary:
 			_reset()
 		MechCommand.Type.PLACE_BUILDING:
 			result = _place(command.payload["building_id"], command.payload["origin"])
+			if result["ok"]:
+				_threat.note_construction(Vector2(command.payload["origin"]) + Vector2(0.5, 0.5))
 		MechCommand.Type.PLACE_WALL_LINE:
 			var placed: int = 0
 			var spent := Vector4i.ZERO
@@ -110,6 +115,8 @@ func execute_command(command: MechCommand) -> Dictionary:
 				if placement["ok"]:
 					placed += 1
 					spent += placement["cost"]
+			if placed > 0:
+				_threat.note_construction(Vector2(command.payload["origins"][0]) + Vector2(0.5, 0.5))
 			result = {"ok": placed > 0, "reason": "" if placed > 0 else "墙线没有可下单的格子",
 				"placed": placed, "skipped": result["origins"].size() - placed, "cost": spent}
 		MechCommand.Type.CANCEL_CONSTRUCTION:
@@ -123,6 +130,7 @@ func execute_command(command: MechCommand) -> Dictionary:
 			building.elapsed_demolition_ticks = 0
 			building.repairing = false
 			building.repair_remainder = 0
+			_threat.note_construction(Vector2(building.origin) + Vector2(building.definition.footprint) * 0.5)
 			_recompute_economy()
 		MechCommand.Type.CANCEL_DEMOLISH:
 			var building: MechBuildingState = _construction.get_building(command.payload["entity_id"])
@@ -209,16 +217,21 @@ func advance_one_tick() -> void:
 	if _production.advance(_construction, _spawn_unit):
 		_recompute_economy()
 	_release_enemies()
+	# Noise emitted last tick reaches wanderers this tick (combat during the
+	# units/enemies passes below lands next tick).
+	var noises: Array[Dictionary] = _threat.noises()
 	var dead: Array[int] = _units.advance(_registry, _grid, _navigation, _tick_rate)
 	for id: int in dead:
 		_remove_entity(id)
 	if not dead.is_empty():
 		_recompute_economy()
 		_sync_navigation()
-	var enemy_result: Dictionary = _enemies.advance(_registry, _grid, _navigation, _construction.all(), _tick_rate)
+	var enemy_result: Dictionary = _enemies.advance(_registry, _grid, _navigation, _construction.all(), _tick_rate, noises)
 	for hit: Dictionary in enemy_result["building_hits"]:
 		damage_building(hit["id"], hit["damage"])
 	for id: int in enemy_result["dead_units"]:
+		# Units destroyed by enemies feed infection at the wreck (values.md §14).
+		_release_spawns(_threat.infect(_unit_definition.cost, _registry.position_of(id)))
 		_remove_entity(id)
 	if not enemy_result["dead_units"].is_empty():
 		_recompute_economy()
@@ -289,12 +302,17 @@ func _spawn_unit(building: MechBuildingState, rally: Vector2i) -> bool:
 	return _units.spawn(building, rally, _unit_definition, _registry, _grid, _navigation)
 
 
-## Wave releases and wanderer backfill arrive as spawn requests; creation stays in
-## the enemy system so definitions, teams and march orders live in one place.
+## Wave releases, wanderer backfill and infection arrive as spawn requests;
+## creation stays in the enemy system so definitions, teams and march orders
+## live in one place.
 func _release_enemies() -> void:
 	var requests: Array[Dictionary] = []
 	requests.append_array(_waves.advance(_grid, _construction.all()))
-	requests.append_array(_threat.advance())
+	requests.append_array(_threat.advance(_construction.all()))
+	_release_spawns(requests)
+
+
+func _release_spawns(requests: Array[Dictionary]) -> void:
 	for request: Dictionary in requests:
 		var rules: MechEnemyDefinition = _enemy_defs.get(request["enemy_id"])
 		if rules != null:
@@ -366,12 +384,18 @@ func building_action_error(type: MechCommand.Type, entity_id: int) -> String:
 
 
 func damage_building(entity_id: int, amount: int) -> Dictionary:
-	# Simulation-side hook for future combat, not a player damage/debug command.
+	# Simulation-side hook for enemy attacks, not a player damage/debug command.
 	var building: MechBuildingState = _construction.get_building(entity_id)
 	if building == null or amount <= 0:
 		return _reject("伤害目标或数值无效")
 	building.hp = maxi(0, building.hp - amount)
 	if building.hp == 0:
+		# Infection: capacity-bearing assets destroyed by enemies spawn builders at
+		# the wreck plus a combat pulse (values.md §14). Demolish/cancel paths never
+		# pass through here, so controlled teardown stays infection-free.
+		var rules: MechBuildingDefinition = building.definition
+		if not rules.is_core and rules.capacity_cost > 0:
+			_release_spawns(_threat.infect(rules.cost, Vector2(building.origin) + Vector2(rules.footprint) * 0.5))
 		_remove_building(entity_id, Vector4i.ZERO)
 		_sync_navigation()
 	state_changed.emit()

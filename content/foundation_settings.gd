@@ -23,3 +23,8 @@ extends Resource
 @export_range(1.0, 3.0, 0.01) var wave_budget_growth: float = 1.14
 @export_range(1, 32, 1) var development_node_threshold: int = 8
 @export_range(2, 32, 1) var flank_wave_interval: int = 4
+## Noise radii and infection conversion (values.md §13/§14).
+@export_range(1.0, 64.0, 1.0) var noise_radius_combat: float = 24.0
+@export_range(1.0, 64.0, 1.0) var noise_radius_construction: float = 12.0
+@export_range(1.0, 64.0, 1.0) var noise_radius_operation: float = 6.0
+@export_range(1.0, 100.0, 1.0) var infection_value_divisor: float = 20.0

@@ -2,6 +2,9 @@ class_name MechUnitSystem
 extends RefCounted
 ## Player orders and the M4 static-target combat loop. No scene dependencies.
 
+## Combat-level noise emitter (set by SimCore); fired at each shot's impact point.
+var combat_noise: Callable = Callable()
+
 
 func create(registry: MechEntityRegistry, rules: MechUnitDefinition, cell: Vector2i) -> int:
 	var id: int = registry.create(rules.unit_id, rules.display_name, Vector2(cell) + Vector2(0.5, 0.5), rules.move_speed)
@@ -174,6 +177,8 @@ func advance(registry: MechEntityRegistry, grid: MechGridState, navigation: Mech
 					unit.cooldown_ticks = maxi(1, ceili(unit.unit_definition.attack_seconds * hz))
 					unit.shot_ticks = maxi(1, ceili(0.1 * hz))
 					unit.shot_target = target.position
+					if combat_noise.is_valid():
+						combat_noise.call(target.position)
 					if target.hp == 0:
 						dead.append(target.entity_id)
 			elif unit.repath_ticks == 0 and (not unit.has_move_order or unit.move_target.distance_to(target.position) > unit.unit_definition.attack_range or not _line_clear(unit.move_target, target.position, grid)):
