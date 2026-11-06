@@ -33,9 +33,12 @@
 
 引擎：Godot **4.7.2 stable**，GDScript，GL Compatibility。逻辑视口与默认窗口均为 **1920×1080**，HUD 按窗口边缘锚定。
 
-双击 [run.bat](run.bat)，或在项目根目录执行：
+双击 [run.bat](run.bat)，或在项目根目录执行 `run.bat`。启动器先调用 Godot 原生导入更新资源与全局脚本类型，再启动游戏；导入失败时停止并输出 `.godot/import.log`。
+
+直接调用引擎时，首次拉取或更新代码后先导入，再运行：
 
 ```powershell
+godot --headless --path . --import
 godot --path .
 ```
 
