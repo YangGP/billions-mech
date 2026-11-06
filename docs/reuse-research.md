@@ -19,7 +19,7 @@
 | 选择集合、编队、输入绑定、队列/阵型语义 | RTS Advanced Lite | rluders/rts-framework 的 SelectionManager/CommandManager；Crusade 的选择与单位控制 | Lite 是 3D，选择投影与地面拾取必须检查；其他候选也有各自实体/场景依赖，不表示已经适配 2D sim |
 | 玩家单位与局部战术 A* | 可脱离场景树的已有寻路实现 | Godot 内置 AStarGrid2D | M2 已接入原生 AStarGrid2D，M3 支持建筑占用变更后的重建与路径更新；正式单位和规模性能仍待 M4/M5 |
 | 小地图 | 先查已有 2D 小地图方案，Lite 无此模块 | Razoric480/godot-minimap-demo | 新工程需接入或实现；该候选为旧演示项目，Godot 4.7 接入与素材许可仍需核对；不直接导入素材 |
-| 机潮流场 | 先查已有 Godot 流场实现 | Crusade 的流场与局部避让实现 | 已 vendor Crusade `flow_field.gd` + `steering.gd`（§9，HEAD e4929c8，MIT 逐字未改）；walkable 注入地形层，建筑阻挡由移动/攻击处理；游荡敌走既有 AStarGrid2D |
+| 机潮流场 | 先查已有 Godot 流场实现 | Crusade 的流场与局部避让实现；Mindustry Pathfinder 成本模型 | M5 行军场为项目自有加权场 `sim/march_field.gd`（软成本口径，§9 0.5.1/§10）；直接复用 Crusade `steering.gd`（分离），`flow_field.gd` 保留 vendor 未接线；游荡敌走既有 AStarGrid2D |
 
 每项正式采用前记录：源 URL、许可证原文位置、版本/提交 SHA、引擎依赖、需修改的接口、已知问题、适配验证结果。可复用模块锁版本入 vendor；未选候选不导入工程。
 
@@ -133,6 +133,8 @@
 
 已知限制与适配口径（详见 `vendor/crusade/README.md`）：均匀成本 BFS 下崎岖地不比开阔地贵，敌人不因崎岖绕路、仅移动层减速——与 map-terrain.md §3"主口前天然迟滞"意图一致；`flow_at` 对角流向无防切角守卫，敌方行军集成在步进校验中对齐玩家 A* 的 DIAGONAL_MODE_ONLY_IF_NO_OBSTACLES 语义；主脑固定 + 地形静态 ⇒ 波次流场整局只算一次；游荡敌不共用主脑流场，数量小（切片图 ≈17 + 回填）直接走既有 AStarGrid2D。
 
+**0.5.1 更新（2026-11-06，用户决策）**：`flow_field.gd` 因均匀成本无法表达"缺口足够便宜时弃墙走缺口"，行军场改为项目自有加权场 `sim/march_field.gd`（Dijkstra + 二叉堆；成本模型取 Mindustry Pathfinder 口径，见 §10）——按 AGENT.md 加权即替换其核心算法，不再算直接复用；该文件按用户指示保留在 vendor 作纯逻辑参考与未来噪声场候选，`steering.gd` 继续直接复用（分离半径由调用方注入：攻击建筑 0.3、其余 0.6）。architecture.md §5 的"只读地形、不因建墙/墙塌重算"规则随之修订为软成本口径（占用变化即时重算、HP 漂移限频 1s）。
+
 本地参考副本：`d:\fish\crusade-rts\`、`d:\fish\godot-tilemap-flowfields\`（与 Lite 副本同级，不参与本项目 Godot 扫描）。godot-tilemap-flowfields 的 algo.rs 存在流场生成误用 SouthWest 邻居值充当 NW 的缺陷（`native/src/algo.rs` L242），引用其思路时须知。vendor 文件的 Godot 4.7 语法检查与实机行为验证由用户开发环境执行，通过前不记为已验收。
 
 ## 10. 巨量单位 RTS 架构对照（2026-11-06，M5 出兵切片前）
@@ -142,7 +144,7 @@
 | 参考 | 规模与形态 | 对本项目的印证与差异 |
 |---|---|---|
 | [RecoilEngine](https://github.com/beyond-all-reason/RecoilEngine)（Spring 后继，BAR 引擎） | 设计目标 ~1 万并发单位、实测 ~1.77 万；C++23，固定 30Hz 确定性模拟层 + `for_mt` 多线程 + 四叉树寻路（HAPFS/QTPFS）+ 渲染帧间插值 | 30Hz 固定步长确定性模拟与本作一致；但其规模靠多线程并行，GDScript 无此路线，本作规模治理仍按架构稿 §9（分区休眠/迷雾外降档/降速阀）。BAR PvE 层（Scavengers/Raptors gadgets）给出波次系统成熟形态：grace period 静默（120–360s 按难度）、anger 进度（时间+玩家经济驱动）、数据驱动波次表（`configs/scav_spawn_defs.lua`）、波内 squad 编组与冷却 |
-| [Mindustry](https://github.com/Anuken/Mindustry)（GPL-3.0，Java） | 数千单位，单线程主循环 | **与本作同构**：波次方共享"向核心的流场"（`Pathfinder.preloadPath(getField(waveTeam, costGround, fieldCore))`），`SpawnGroup` 数据驱动波次构成（begin/spacing/unitScaling/max）。差异：其移动成本把玩家建筑血量折成软成本烘进流场（增量更新，敌人择最薄墙突入）；本作按架构稿走地形-only 场 + 撞墙接敌（TAB 口径、零重算）——记录为已知备选，不采用 |
+| [Mindustry](https://github.com/Anuken/Mindustry)（GPL-3.0，Java） | 数千单位，单线程主循环 | **与本作同构**：波次方共享"向核心的流场"（`Pathfinder.preloadPath(getField(waveTeam, costGround, fieldCore))`），`SpawnGroup` 数据驱动波次构成（begin/spacing/unitScaling/max）。其"建筑血量折成软成本烘进流场、敌人择最薄墙突入"的方案**经用户决策采用**（2026-11-06，§9 0.5.1）：行军场改为加权软成本（`sim/march_field.gd`），缺口足够便宜时敌人自动弃墙走缺口；差异仅剩本作用"占用即时 + HP 限频 1s 重算"替代其增量更新 |
 | [openage](https://github.com/SFTtech/openage)（GPLv3） | AoE2 引擎重制：扇区/门户分层 + 逐扇区流场 | 分区休眠（架构稿 §9）的蓝图来源；流场缓存/复用思路供后续噪声目标场参考（§9 已记） |
 | [OpenRA](https://github.com/OpenRA/OpenRA)（GPL） | 中规模 lockstep RTS，Actor/Trait | 命令即意图、tick 串行执行——与本项目命令队列同构（§4/§6 已记） |
 | Supreme Commander（闭源） | 500 单位/边设计上限、战略缩放 | 仅设计标尺：证明 1–2k 是"可玩规模"常规区间；无实现可引 |

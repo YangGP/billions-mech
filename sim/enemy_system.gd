@@ -1,29 +1,55 @@
 class_name MechEnemySystem
 extends RefCounted
-## M5 marching and combat for wave-side enemies. Marching reads the vendored
-## FlowField whose walkability is terrain-only, so player walls never invalidate
-## the field: an enemy whose step is blocked by a building engages that building
-## instead ("撞墙打墙", waves-enemies.md §8). Enemies are not native RVO agents;
-## stepping is guarded here and crowd separation comes from the vendored
-## Steering over grid-bucket neighbours.
+## M5 marching and combat for wave-side enemies. Marching reads a weighted
+## MechMarchField (terrain × building soft cost, values.md §11): a wide opening is
+## always cheaper than chewing walls, so enemies funnel through gaps; with no
+## cheap route the field points into the wall and blocker engagement attacks it
+## ("撞墙打墙", waves-enemies.md §8). The field recomputes on occupancy changes
+## or building HP drift. Enemies are not native RVO agents; stepping is guarded
+## here and crowd separation comes from the vendored Steering over grid-bucket
+## neighbours. Enemies attacking buildings crowd tighter (partial overlap).
 
 const FLOW_WEIGHT: float = 1.0
 const SEPARATION_WEIGHT: float = 0.6
 const SEPARATION_RADIUS: float = 0.6
+const CROWD_SEPARATION_RADIUS: float = 0.3
 const VISION_SCAN_INTERVAL: int = 5
+const FIELD_HP_REFRESH_TICKS: int = 30
 
-var _flow: FlowField
+var _field := MechMarchField.new()
+var _goal: Vector2i = Vector2i.ZERO
+var _field_revision: int = -1
+var _field_hp: Dictionary = {}
 var _tick_counter: int = 0
 
 
-func reset(grid: MechGridState, goal: Vector2i) -> void:
-	# Terrain-only field toward the fixed mainbrain cell: one build per session,
-	# never recomputed when walls appear or fall (architecture.md §5).
-	_flow = FlowField.new(Rect2i(Vector2i.ZERO, grid.dimensions()), _terrain_walkable(grid), goal)
+func reset(grid: MechGridState, goal: Vector2i, buildings: Array[MechBuildingState]) -> void:
+	_goal = goal
+	_field_revision = -1
+	_field_hp.clear()
+	_refresh_field(grid, buildings)
 
 
-func _terrain_walkable(grid: MechGridState) -> Callable:
-	return func(cell: Vector2i) -> bool: return grid.terrain_at(cell) != MechGridState.Terrain.OBSTACLE
+func _refresh_field(grid: MechGridState, buildings: Array[MechBuildingState]) -> void:
+	# Occupancy changes (place/cancel/destroy) rebuild immediately; plain HP drift
+	# (walls being chewed) is throttled to once per refresh interval.
+	if grid.revision() != _field_revision:
+		_rebuild_field(grid, buildings)
+		return
+	if _tick_counter % FIELD_HP_REFRESH_TICKS != 0:
+		return
+	for building: MechBuildingState in buildings:
+		if _field_hp.get(building.entity_id, -1) != building.hp:
+			_rebuild_field(grid, buildings)
+			return
+
+
+func _rebuild_field(grid: MechGridState, buildings: Array[MechBuildingState]) -> void:
+	_field.rebuild(grid, _goal, buildings)
+	_field_revision = grid.revision()
+	_field_hp.clear()
+	for building: MechBuildingState in buildings:
+		_field_hp[building.entity_id] = building.hp
 
 
 func create(registry: MechEntityRegistry, rules: MechEnemyDefinition, position: Vector2) -> int:
@@ -43,8 +69,7 @@ func create(registry: MechEntityRegistry, rules: MechEnemyDefinition, position: 
 ## removal/economy paths so refunds and capacity follow the existing rules.
 func advance(registry: MechEntityRegistry, grid: MechGridState, navigation: MechGridNavigation, buildings: Array[MechBuildingState], hz: int) -> Dictionary:
 	var result: Dictionary = {"dead_units": [], "building_hits": []}
-	if _flow == null:
-		return result
+	_refresh_field(grid, buildings)
 	var building_ids: Dictionary = {}
 	var buildings_by_id: Dictionary = {}
 	var building_cells: Dictionary = {}
@@ -113,7 +138,7 @@ func _advance_one(enemy: MechEntityState, registry: MechEntityRegistry, grid: Me
 
 func _advance_marching(enemy: MechEntityState, grid: MechGridState, enemy_buckets: Dictionary, building_ids: Dictionary, dt: float) -> void:
 	var cell: Vector2i = Vector2i(enemy.position.floor())
-	var flow_dir: Vector2 = _flow.flow_at(cell)
+	var flow_dir: Vector2 = _field.flow_at(cell)
 	if flow_dir == Vector2.ZERO:
 		return
 	var speed: float = enemy.enemy_definition.move_speed / grid.movement_weight(cell)
@@ -169,12 +194,14 @@ func _advance_engaged(enemy: MechEntityState, registry: MechEntityRegistry, grid
 				if target_unit.hp == 0:
 					result["dead_units"].append(target_unit.entity_id)
 		return
-	_chase(enemy, grid, navigation, target_building, target_unit, enemy_buckets, building_ids, dt)
+	# Enemies closing on a building may partially overlap so a crowd can all reach it.
+	var separation_radius: float = CROWD_SEPARATION_RADIUS if target_building != null else SEPARATION_RADIUS
+	_chase(enemy, grid, navigation, target_building, target_unit, enemy_buckets, building_ids, dt, separation_radius)
 
 
 func _chase(enemy: MechEntityState, grid: MechGridState, navigation: MechGridNavigation,
 		target_building: MechBuildingState, target_unit: MechEntityState,
-		enemy_buckets: Dictionary, building_ids: Dictionary, dt: float) -> void:
+		enemy_buckets: Dictionary, building_ids: Dictionary, dt: float, separation_radius: float) -> void:
 	if enemy.repath_ticks == 0 and not enemy.has_move_order:
 		var chase_cell := Vector2i(-1, -1)
 		if target_building != null:
@@ -202,7 +229,7 @@ func _chase(enemy: MechEntityState, grid: MechGridState, navigation: MechGridNav
 		enemy.finish_path_if_arrived()
 		return
 	var direction: Vector2 = enemy.position.direction_to(enemy.next_waypoint())
-	var separation: Vector2 = Steering.separation(enemy.position, _separation_neighbors(enemy, enemy_buckets), SEPARATION_RADIUS)
+	var separation: Vector2 = Steering.separation(enemy.position, _separation_neighbors(enemy, enemy_buckets), separation_radius)
 	var blended: Vector2 = Steering.combine(velocity, separation, FLOW_WEIGHT, SEPARATION_WEIGHT, speed)
 	_guarded_step(enemy, blended, direction, speed, dt, grid, building_ids)
 	enemy.finish_path_if_arrived()
@@ -298,14 +325,14 @@ func _slide_step(enemy: MechEntityState, direction: Vector2, speed: float, dt: f
 	var step_x: int = int(sign(direction.x))
 	var step_y: int = int(sign(direction.y))
 	var best_position: Vector2 = enemy.position
-	var best_cost: int = 0x7FFFFFFF
+	var best_cost: float = INF
 	var found: bool = false
 	for offset: Vector2i in [Vector2i(step_x, 0), Vector2i(0, step_y)]:
 		if offset == Vector2i.ZERO:
 			continue
 		var neighbour: Vector2i = cell + offset
-		var cost: int = _flow.cost_at(neighbour)
-		if cost == FlowField.UNREACHABLE or cost >= best_cost and found:
+		var cost: float = _field.cost_at(neighbour)
+		if not is_finite(cost) or cost >= best_cost and found:
 			continue
 		var center: Vector2 = Vector2(neighbour) + Vector2(0.5, 0.5)
 		var to_center: Vector2 = center - enemy.position

@@ -539,9 +539,9 @@ func _reset() -> void:
 	_recompute_economy()
 	_navigation_revision = -1
 	_sync_navigation()
-	# Terrain-only march field toward the fixed mainbrain cell; one build per reset.
+	# Weighted march field toward the fixed mainbrain cell; rebuilt on building changes.
 	var brain: MechBuildingDefinition = _construction.definition(&"mainbrain")
-	_enemies.reset(_grid, _map_definition.mainbrain_origin + (brain.footprint - Vector2i.ONE) / 2)
+	_enemies.reset(_grid, _map_definition.mainbrain_origin + (brain.footprint - Vector2i.ONE) / 2, _construction.all())
 
 
 func _settings_error(settings: MechFoundationSettings) -> String:
