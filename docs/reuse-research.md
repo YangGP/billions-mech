@@ -1,13 +1,13 @@
 # 模块复用：已有方案调研
 
-> 调研日期：2026-11-04～2026-11-06。版本：0.4。\
+> 调研日期：2026-11-04～2026-11-06。按当前实现整理。\
 > 范围：支撑 architecture.md 的模块复用选型；本稿是来源核对和建议，不表示候选已接入或完成适配/性能验证。\
 > 已确认原则：新建项目，旧原型实现不再使用；外部模块能复用就复用，不能复用先找其他已有方案。开发顺序见 development-plan.md。
-> 历史口径：§4 记录 M3 单钱包实现时的选型依据；新版设计已加入多资源与采矿，扩展任务见开发计划。该记录不限定当前设计的资源范围。
+> 当前直接复用与候选分别标明；检查结果见 [M5 实施记录](../validation/m5-threat-defense.md)，不以调研替代玩法或性能验收。
 
 ## 1. 结论
 
-从空的 2D 等距工程开始；比较 Godot 内置能力、RTS Advanced Lite 的可适配模块与其他已有方案。旧原型代码、场景与内容定义不纳入候选。只有确认外部方案不适合后，才实现本项目特有规则。
+项目采用 2D 等距、模拟/表现分离；已比较 Godot 内置能力、RTS Advanced Lite 的可适配模块与其他已有方案。旧原型代码、场景与内容定义不纳入候选。只有确认外部方案不适合后，才实现本项目特有规则。
 
 ## 2. 模块复用入口
 
@@ -16,10 +16,10 @@
 | 模块 | 优先复用来源 | 不能复用时的已有候选 | 当前结论与限制 |
 |---|---|---|---|
 | 2D 等距镜头、地图坐标、建造预览、时钟 | Godot 内置 2D/网格能力与外部可适配模块 | Crusade 的等距镜头/地图实现；其他固定步长/放置方案按功能检索 | M1–M3 已使用原生固定物理步、Camera2D 与项目坐标/预览适配；Crusade 要求 4.4.1，未导入其场景运行时 |
-| 选择集合、编队、输入绑定、队列/阵型语义 | RTS Advanced Lite | rluders/rts-framework 的 SelectionManager/CommandManager；Crusade 的选择与单位控制 | Lite 是 3D，选择投影与地面拾取必须检查；其他候选也有各自实体/场景依赖，不表示已经适配 2D sim |
-| 玩家单位与局部战术 A* | 可脱离场景树的已有寻路实现 | Godot 内置 AStarGrid2D | M2 已接入原生 AStarGrid2D，M3 支持建筑占用变更后的重建与路径更新；正式单位和规模性能仍待 M4/M5 |
+| 选择集合、编队、输入绑定、队列/阵型语义 | RTS Advanced Lite | rluders/rts-framework 的 SelectionManager/CommandManager；Crusade 的选择与单位控制 | 选择/编队/队列已由项目实现；Lite 整框架不采用（§7），独立输入绑定模块保留为 M6 候选（§8） |
+| 玩家单位与局部战术 A* | 可脱离场景树的已有寻路实现 | Godot 内置 AStarGrid2D | M2 已接入原生 AStarGrid2D，M3 支持建筑占用变更后的重建与路径更新；正式单位已接入，规模性能待测 |
 | 小地图 | 先查已有 2D 小地图方案，Lite 无此模块 | Razoric480/godot-minimap-demo | 新工程需接入或实现；该候选为旧演示项目，Godot 4.7 接入与素材许可仍需核对；不直接导入素材 |
-| 机潮流场 | 先查已有 Godot 流场实现 | Crusade 的流场与局部避让实现；Mindustry Pathfinder 成本模型 | M5 行军场为项目自有加权场 `sim/march_field.gd`（软成本口径，§9 0.5.1/§10）；直接复用 Crusade `steering.gd`（分离），`flow_field.gd` 已随设计变更从 vendor 移除；游荡敌走既有 AStarGrid2D |
+| 机潮流场 | 先查已有 Godot 流场实现 | Crusade 的流场与局部避让实现；Mindustry Pathfinder 成本模型 | M5 行军场为项目自有加权场 `sim/march_field.gd`（软成本口径，§9/§10）；直接复用 Crusade `steering.gd`（分离），`flow_field.gd` 已随设计变更从 vendor 移除；游荡敌走既有 AStarGrid2D |
 
 每项正式采用前记录：源 URL、许可证原文位置、版本/提交 SHA、引擎依赖、需修改的接口、已知问题、适配验证结果。可复用模块锁版本入 vendor；未选候选不导入工程。
 
@@ -43,7 +43,7 @@
 | 来源 | 许可证 / 接入成本 | 采用结论 |
 |---|---|---|
 | RTS Advanced Lite | MIT；3D 场景与单位模块，Lite 不提供完整建造系统 | 无可直接接入的建造经济模块，不为 M3 导入整个框架 |
-| [Mindustry ConstructBlock](https://github.com/Anuken/Mindustry/blob/master/core/src/mindustry/world/blocks/ConstructBlock.java) | GPL-3.0；Java、物品供料与世界建筑生命周期依赖 | 借鉴独立建造状态、取消与完工切换的设计；本项目为预付单钱包、并行时间施工，不复制源码 |
+| [Mindustry ConstructBlock](https://github.com/Anuken/Mindustry/blob/master/core/src/mindustry/world/blocks/ConstructBlock.java) | GPL-3.0；Java、物品供料与世界建筑生命周期依赖 | 借鉴独立建造状态、取消与完工切换的设计；本项目为多资源预付、并行时间施工，不复制源码 |
 | [OpenRA RepairableBuilding](https://github.com/OpenRA/OpenRA/blob/bleed/OpenRA.Mods.Common/Traits/Buildings/RepairableBuilding.cs) | GPL-3.0；C# Actor/Trait 与玩家经济依赖 | 参考模拟 tick 中小步扣费与修复的成熟做法；不复制源码，不接入其运行时 |
 | [Godot Geometry2D](https://docs.godotengine.org/en/stable/classes/class_geometry2d.html) | 随引擎提供 | 直接复用 `bresenham_line` 生成墙线，预览与提交用同一组逻辑格 |
 | [Godot ConfirmationDialog](https://docs.godotengine.org/en/stable/classes/class_confirmationdialog.html) | 随引擎提供 | 直接复用拆除确认弹窗；继续复用原生 Camera2D、AStarGrid2D、Resource、Control 与进度条 |
@@ -60,7 +60,7 @@
 
 复核 [RTS Advanced Lite README](https://github.com/openclawaimac/godot-rts-advanced-lite#readme)（MIT，3D 选择/阵型/分离/生产）和高星项目 [OpenRA ProductionQueue](https://github.com/OpenRA/OpenRA/blob/bleed/OpenRA.Mods.Common/Traits/Player/ProductionQueue.cs)（GPL-3.0-or-later，C# Actor/Traits、独立队列与预付选项）。Lite 的地面拾取/影子节点仍依赖 3D 适配，OpenRA 依赖其世界与规则运行时，均不直接导入。
 
-选择继续复用原生 Rect2/Geometry2D、AStarGrid2D 与现有串行命令；新增纯数据生产队列、单位状态和客户端选择集合。移动复用原生 A*，局部占位用格桶，等待后暂时屏蔽其他单位格重新求路；生产扩展本项目已有账本及预留事务。未复制第三方源码，未产生新 vendor 或许可证依赖；未将 4 单位训练场视为最终规模性能验证。
+选择继续复用原生 Rect2/Geometry2D、AStarGrid2D 与现有串行命令；新增纯数据生产队列、单位状态和客户端选择集合。移动直接复用原生 A* 与下述 RVO，友军临时占位不封路或替换指令终点；生产扩展本项目已有账本及预留事务。未复制第三方源码，未产生新 vendor 或许可证依赖；未将 4 单位训练场视为最终规模性能验证。
 
 ### 窄口拥堵：直接采用原生 RVO（2026-11-06）
 
@@ -77,20 +77,13 @@
 
 后续目标漂移反馈修正的是项目指令适配：友军临时占位不再替换点击格/阵型终点；最后路点在原生位移实际提交后确认，空路径重试原目标。单兵静态不可达时拒绝下令，不寻找附近替代终点。求路与避让仍分别直接调用原生 AStarGrid2D 与 RVO，没有新增避让或寻路算法。
 
-按 [官方回调时序](https://docs.godotengine.org/en/stable/tutorials/navigation/navigation_using_navigationservers.html)，提交发生在固定物理帧，移动提交和视图刷新在同帧的原生回调收齐后执行，不在每个单独回调中各自刷新。已知限制：RVO 不能保证所有拥堵场景都能解开，[官方说明](https://docs.godotengine.org/en/stable/tutorials/navigation/navigation_using_navigationagents.html) 提示完全对称的迎面情形可能失败。这里只完成 29 个脚本的语法核对，通行、暂停和资源生命周期仍须运行复验，不能把接入成熟求解器写成已通过玩法验收。
+按 [官方回调时序](https://docs.godotengine.org/en/stable/tutorials/navigation/navigation_using_navigationservers.html)，提交发生在固定物理帧，移动提交和视图刷新在同帧的原生回调收齐后执行，不在每个单独回调中各自刷新。已知限制：RVO 不能保证所有拥堵场景都能解开，[官方说明](https://docs.godotengine.org/en/stable/tutorials/navigation/navigation_using_navigationagents.html) 提示完全对称的迎面情形可能失败。当前 36 个脚本语法与双场景启动已通过，窄口通行/编队已有用户人工复验；暂停、资源生命周期与其余交互仍待补验，范围见 [M5 检查记录](../validation/m5-threat-defense.md)。
 
-## 7. 是否改用 RTS Advanced Lite：核查与决定（2026-11-06）
+## 7. RTS Advanced Lite 整框架采用结论
 
-用户要求核查功能是否使用 RTS Advanced Lite，未使用则改为该框架实现。核查结果：全部 29 个脚本均为自有 `Mech*` 类（继承 Godot 原生 RefCounted/Node2D/Camera2D/CanvasLayer/Resource），无 vendor 目录与 Lite 引用；选择/编队、生产队列、单位战斗为自有 2D sim/客户端实现，寻路直接调用 AStarGrid2D，避让直接调用 NavigationServer2D RVO（§6）。
+当前不采用 Lite 整框架。其单位、选择投影和地面拾取依赖 3D 场景节点，直接接入与本项目 2D 等距、无头 sim 边界冲突；Lite 缺少建造、多资源经济、电力覆盖、容量、采矿与波次系统。项目已有原生 AStarGrid2D/RVO 路线，Lite 的自写分离不能替代现行原生求解器。
 
-经用户确认维持现状、不改用 Lite，决定依据记录如下：
-
-- 现行实现已直接复用引擎内置成熟方案（AStarGrid2D、NavigationServer2D/RVO2、Geometry2D、Camera2D），符合 AGENT.md"直接复用引擎内置能力"的要求。Lite 为 3D 场景节点基座，选择投影/地面拾取/单位模块接入 2D 等距项目须按本作改写；按 AGENT.md 口径，仅参考设计后自行重写不算复用。
-- Lite 不含本项目最大系统：建造、多资源经济、电力覆盖、容量、采矿、波次（§4 已核对"没有可直接接入的建造经济模块"）。
-- architecture.md 红线要求 SimCore 不 import 场景/节点类型（无头 sim）；Lite 单位与选择耦合场景节点，直接接入破坏该边界。
-- 主脑/组装厂窄口拥堵已用原生 RVO 修复（§6），换用 Lite 的分离避让会回退该修复。
-- 本地环境无 Godot，整框架替换后无法执行任何校验；不做不可验证的替换。
-- 后续未实现模块（键位重绑定、小地图等）仍按 §2 流程逐模块评估 Lite 与其他候选；采用前照常记录来源、许可证、版本与适配验证结果。
+后续未实现的键位绑定等模块继续逐项评估；不因整框架未采用而跳过可独立复用模块，候选详见 §8。
 
 ## 8. Lite 源码通读核查（2026-11-06，本地参考副本）
 
@@ -108,45 +101,34 @@
 
 **副本位置**：副本已按用户指示移出项目目录，现位于 `d:\fish\godot-rts-advanced-lite-main\`（与其他参考仓库同级，不参与本项目 Godot 扫描与导入）。
 
-## 9. M5 机潮行军流场选型（2026-11-06）
+## 9. M5 行军场与分离选型
 
-需求（architecture.md §5）：未接敌机潮向主脑行军用流场——只读地形、不因建墙/墙塌重算；建筑阻挡由移动/攻击处理；接敌后切 sim 侧 A*；接敌判定/分离走空间分区。按用户指示扩大到非 Godot 生态与 C#（Godot 原生支持 .NET），共核对五个候选后定稿，不再扩大检索：
+当前机潮采用加权软成本场：地形权重 × 建筑软成本，目标为主脑；占用变化重算、HP 漂移限频刷新。接敌后走既有 AStarGrid2D，接敌判定与分离走网格桶，游荡敌按噪声各自寻路。
 
-| # | 候选 | 形态 | 许可证 / 维护 | 结论 |
-|---|---|---|---|---|
-| 1 | [Crusade RTS](https://github.com/saman-mb/crusade-rts) `src/core/flow_field.gd` + `steering.gd` | Godot 4.4 GDScript，纯 RefCounted，带 headless 单测与 CI | MIT ©2026；HEAD `e4929c8`（2026-07-26，PR #263 仍在演进） | **直接 vendor 复用**（下详） |
-| 2 | [godot-tilemap-flowfields](https://github.com/arnemileswinter/godot-tilemap-flowfields) | Godot 3.5 GDNative：Rust 核心 + 预编译 .so/.dll，FlowFieldGenerator 节点读 TileMap | MIT ©2022；v0.1.0 早期 | 不采用：引擎版本（3.5 vs 4.7）、原生二进制依赖（本项目纯 GDScript）、节点/TileMap 耦合违反无头 sim 红线 |
-| 3 | [openage pathfinding](https://github.com/SFTtech/openage)（libopenage/pathfinding，v0.6.0） | C++/Python 引擎级：扇区/门户分层 A* + 逐扇区流场，源自 Elijah Emerson 流场砖文章 | **GPLv3**；成熟引擎项目 | 仅参考设计：GPL 不可 vendor、不复制源码；其 FLOW_LOS/波前受阻标记与字段缓存复用留作后续规模优化参考 |
-| 4 | [bevy_pathfinder](https://lib.rs/crates/bevy_pathfinder)（v0.1.2） | Rust crate：BFS 流场（多目标 O(1) 查询）+ 哽喉点检测 FlowGate + 共享 A* | MIT；2026-09 仍发版 | 仅参考：Rust 需 GDExtension 工具链，与纯 GDScript 边界冲突；哽喉点检测留作后续雷达/伏击玩法候选 |
-| 5 | [Pathfindax](https://www.nuget.org/packages/Pathfindax) | C# 寻路框架（A*/Dijkstra/PotentialField/FlowField），耦合 Duality 引擎 | 最后更新 **2019-09-01**，仅 .NET Framework 4.7.2 | 不采用：7 年未维护，目标框架无法直接用于 Godot .NET（须整体移植），接入即等于参考后自写 |
+| 候选 | 许可证与依赖 | 当前结论 |
+|---|---|---|
+| [Crusade RTS](https://github.com/saman-mb/crusade-rts) flow_field / steering | MIT；Godot 4.4、纯 RefCounted；锁定 `e4929c8` | 直接 vendor `steering.gd`；均匀成本 BFS 无法表达建筑软成本择路，flow_field 已移出工程 |
+| [godot-tilemap-flowfields](https://github.com/arnemileswinter/godot-tilemap-flowfields) | MIT；Godot 3.5 GDNative/Rust、FlowFieldGenerator/TileMap | 引擎版本、原生二进制和节点耦合不满足当前边界 |
+| [openage pathfinding](https://github.com/SFTtech/openage) | GPLv3；C++/Python、扇区/门户与流场 | 仅参考分层/缓存设计，不复制源码或接入运行时 |
+| [bevy_pathfinder](https://lib.rs/crates/bevy_pathfinder) | MIT；Rust crate | 需要新增原生扩展工具链；仅作候选参考 |
+| [Pathfindax](https://www.nuget.org/packages/Pathfindax) | C#、Duality、.NET Framework 4.7.2；调研记录最后更新 2019-09 | 依赖与版本不适合直接接入，不为其引入 .NET 工具链 |
 
-引擎内置核对：NavigationServer2D 提供逐 agent 寻路与 RVO 避让、AStarGrid2D 为逐 agent A*，Godot 4.7 无内置流场能力，不存在可直接复用的内置方案。C# 生态按用户要求专门核对（NuGet Tags:"PathFinding" 全表 + Unity 生态检索）：唯一带 FlowField 的 C# 库即 #5 Pathfindax（2019 年停更），Unity 侧只有教程文章代码、无维护库——**引入 C#/.NET 工具链缺乏可维护的成熟模块支撑**，且会为用户验证链增加 dotnet 构建步骤；若日后出现活跃维护的 C# 候选，再按 §2 流程单独评估。
+Godot 当前项目使用的 NavigationServer2D 与 AStarGrid2D 提供逐 agent 能力，不提供所需的共享加权积分场。已核对候选中没有可直接接入且符合当前边界的加权场，因此 `sim/march_field.gd` 为项目自写 Dijkstra/二叉堆实现；成本模型参考 Mindustry（§10），不复制其源码，不算直接复用。
 
-### 采用：vendor/crusade（锁版本 HEAD `e4929c8`，MIT）
+**实际 vendor**：`vendor/crusade/steering.gd` 逐字复用，MIT 全文随附，锁定 `e4929c8`。分离半径由调用方注入，项目负责邻居查询、状态切换与位移守卫。`flow_follower.gd` 耦合上游等距/高程几何，其贴墙滑动语义也与撞墙接敌冲突，因此不导入。采用文件与限制见 [vendor 说明](../vendor/crusade/README.md)。
 
-已按 AGENT.md"直接复用"要求拉取本地副本（`d:\fish\crusade-rts\`，项目同级不参与导入）逐文件分析后，vendor 两个纯逻辑文件入 `vendor/crusade/`，逐字未改：
+源码分析时的本地参考副本位于 `d:/fish/crusade-rts/` 与 `d:/fish/godot-tilemap-flowfields/`，不作为工程运行依赖。原生寻路、RVO 与 vendor 之外的业务接线由项目负责；语法检查通过不表示封墙、缺口分流或目标规模已通过实机验收。
 
-- **`flow_field.gd`**：均匀成本 4 连通 BFS 积分场（PackedInt32Array 扁平缓冲，`recompute(goal)` 复用）+ 8 邻最低成本流向向量；可通过性经构造器 `walkable: Callable` 注入。本项目注入"地形层可通过、不含建筑"，即满足"只计地形，玩家建筑由实际碰撞/攻击处理"；附 headless 单测，仅依赖核心类型。
-- **`steering.gd`**：纯静态分离（逆距离权重、NaN/重合防护）与期望速度合成；配合本项目网格桶邻居表即满足"分离使用空间分区"。
+## 10. 巨量单位 RTS 架构对照
 
-不导入部分：`flow_follower.gd` 耦合 Crusade 等距/高程几何（EntityPlacement/IsoCoord），且墙卫语义为"贴墙滑动"——与本项目"撞墙打墙"（建筑阻挡切攻击）规则冲突；其"步进逐级降级、绝不站进实体格"守卫思路在敌方行军集成中吸收。其余 A*/阵型/编辑器模块本项目已有对应实现。
-
-已知限制与适配口径（详见 `vendor/crusade/README.md`）：均匀成本 BFS 下崎岖地不比开阔地贵，敌人不因崎岖绕路、仅移动层减速——与 map-terrain.md §3"主口前天然迟滞"意图一致；`flow_at` 对角流向无防切角守卫，敌方行军集成在步进校验中对齐玩家 A* 的 DIAGONAL_MODE_ONLY_IF_NO_OBSTACLES 语义；主脑固定 + 地形静态 ⇒ 波次流场整局只算一次；游荡敌不共用主脑流场，数量小（切片图 ≈17 + 回填）直接走既有 AStarGrid2D。
-
-**0.5.1 更新（2026-11-06，用户决策）**：`flow_field.gd` 因均匀成本无法表达"缺口足够便宜时弃墙走缺口"，行军场改为项目自有加权场 `sim/march_field.gd`（Dijkstra + 二叉堆；成本模型取 Mindustry Pathfinder 口径，见 §10）——按 AGENT.md 加权即替换其核心算法，不再算直接复用；该文件已从 vendor 移除（上游源码保留在本地参考副本 `d:\fish\crusade-rts\`，未来噪声场若需共享场按 §2 重新评估），`steering.gd` 继续直接复用（分离半径由调用方注入：攻击建筑 0.3、其余 0.6）。architecture.md §5 的"只读地形、不因建墙/墙塌重算"规则随之修订为软成本口径（占用变化即时重算、HP 漂移限频 1s）。
-
-本地参考副本：`d:\fish\crusade-rts\`、`d:\fish\godot-tilemap-flowfields\`（与 Lite 副本同级，不参与本项目 Godot 扫描）。godot-tilemap-flowfields 的 algo.rs 存在流场生成误用 SouthWest 邻居值充当 NW 的缺陷（`native/src/algo.rs` L242），引用其思路时须知。vendor 文件的 Godot 4.7 语法检查与实机行为验证由用户开发环境执行，通过前不记为已验收。
-
-## 10. 巨量单位 RTS 架构对照（2026-11-06，M5 出兵切片前）
-
-按用户要求，在出兵切片动工前核对巨量单位 RTS 的成熟架构，共五个参考；全部为设计对照，无代码引入（GPL/闭源/异构运行时，无一可 vendor）：
+以下保留规模治理、波次与寻路的设计对照；未引入这些项目的代码或运行时，表中规模属于参考项目，不是本项目实测结果：
 
 | 参考 | 规模与形态 | 对本项目的印证与差异 |
 |---|---|---|
 | [RecoilEngine](https://github.com/beyond-all-reason/RecoilEngine)（Spring 后继，BAR 引擎） | 设计目标 ~1 万并发单位、实测 ~1.77 万；C++23，固定 30Hz 确定性模拟层 + `for_mt` 多线程 + 四叉树寻路（HAPFS/QTPFS）+ 渲染帧间插值 | 30Hz 固定步长确定性模拟与本作一致；但其规模靠多线程并行，GDScript 无此路线，本作规模治理仍按架构稿 §9（分区休眠/迷雾外降档/降速阀）。BAR PvE 层（Scavengers/Raptors gadgets）给出波次系统成熟形态：grace period 静默（120–360s 按难度）、anger 进度（时间+玩家经济驱动）、数据驱动波次表（`configs/scav_spawn_defs.lua`）、波内 squad 编组与冷却 |
-| [Mindustry](https://github.com/Anuken/Mindustry)（GPL-3.0，Java） | 数千单位，单线程主循环 | **与本作同构**：波次方共享"向核心的流场"（`Pathfinder.preloadPath(getField(waveTeam, costGround, fieldCore))`），`SpawnGroup` 数据驱动波次构成（begin/spacing/unitScaling/max）。其"建筑血量折成软成本烘进流场、敌人择最薄墙突入"的方案**经用户决策采用**（2026-11-06，§9 0.5.1）：行军场改为加权软成本（`sim/march_field.gd`），缺口足够便宜时敌人自动弃墙走缺口；差异仅剩本作用"占用即时 + HP 限频 1s 重算"替代其增量更新 |
+| [Mindustry](https://github.com/Anuken/Mindustry)（GPL-3.0，Java） | 数千单位，单线程主循环 | **与本作同构**：波次方共享"向核心的流场"（`Pathfinder.preloadPath(getField(waveTeam, costGround, fieldCore))`），`SpawnGroup` 数据驱动波次构成（begin/spacing/unitScaling/max）。其"建筑血量折成软成本烘进流场、敌人择最薄墙突入"的方案**经用户决策采用**（§9）：行军场改为加权软成本（`sim/march_field.gd`），缺口足够便宜时敌人自动弃墙走缺口；差异仅剩本作用"占用即时 + HP 限频 1s 重算"替代其增量更新 |
 | [openage](https://github.com/SFTtech/openage)（GPLv3） | AoE2 引擎重制：扇区/门户分层 + 逐扇区流场 | 分区休眠（架构稿 §9）的蓝图来源；流场缓存/复用思路供后续噪声目标场参考（§9 已记） |
 | [OpenRA](https://github.com/OpenRA/OpenRA)（GPL） | 中规模 lockstep RTS，Actor/Trait | 命令即意图、tick 串行执行——与本项目命令队列同构（§4/§6 已记） |
 | Supreme Commander（闭源） | 500 单位/边设计上限、战略缩放 | 仅设计标尺：证明 1–2k 是"可玩规模"常规区间；无实现可引 |
 
-结论：本作"无头固定步长模拟 + 命令队列 + 波次流场 + 空间分区"与上述主流实现**同构**，不存在需要推翻的架构性差异；Recoil 的多线程路线明确不适用于 GDScript。出兵切片据此确认两个实现口径：**波内分批出生**（BAR squad/冷却思路的简化版，避免单 tick 批量插入的峰值）；**波次配置数据驱动**（对标 SpawnGroup/波次表，本作即数值稿 §12 预算曲线，不写死在代码）。
+采用结论：沿用无头固定步长模拟、命令队列、波次流场与空间分区；参考项目的原生多线程方案未接入。本项目出兵遵循两个口径：**波内分批出生**（BAR squad/冷却思路的简化版，避免单 tick 批量插入的峰值）；**波次配置数据驱动**（对标 SpawnGroup/波次表，本作即数值稿 §12 预算曲线，不写死在代码）。

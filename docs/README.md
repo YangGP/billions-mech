@@ -18,6 +18,8 @@
 | [模块复用调研](reuse-research.md) | 候选来源、采用结论与验证限制 |
 | [开发计划](development-plan.md) | 当前进度、同步任务、待明确规则与里程碑验收 |
 
-## 历史与实施记录
+## 实施与检查
 
-[归档索引](../archive/README.md) 保留被替代的旧稿。[重启](../validation/rebuild-foundation.md)、[M2](../validation/m2-world-space.md)、[原 M3](../validation/m3-construction-economy.md)、[新版经济/采矿](../validation/m3-mining-economy.md)、[M4 单位/生产](../validation/m4-units-production.md) 记录保留各阶段的参数、检查结果与验收项；最新进度统一看开发计划。
+[M5 实施与检查](../validation/m5-threat-defense.md) 汇总当前实现及有效检查结果，[bundle 审查记录](../validation/m5-bundle-review.md) 保留逐提交结论；待验收清单与后续顺序统一看[开发计划](development-plan.md)。
+
+旧设计稿和 M1–M4 实施流水已清理，仍有效的检查结果与待验项已汇总；旧版本从 Git 历史追溯。[旧原型资源](../archive/README.md) 仅保留非运行依赖的场景和素材。
