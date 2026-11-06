@@ -19,7 +19,7 @@
 | 选择集合、编队、输入绑定、队列/阵型语义 | RTS Advanced Lite | rluders/rts-framework 的 SelectionManager/CommandManager；Crusade 的选择与单位控制 | Lite 是 3D，选择投影与地面拾取必须检查；其他候选也有各自实体/场景依赖，不表示已经适配 2D sim |
 | 玩家单位与局部战术 A* | 可脱离场景树的已有寻路实现 | Godot 内置 AStarGrid2D | M2 已接入原生 AStarGrid2D，M3 支持建筑占用变更后的重建与路径更新；正式单位和规模性能仍待 M4/M5 |
 | 小地图 | 先查已有 2D 小地图方案，Lite 无此模块 | Razoric480/godot-minimap-demo | 新工程需接入或实现；该候选为旧演示项目，Godot 4.7 接入与素材许可仍需核对；不直接导入素材 |
-| 机潮流场 | 先查已有 Godot 流场实现 | Crusade 的流场与局部避让实现；Mindustry Pathfinder 成本模型 | M5 行军场为项目自有加权场 `sim/march_field.gd`（软成本口径，§9 0.5.1/§10）；直接复用 Crusade `steering.gd`（分离），`flow_field.gd` 保留 vendor 未接线；游荡敌走既有 AStarGrid2D |
+| 机潮流场 | 先查已有 Godot 流场实现 | Crusade 的流场与局部避让实现；Mindustry Pathfinder 成本模型 | M5 行军场为项目自有加权场 `sim/march_field.gd`（软成本口径，§9 0.5.1/§10）；直接复用 Crusade `steering.gd`（分离），`flow_field.gd` 已随设计变更从 vendor 移除；游荡敌走既有 AStarGrid2D |
 
 每项正式采用前记录：源 URL、许可证原文位置、版本/提交 SHA、引擎依赖、需修改的接口、已知问题、适配验证结果。可复用模块锁版本入 vendor；未选候选不导入工程。
 
@@ -27,7 +27,7 @@
 
 - [RTS Advanced Lite README](https://github.com/openclawaimac/godot-rts-advanced-lite#readme)：3D 基座、Lite/Pro 能力边界、MIT。
 - [Crusade README](https://github.com/saman-mb/crusade-rts#readme)：MIT、2D 等距地图/镜头/选择、流场候选与 Godot 4.4.1 要求。
-- [Crusade src/core/flow_field.gd](https://github.com/saman-mb/crusade-rts/blob/main/src/core/flow_field.gd)：已 vendor 的流场核心一手源码（§9）。
+- [Crusade src/core/flow_field.gd](https://github.com/saman-mb/crusade-rts/blob/main/src/core/flow_field.gd)：曾 vendor 的流场核心一手源码；0.5.1 设计变更后已移除（§9），上游本地副本仍在 `d:\fish\crusade-rts\`。
 - [RTS Framework README](https://github.com/rluders/rts-framework#readme)：MIT、选择与命令模块及其场景依赖。
 - [AStarGrid2D 官方文档](https://docs.godotengine.org/en/stable/classes/class_astargrid2d.html)：内置 2D 网格寻路接口。
 - [Godot Minimap Demo README](https://github.com/Razoric480/godot-minimap-demo#readme)：MIT 代码仓库与 2D 小地图表示演示；不据此认定演示素材均可沿用。
@@ -133,7 +133,7 @@
 
 已知限制与适配口径（详见 `vendor/crusade/README.md`）：均匀成本 BFS 下崎岖地不比开阔地贵，敌人不因崎岖绕路、仅移动层减速——与 map-terrain.md §3"主口前天然迟滞"意图一致；`flow_at` 对角流向无防切角守卫，敌方行军集成在步进校验中对齐玩家 A* 的 DIAGONAL_MODE_ONLY_IF_NO_OBSTACLES 语义；主脑固定 + 地形静态 ⇒ 波次流场整局只算一次；游荡敌不共用主脑流场，数量小（切片图 ≈17 + 回填）直接走既有 AStarGrid2D。
 
-**0.5.1 更新（2026-11-06，用户决策）**：`flow_field.gd` 因均匀成本无法表达"缺口足够便宜时弃墙走缺口"，行军场改为项目自有加权场 `sim/march_field.gd`（Dijkstra + 二叉堆；成本模型取 Mindustry Pathfinder 口径，见 §10）——按 AGENT.md 加权即替换其核心算法，不再算直接复用；该文件按用户指示保留在 vendor 作纯逻辑参考与未来噪声场候选，`steering.gd` 继续直接复用（分离半径由调用方注入：攻击建筑 0.3、其余 0.6）。architecture.md §5 的"只读地形、不因建墙/墙塌重算"规则随之修订为软成本口径（占用变化即时重算、HP 漂移限频 1s）。
+**0.5.1 更新（2026-11-06，用户决策）**：`flow_field.gd` 因均匀成本无法表达"缺口足够便宜时弃墙走缺口"，行军场改为项目自有加权场 `sim/march_field.gd`（Dijkstra + 二叉堆；成本模型取 Mindustry Pathfinder 口径，见 §10）——按 AGENT.md 加权即替换其核心算法，不再算直接复用；该文件已从 vendor 移除（上游源码保留在本地参考副本 `d:\fish\crusade-rts\`，未来噪声场若需共享场按 §2 重新评估），`steering.gd` 继续直接复用（分离半径由调用方注入：攻击建筑 0.3、其余 0.6）。architecture.md §5 的"只读地形、不因建墙/墙塌重算"规则随之修订为软成本口径（占用变化即时重算、HP 漂移限频 1s）。
 
 本地参考副本：`d:\fish\crusade-rts\`、`d:\fish\godot-tilemap-flowfields\`（与 Lite 副本同级，不参与本项目 Godot 扫描）。godot-tilemap-flowfields 的 algo.rs 存在流场生成误用 SouthWest 邻居值充当 NW 的缺陷（`native/src/algo.rs` L242），引用其思路时须知。vendor 文件的 Godot 4.7 语法检查与实机行为验证由用户开发环境执行，通过前不记为已验收。
 
