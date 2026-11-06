@@ -1,4 +1,5 @@
-[gd_resource type="Resource" script_class="MechFoundationSettings" load_steps=11 format=3]
+[gd_resource type="Resource" script_class="MechFoundationSettings" load_steps=16 format=3]
+
 [ext_resource type="Script" path="res://content/foundation_settings.gd" id="1"]
 [ext_resource type="Resource" path="res://content/maps/first_outpost.tres" id="2"]
 [ext_resource type="Resource" path="res://content/buildings/mainbrain.tres" id="3"]
@@ -9,6 +10,11 @@
 [ext_resource type="Resource" path="res://content/buildings/mining_station.tres" id="8"]
 [ext_resource type="Resource" path="res://content/buildings/assembly_plant.tres" id="9"]
 [ext_resource type="Resource" path="res://content/units/sentinel.tres" id="10"]
+[ext_resource type="Script" path="res://content/enemy_definition.gd" id="11"]
+[ext_resource type="Resource" path="res://content/enemies/builder.tres" id="12"]
+[ext_resource type="Resource" path="res://content/enemies/wanderer.tres" id="13"]
+[ext_resource type="Resource" path="res://content/enemies/recycler.tres" id="14"]
+[ext_resource type="Resource" path="res://content/enemies/prototype.tres" id="15"]
 
 [resource]
 script = ExtResource("1")
@@ -22,3 +28,5 @@ starting_buildings = Dictionary[Vector2i, StringName]({Vector2i(26, 32): &"assem
 starting_unit_cells = Array[Vector2i]([Vector2i(23, 33), Vector2i(24, 33), Vector2i(23, 34), Vector2i(24, 34)])
 practice_target_cells = Array[Vector2i]([Vector2i(32, 26), Vector2i(31, 21)])
 probe_speed = 2.5
+enemy_definitions = Array[ExtResource("11")]([ExtResource("12"), ExtResource("13"), ExtResource("14"), ExtResource("15")])
+threat_enabled = false

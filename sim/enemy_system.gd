@@ -61,7 +61,7 @@ func create(registry: MechEntityRegistry, rules: MechEnemyDefinition, position: 
 	enemy.hp = rules.max_hp
 	enemy.max_hp = rules.max_hp
 	enemy.hp_last_tick = rules.max_hp
-	enemy.order = &"marching"
+	enemy.order = &"wandering" if rules.stationary else &"marching"
 	return id
 
 
@@ -132,6 +132,9 @@ func _advance_one(enemy: MechEntityState, registry: MechEntityRegistry, grid: Me
 	if enemy.order == &"engaged":
 		_advance_engaged(enemy, registry, grid, navigation, buildings_by_id, building_ids,
 			building_cells, unit_buckets, enemy_buckets, dt, hz, result)
+		return
+	# TAB-style wanderers hold position until seen or attacked (noise comes later).
+	if enemy.enemy_definition.stationary:
 		return
 	_advance_marching(enemy, grid, enemy_buckets, building_ids, dt)
 
@@ -247,7 +250,8 @@ func _engage(enemy: MechEntityState, target_id: int) -> void:
 
 
 func _disengage(enemy: MechEntityState) -> void:
-	enemy.order = &"marching"
+	# Stationary enemies idle where the chase ended (waves resume the march).
+	enemy.order = &"wandering" if enemy.enemy_definition.stationary else &"marching"
 	enemy.attack_target_id = 0
 	enemy.set_move_path(PackedVector2Array())
 

@@ -28,6 +28,7 @@ var _selection_toggle: bool = false
 var _attack_move_mode: bool = false
 var _last_group: int = -1
 var _last_group_time: int = 0
+var _last_threat_key: String = ""
 
 
 func _ready() -> void:
@@ -445,6 +446,7 @@ func _on_command_finished(command_type: int, result: Dictionary) -> void:
 
 func _refresh() -> void:
 	var state: Dictionary = _sim.snapshot()
+	_present_threat(state)
 	if _last_generation != state["generation"]:
 		_selection.reset()
 		_attack_move_mode = false
@@ -466,6 +468,21 @@ func _refresh() -> void:
 		_last_map_revision = state["map_revision"]
 	_refresh_selection()
 	_update_cursor()
+
+
+func _present_threat(state: Dictionary) -> void:
+	# Interim announcement: a text line on the transition into "announced".
+	# The proper wave-slot HUD arrives with the M5-04 batch.
+	var threat: Dictionary = state.get("threat", {})
+	if threat.is_empty() or not threat.get("active", false):
+		_last_threat_key = ""
+		return
+	var key: String = "%s_%d_%s" % [String(threat.get("phase", &"")), int(threat.get("wave_index", 0)), String(threat.get("edge", &""))]
+	if key == _last_threat_key:
+		return
+	_last_threat_key = key
+	if threat.get("phase", &"") == &"announced":
+		_hud.feedback("侦测到%s机潮，方向：%s。" % [threat.get("tier", ""), threat.get("edge_name", "")])
 
 
 func _refresh_selection() -> void:

@@ -15,6 +15,9 @@ extends Resource
 @export var vision_radius: float = 6.0
 @export var threat_cost: float = 1.0
 @export var prefers_buildings: bool = false
+## TAB-style: wanderers stand until seen or attacked; wave enemies march to the
+## core. Noise convergence will re-target stationary enemies later.
+@export var stationary: bool = false
 
 
 func validation_error() -> String:
@@ -41,4 +44,5 @@ func snapshot() -> Dictionary:
 		"damage": damage, "damage_vs_building": building_damage(),
 		"attack_seconds": attack_seconds, "attack_range": attack_range,
 		"move_speed": move_speed, "vision_radius": vision_radius,
-		"threat_cost": threat_cost, "prefers_buildings": prefers_buildings}
+		"threat_cost": threat_cost, "prefers_buildings": prefers_buildings,
+		"stationary": stationary}

@@ -14,6 +14,9 @@ var _minerals := MechMineralSystem.new()
 var _production := MechProductionSystem.new()
 var _units := MechUnitSystem.new()
 var _enemies := MechEnemySystem.new()
+var _waves := MechWaveDirector.new()
+var _threat := MechThreatSystem.new()
+var _enemy_defs: Dictionary = {}
 var _settings: MechFoundationSettings
 var _unit_definition: MechUnitDefinition
 var _map_definition: MechMapDefinition
@@ -46,6 +49,15 @@ func configure(settings: MechFoundationSettings) -> bool:
 	_unit_definition = settings.unit_definition
 	_map_definition = settings.map_definition
 	_construction.configure(settings.building_definitions)
+	var wave_error: String = _waves.configure(settings)
+	if not wave_error.is_empty():
+		return _configuration_error(wave_error)
+	var threat_error: String = _threat.configure(settings.enemy_definitions)
+	if not threat_error.is_empty():
+		return _configuration_error(threat_error)
+	_enemy_defs.clear()
+	for rules: MechEnemyDefinition in settings.enemy_definitions:
+		_enemy_defs[rules.enemy_id] = rules
 	_probe_speed = maxf(0.1, settings.probe_speed)
 	_tick_rate = maxi(1, settings.simulation_hz)
 	_starting_resources = settings.starting_resources
@@ -196,6 +208,7 @@ func advance_one_tick() -> void:
 	_sync_navigation()
 	if _production.advance(_construction, _spawn_unit):
 		_recompute_economy()
+	_release_enemies()
 	var dead: Array[int] = _units.advance(_registry, _grid, _navigation, _tick_rate)
 	for id: int in dead:
 		_remove_entity(id)
@@ -231,6 +244,7 @@ func snapshot() -> Dictionary:
 		"scenario": _settings.scenario_name, "unit_catalog": _unit_definition.snapshot(),
 		"catalog": _construction.catalog(_economy), "probe_id": _probe_id,
 		"mainbrain_id": _mainbrain_id, "generation": _generation,
+		"threat": _waves.state(),
 		"map_revision": _grid.revision(), "map_name": _map_definition.display_name}
 
 
@@ -273,6 +287,18 @@ func _recompute_economy() -> void:
 
 func _spawn_unit(building: MechBuildingState, rally: Vector2i) -> bool:
 	return _units.spawn(building, rally, _unit_definition, _registry, _grid, _navigation)
+
+
+## Wave releases and wanderer backfill arrive as spawn requests; creation stays in
+## the enemy system so definitions, teams and march orders live in one place.
+func _release_enemies() -> void:
+	var requests: Array[Dictionary] = []
+	requests.append_array(_waves.advance(_grid, _construction.all()))
+	requests.append_array(_threat.advance())
+	for request: Dictionary in requests:
+		var rules: MechEnemyDefinition = _enemy_defs.get(request["enemy_id"])
+		if rules != null:
+			_enemies.create(_registry, rules, request["position"])
 
 
 func _validate_production_command(command: MechCommand) -> Dictionary:
@@ -542,6 +568,8 @@ func _reset() -> void:
 	# Weighted march field toward the fixed mainbrain cell; rebuilt on building changes.
 	var brain: MechBuildingDefinition = _construction.definition(&"mainbrain")
 	_enemies.reset(_grid, _map_definition.mainbrain_origin + (brain.footprint - Vector2i.ONE) / 2, _construction.all())
+	_waves.reset(_grid, _map_definition, _settings.threat_enabled, _tick_rate)
+	_threat.reset(_grid, _settings.threat_enabled, _tick_rate)
 
 
 func _settings_error(settings: MechFoundationSettings) -> String:
