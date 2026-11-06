@@ -19,7 +19,7 @@
 | 选择集合、编队、输入绑定、队列/阵型语义 | RTS Advanced Lite | rluders/rts-framework 的 SelectionManager/CommandManager；Crusade 的选择与单位控制 | Lite 是 3D，选择投影与地面拾取必须检查；其他候选也有各自实体/场景依赖，不表示已经适配 2D sim |
 | 玩家单位与局部战术 A* | 可脱离场景树的已有寻路实现 | Godot 内置 AStarGrid2D | M2 已接入原生 AStarGrid2D，M3 支持建筑占用变更后的重建与路径更新；正式单位和规模性能仍待 M4/M5 |
 | 小地图 | 先查已有 2D 小地图方案，Lite 无此模块 | Razoric480/godot-minimap-demo | 新工程需接入或实现；该候选为旧演示项目，Godot 4.7 接入与素材许可仍需核对；不直接导入素材 |
-| 机潮流场 | 先查已有 Godot 流场实现 | Crusade 的流场与局部避让实现 | 只作候选；必须满足“只计地形，玩家建筑由实际碰撞/攻击处理”以及纯数据 sim 边界 |
+| 机潮流场 | 先查已有 Godot 流场实现 | Crusade 的流场与局部避让实现 | 已 vendor Crusade `flow_field.gd` + `steering.gd`（§9，HEAD e4929c8，MIT 逐字未改）；walkable 注入地形层，建筑阻挡由移动/攻击处理；游荡敌走既有 AStarGrid2D |
 
 每项正式采用前记录：源 URL、许可证原文位置、版本/提交 SHA、引擎依赖、需修改的接口、已知问题、适配验证结果。可复用模块锁版本入 vendor；未选候选不导入工程。
 
@@ -27,11 +27,16 @@
 
 - [RTS Advanced Lite README](https://github.com/openclawaimac/godot-rts-advanced-lite#readme)：3D 基座、Lite/Pro 能力边界、MIT。
 - [Crusade README](https://github.com/saman-mb/crusade-rts#readme)：MIT、2D 等距地图/镜头/选择、流场候选与 Godot 4.4.1 要求。
+- [Crusade src/core/flow_field.gd](https://github.com/saman-mb/crusade-rts/blob/main/src/core/flow_field.gd)：已 vendor 的流场核心一手源码（§9）。
 - [RTS Framework README](https://github.com/rluders/rts-framework#readme)：MIT、选择与命令模块及其场景依赖。
 - [AStarGrid2D 官方文档](https://docs.godotengine.org/en/stable/classes/class_astargrid2d.html)：内置 2D 网格寻路接口。
 - [Godot Minimap Demo README](https://github.com/Razoric480/godot-minimap-demo#readme)：MIT 代码仓库与 2D 小地图表示演示；不据此认定演示素材均可沿用。
+- [godot-tilemap-flowfields](https://github.com/arnemileswinter/godot-tilemap-flowfields)：MIT、Godot 3.5 GDNative/Rust 流场插件，§9 排除。
+- [openage pathfinding](https://github.com/SFTtech/openage)：GPLv3、C++/Python 引擎级扇区/门户 + 流场实现，§9 仅参考。
+- [bevy_pathfinder](https://lib.rs/crates/bevy_pathfinder)：MIT、Rust 流场 crate，§9 仅参考。
+- [Pathfindax（NuGet）](https://www.nuget.org/packages/Pathfindax)：C# 寻路框架，2019-09 后停更，§9 排除。
 
-调研方式：检查项目与官方源码/README/issue。本环境未找到 Agent-Reach 命令，改用可用的网页检索和一手源码；未导入、执行或复制任何候选依赖。
+调研方式：检查项目与官方源码/README/issue。本环境未找到 Agent-Reach 命令，改用可用的网页检索和一手源码；未执行任何候选运行时，未选候选不导入工程；正式采用者按 §2 锁版本入 vendor（迄今为 vendor/crusade，见 §9）。
 
 ## 4. M3 建造与经济选型（2026-11-05）
 
@@ -102,3 +107,30 @@
 **已核实的分歧（本项目保持不动）**：`nearest_open` 螺旋把目标吸附到最近可走格——本项目规则为"单兵静态不可达拒绝下令，不找替代终点"；`rts_separation.gd` O(n²) 自写分离——已被原生 RVO 替代（§6）；`rts_unit.gd` 为 Node3D 场景节点、战斗仅单位对单位——违反无头 sim 红线，且 M5 所需的建筑目标、流场行军、波次 Lite 均不提供；formation/orders 的贪心槽位分配——本项目已按"成组落点一次分配 + 保留原目的地"规则实现。camera（3D）、economy/resource_node（单币/可占领点模型）、loc（无 i18n 需求）、teams（关系表；本项目仅玩家/机潮两方，team 字段已够）均不适用。
 
 **副本位置**：副本已按用户指示移出项目目录，现位于 `d:\fish\godot-rts-advanced-lite-main\`（与其他参考仓库同级，不参与本项目 Godot 扫描与导入）。
+
+## 9. M5 机潮行军流场选型（2026-11-06）
+
+需求（architecture.md §5）：未接敌机潮向主脑行军用流场——只读地形、不因建墙/墙塌重算；建筑阻挡由移动/攻击处理；接敌后切 sim 侧 A*；接敌判定/分离走空间分区。按用户指示扩大到非 Godot 生态与 C#（Godot 原生支持 .NET），共核对五个候选后定稿，不再扩大检索：
+
+| # | 候选 | 形态 | 许可证 / 维护 | 结论 |
+|---|---|---|---|---|
+| 1 | [Crusade RTS](https://github.com/saman-mb/crusade-rts) `src/core/flow_field.gd` + `steering.gd` | Godot 4.4 GDScript，纯 RefCounted，带 headless 单测与 CI | MIT ©2026；HEAD `e4929c8`（2026-07-26，PR #263 仍在演进） | **直接 vendor 复用**（下详） |
+| 2 | [godot-tilemap-flowfields](https://github.com/arnemileswinter/godot-tilemap-flowfields) | Godot 3.5 GDNative：Rust 核心 + 预编译 .so/.dll，FlowFieldGenerator 节点读 TileMap | MIT ©2022；v0.1.0 早期 | 不采用：引擎版本（3.5 vs 4.7）、原生二进制依赖（本项目纯 GDScript）、节点/TileMap 耦合违反无头 sim 红线 |
+| 3 | [openage pathfinding](https://github.com/SFTtech/openage)（libopenage/pathfinding，v0.6.0） | C++/Python 引擎级：扇区/门户分层 A* + 逐扇区流场，源自 Elijah Emerson 流场砖文章 | **GPLv3**；成熟引擎项目 | 仅参考设计：GPL 不可 vendor、不复制源码；其 FLOW_LOS/波前受阻标记与字段缓存复用留作后续规模优化参考 |
+| 4 | [bevy_pathfinder](https://lib.rs/crates/bevy_pathfinder)（v0.1.2） | Rust crate：BFS 流场（多目标 O(1) 查询）+ 哽喉点检测 FlowGate + 共享 A* | MIT；2026-09 仍发版 | 仅参考：Rust 需 GDExtension 工具链，与纯 GDScript 边界冲突；哽喉点检测留作后续雷达/伏击玩法候选 |
+| 5 | [Pathfindax](https://www.nuget.org/packages/Pathfindax) | C# 寻路框架（A*/Dijkstra/PotentialField/FlowField），耦合 Duality 引擎 | 最后更新 **2019-09-01**，仅 .NET Framework 4.7.2 | 不采用：7 年未维护，目标框架无法直接用于 Godot .NET（须整体移植），接入即等于参考后自写 |
+
+引擎内置核对：NavigationServer2D 提供逐 agent 寻路与 RVO 避让、AStarGrid2D 为逐 agent A*，Godot 4.7 无内置流场能力，不存在可直接复用的内置方案。C# 生态按用户要求专门核对（NuGet Tags:"PathFinding" 全表 + Unity 生态检索）：唯一带 FlowField 的 C# 库即 #5 Pathfindax（2019 年停更），Unity 侧只有教程文章代码、无维护库——**引入 C#/.NET 工具链缺乏可维护的成熟模块支撑**，且会为用户验证链增加 dotnet 构建步骤；若日后出现活跃维护的 C# 候选，再按 §2 流程单独评估。
+
+### 采用：vendor/crusade（锁版本 HEAD `e4929c8`，MIT）
+
+已按 AGENT.md"直接复用"要求拉取本地副本（`d:\fish\crusade-rts\`，项目同级不参与导入）逐文件分析后，vendor 两个纯逻辑文件入 `vendor/crusade/`，逐字未改：
+
+- **`flow_field.gd`**：均匀成本 4 连通 BFS 积分场（PackedInt32Array 扁平缓冲，`recompute(goal)` 复用）+ 8 邻最低成本流向向量；可通过性经构造器 `walkable: Callable` 注入。本项目注入"地形层可通过、不含建筑"，即满足"只计地形，玩家建筑由实际碰撞/攻击处理"；附 headless 单测，仅依赖核心类型。
+- **`steering.gd`**：纯静态分离（逆距离权重、NaN/重合防护）与期望速度合成；配合本项目网格桶邻居表即满足"分离使用空间分区"。
+
+不导入部分：`flow_follower.gd` 耦合 Crusade 等距/高程几何（EntityPlacement/IsoCoord），且墙卫语义为"贴墙滑动"——与本项目"撞墙打墙"（建筑阻挡切攻击）规则冲突；其"步进逐级降级、绝不站进实体格"守卫思路在敌方行军集成中吸收。其余 A*/阵型/编辑器模块本项目已有对应实现。
+
+已知限制与适配口径（详见 `vendor/crusade/README.md`）：均匀成本 BFS 下崎岖地不比开阔地贵，敌人不因崎岖绕路、仅移动层减速——与 map-terrain.md §3"主口前天然迟滞"意图一致；`flow_at` 对角流向无防切角守卫，敌方行军集成在步进校验中对齐玩家 A* 的 DIAGONAL_MODE_ONLY_IF_NO_OBSTACLES 语义；主脑固定 + 地形静态 ⇒ 波次流场整局只算一次；游荡敌不共用主脑流场，数量小（切片图 ≈17 + 回填）直接走既有 AStarGrid2D。
+
+本地参考副本：`d:\fish\crusade-rts\`、`d:\fish\godot-tilemap-flowfields\`（与 Lite 副本同级，不参与本项目 Godot 扫描）。godot-tilemap-flowfields 的 algo.rs 存在流场生成误用 SouthWest 邻居值充当 NW 的缺陷（`native/src/algo.rs` L242），引用其思路时须知。vendor 文件的 Godot 4.7 语法检查与实机行为验证由用户开发环境执行，通过前不记为已验收。
