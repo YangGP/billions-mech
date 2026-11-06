@@ -501,6 +501,60 @@ layout_mode = 0
 mouse_filter = 2
 theme_override_styles/panel = SubResource("StyleBox_selection")
 
+[node name="SessionResult" type="Panel" parent="Root"]
+visible = false
+layout_mode = 0
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -260.0
+offset_top = -145.0
+offset_right = 260.0
+offset_bottom = 145.0
+theme_override_styles/panel = SubResource("StyleBox_panel")
+
+[node name="Title" type="Label" parent="Root/SessionResult"]
+layout_mode = 0
+offset_left = 24.0
+offset_top = 22.0
+offset_right = 496.0
+offset_bottom = 66.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.95, 0.49, 0.47, 1)
+theme_override_font_sizes/font_size = 30
+text = "防守失败"
+horizontal_alignment = 1
+
+[node name="Details" type="Label" parent="Root/SessionResult"]
+layout_mode = 0
+offset_left = 24.0
+offset_top = 83.0
+offset_right = 496.0
+offset_bottom = 176.0
+mouse_filter = 2
+theme_override_font_sizes/font_size = 17
+text = "主脑已被摧毁\n战场已停止\n可继续查看战场，或开始新的一局。"
+horizontal_alignment = 1
+
+[node name="Restart" type="Button" parent="Root/SessionResult"]
+layout_mode = 0
+offset_left = 32.0
+offset_top = 215.0
+offset_right = 252.0
+offset_bottom = 263.0
+focus_mode = 0
+text = "重新开始 [R]"
+
+[node name="Scenario" type="Button" parent="Root/SessionResult"]
+layout_mode = 0
+offset_left = 268.0
+offset_top = 215.0
+offset_right = 488.0
+offset_bottom = 263.0
+focus_mode = 0
+text = "进入训练场"
+
 [node name="DemolitionDialog" type="ConfirmationDialog" parent="."]
 title = "拆除建筑"
 size = Vector2i(540, 210)

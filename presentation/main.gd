@@ -29,6 +29,7 @@ var _attack_move_mode: bool = false
 var _last_group: int = -1
 var _last_group_time: int = 0
 var _last_threat_key: String = ""
+var _last_session_ended: bool = false
 
 
 func _ready() -> void:
@@ -57,7 +58,7 @@ func _ready() -> void:
 	_sim.state_changed.connect(_refresh)
 	_refresh()
 	_select_starting_units()
-	print("[Billions Mech] M4 production and unit command ready; 1920x1080; whitebox; ", initial_settings.scenario_name)
+	print("[Billions Mech] M5 threat and defense ready; 1920x1080; whitebox; ", initial_settings.scenario_name)
 
 
 func _physics_process(_delta: float) -> void:
@@ -185,7 +186,7 @@ func _handle_key(key: int) -> bool:
 		KEY_E:
 			_request_build(&"sentry_tower")
 		KEY_A:
-			if not _selected_units().is_empty() and _build_id == &"":
+			if not _sim.session_ended() and not _selected_units().is_empty() and _build_id == &"":
 				_attack_move_mode = true
 				_hud.feedback("攻击移动：左键指定目的地，右键或 Esc 取消。")
 		KEY_X:
@@ -237,6 +238,9 @@ func _fit_map() -> void:
 
 
 func _request_build(id: StringName) -> void:
+	if _sim.session_ended():
+		_hud.feedback("本局已结束，请重新开始或切换场景。", true)
+		return
 	_cancel_selection_drag()
 	_attack_move_mode = false
 	_cancel_wall_drag()
@@ -358,6 +362,9 @@ func _selected_units() -> Array[int]:
 
 
 func _issue_unit_order(attack_move: bool) -> void:
+	if _sim.session_ended():
+		_hud.feedback("本局已结束，请重新开始或切换场景。", true)
+		return
 	var ids: Array[int] = _selected_units()
 	var cell: Vector2i = _mouse_cell()
 	if not ids.is_empty():
@@ -446,6 +453,7 @@ func _on_command_finished(command_type: int, result: Dictionary) -> void:
 
 func _refresh() -> void:
 	var state: Dictionary = _sim.snapshot()
+	var ended: bool = state["session"]["ended"]
 	_present_threat(state)
 	if _last_generation != state["generation"]:
 		_selection.reset()
@@ -468,6 +476,12 @@ func _refresh() -> void:
 		_last_map_revision = state["map_revision"]
 	_refresh_selection()
 	_update_cursor()
+	if ended and not _last_session_ended:
+		_cancel_selection_drag()
+		_cancel_build()
+		_attack_move_mode = false
+		_hud.feedback("主脑已被摧毁，本局结束。可查看战场或重新开始。", true)
+	_last_session_ended = ended
 
 
 func _present_threat(state: Dictionary) -> void:

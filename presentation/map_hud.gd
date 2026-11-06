@@ -50,6 +50,7 @@ var _panels: Array[Control] = []
 var _building_widgets: Array[Control] = []
 var _unit_catalog: Dictionary = {}
 var _production_widgets: Array[Control] = []
+var _session_ended: bool = false
 
 
 func _ready() -> void:
@@ -75,7 +76,7 @@ func _ready() -> void:
 	_primary = $Root/Inspector/Primary
 	_demolish = $Root/Inspector/Demolish
 	_dialog = $DemolitionDialog
-	_panels = [$Root/Header, $Root/Inspector, $Root/Toolbar]
+	_panels = [$Root/Header, $Root/Inspector, $Root/Toolbar, $Root/SessionResult]
 	_build_buttons = {&"compute_node": $Root/Toolbar/ComputeNode, &"armored_wall": $Root/Toolbar/ArmoredWall,
 		&"sentry_tower": $Root/Toolbar/SentryTower, &"mining_station": $Root/Toolbar/MiningStation,
 		&"assembly_plant": $Root/Toolbar/AssemblyPlant}
@@ -87,6 +88,8 @@ func _ready() -> void:
 	$Root/Toolbar/FocusCore.pressed.connect(focus_requested.emit)
 	$Root/Toolbar/Restart.pressed.connect(restart_requested.emit)
 	$Root/Header/Scenario.pressed.connect(scenario_requested.emit)
+	$Root/SessionResult/Restart.pressed.connect(restart_requested.emit)
+	$Root/SessionResult/Scenario.pressed.connect(scenario_requested.emit)
 	$Root/Inspector/Produce.pressed.connect(_produce_pressed)
 	$Root/Inspector/CancelProduction.pressed.connect(_cancel_production_pressed)
 	_production_widgets = [$Root/Inspector/Produce, $Root/Inspector/Queue, $Root/Inspector/CancelProduction]
@@ -101,7 +104,7 @@ func blocks_point(point: Vector2) -> bool:
 	if _dialog.visible:
 		return true
 	for panel: Control in _panels:
-		if panel.get_global_rect().has_point(point):
+		if panel.is_visible_in_tree() and panel.get_global_rect().has_point(point):
 			return true
 	return false
 
@@ -113,6 +116,8 @@ func present_map(map_state: Dictionary) -> void:
 
 func present_state(state: Dictionary) -> void:
 	_unit_catalog = state["unit_catalog"]
+	_session_ended = state["session"]["ended"]
+	$Root/SessionResult.visible = _session_ended
 	$Root/Header/Subtitle.text = "白模开发  /  %s" % state["scenario"]
 	$Root/Header/Scenario.text = "单位训练场" if state["scenario"] == "标准开局" else "返回标准开局"
 	if _generation != state["generation"]:
@@ -125,6 +130,15 @@ func present_state(state: Dictionary) -> void:
 	_state_label.text = "已暂停 · 可规划" if clock["paused"] else "运行中"
 	_state_label.modulate = Color("f0bc79") if clock["paused"] else ACCENT
 	_pause_button.text = "继续 [空格]" if clock["paused"] else "暂停 [空格]"
+	_pause_button.disabled = _session_ended
+	if _session_ended:
+		_pending_demolish = 0
+		_dialog.hide()
+		_state_label.text = "防守失败 · 本局结束"
+		_state_label.modulate = Color("f27c78")
+		_pause_button.text = "本局已结束"
+		$Root/SessionResult/Details.text = "%s\n坚持了 %02d:%02d · 战场已停止\n可继续查看战场，或开始新的一局。" % [state["session"]["reason"], int(seconds / 60.0), int(fmod(seconds, 60.0))]
+		$Root/SessionResult/Scenario.text = "进入训练场" if state["scenario"] == "标准开局" else "返回标准开局"
 	var economy: Dictionary = state["economy"]
 	_coins_label.text = "算力币  %d   +%d/分钟" % [economy["coins"], economy["income_rate"]]
 	_ore_label.text = "矿石  %d   +%d/分钟" % [economy["ore"], economy["production_per_minute"].y]
@@ -140,8 +154,8 @@ func present_state(state: Dictionary) -> void:
 		var button: Button = _build_buttons[id]
 		var index: int = BUILD_IDS.find(id)
 		button.text = "%s %s\n%s" % [SHORTCUTS[index], entry["name"], MechResources.text(entry["cost"])]
-		button.disabled = not entry["unavailable_reason"].is_empty()
-		button.tooltip_text = entry["unavailable_reason"] if button.disabled else "占地 %d×%d；施工 %.1f 秒；预留电力 %d、容量 %d" % [entry["footprint"].x, entry["footprint"].y, entry["construction_seconds"], entry["power_cost"], entry["capacity_cost"]]
+		button.disabled = _session_ended or not entry["unavailable_reason"].is_empty()
+		button.tooltip_text = "本局已结束" if _session_ended else (entry["unavailable_reason"] if button.disabled else "占地 %d×%d；施工 %.1f 秒；预留电力 %d、容量 %d" % [entry["footprint"].x, entry["footprint"].y, entry["construction_seconds"], entry["power_cost"], entry["capacity_cost"]])
 
 
 func present_zoom(factor: float) -> void:
@@ -221,7 +235,7 @@ func present_selection(building: Dictionary, errors: Dictionary) -> void:
 		$Root/Inspector/Produce.text = "生产%s · %s" % [_unit_catalog["name"], MechResources.text(_unit_catalog["cost"])]
 		$Root/Inspector/Produce.disabled = not building["production_error"].is_empty()
 		$Root/Inspector/Produce.tooltip_text = building["production_error"]
-		$Root/Inspector/CancelProduction.disabled = queue.is_empty()
+		$Root/Inspector/CancelProduction.disabled = _session_ended or queue.is_empty()
 		$Root/Inspector/Queue.text = "队列 %d / %d · %d%%\n%s" % [queue.size(), building["queue_limit"], roundi(production["progress"] * 100), "出口受阻，订单保留" if production["blocked"] else "选厂后右键设置集结点"]
 		if building["phase"] == MechBuildingState.Phase.OPERATING:
 			_build_label.text = "生产进度  %d%%" % roundi(production["progress"] * 100)

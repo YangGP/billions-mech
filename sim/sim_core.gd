@@ -32,6 +32,7 @@ var _generation: int = 0
 var _tick_rate: int = 30
 var _starting_resources := Vector4i.ZERO
 var _navigation_revision: int = -1
+var _outcome: StringName = &"ongoing"
 
 
 func _init() -> void:
@@ -44,6 +45,10 @@ func shutdown() -> void:
 
 func _on_movement_finished() -> void:
 	state_changed.emit()
+
+
+func session_ended() -> bool:
+	return _outcome != &"ongoing"
 
 
 func configure(settings: MechFoundationSettings) -> bool:
@@ -160,6 +165,8 @@ func execute_command(command: MechCommand) -> Dictionary:
 
 
 func validate_command(command: MechCommand) -> Dictionary:
+	if session_ended() and command.type not in [MechCommand.Type.RESET_SESSION, MechCommand.Type.LOAD_SCENARIO]:
+		return _reject("本局已结束，请重新开始或切换场景")
 	match command.type:
 		MechCommand.Type.LOAD_SCENARIO:
 			if not command.payload.get("settings") is MechFoundationSettings:
@@ -210,7 +217,7 @@ func validate_command(command: MechCommand) -> Dictionary:
 
 
 func advance_one_tick() -> void:
-	if not _clock.advance():
+	if session_ended() or not _clock.advance():
 		return
 	# Income precedes completions: newly finished nodes start accruing next tick.
 	_economy.advance_income(_construction.all(), _tick_rate)
@@ -245,6 +252,11 @@ func advance_one_tick() -> void:
 	if not enemy_result["dead_units"].is_empty():
 		_recompute_economy()
 		_sync_navigation()
+	# Finish removal bookkeeping for this combat pass, but never fire towers or
+	# submit a new native movement batch after the core has fallen.
+	if session_ended():
+		state_changed.emit()
+		return
 	# Towers fire after enemy movement; hits return as results and share the
 	# unit-kill removal bookkeeping (grid release, economy, navigation).
 	var tower_hits: Array[Dictionary] = _towers.advance(_registry, _construction.all(), _tick_rate)
@@ -288,6 +300,8 @@ func snapshot() -> Dictionary:
 		"scenario": _settings.scenario_name, "unit_catalog": _unit_definition.snapshot(),
 		"catalog": _construction.catalog(_economy), "probe_id": _probe_id,
 		"mainbrain_id": _mainbrain_id, "generation": _generation,
+		"session": {"outcome": _outcome, "ended": session_ended(),
+			"reason": "主脑已被摧毁" if _outcome == &"defeat" else ""},
 		"threat": _waves.state(),
 		"map_revision": _grid.revision(), "map_name": _map_definition.display_name}
 
@@ -319,7 +333,7 @@ func _building_snapshot(building: MechBuildingState) -> Dictionary:
 	result["mineral"] = mineral
 	result["production"] = _production.snapshot(building.entity_id)
 	if building.definition.produced_unit != &"":
-		result["production_error"] = _production.order_error(building, _unit_definition, _economy)
+		result["production_error"] = "本局已结束" if session_ended() else _production.order_error(building, _unit_definition, _economy)
 	if not mineral.is_empty() and mineral["remaining"] == 0 and building.operating():
 		result["status"] = "矿点已耗竭 · 停产"
 	return result
@@ -344,6 +358,8 @@ func _release_enemies() -> void:
 
 
 func _release_spawns(requests: Array[Dictionary]) -> void:
+	if session_ended():
+		return
 	for request: Dictionary in requests:
 		var rules: MechEnemyDefinition = _enemy_defs.get(request["enemy_id"])
 		if rules != null:
@@ -388,11 +404,19 @@ func preview_footprint(origin: Vector2i, footprint: Vector2i) -> Dictionary:
 
 
 func preview_build(id: StringName, origin: Vector2i) -> Dictionary:
-	return _construction.preview_placement(id, origin, _grid, _economy, _minerals)
+	var result: Dictionary = _construction.preview_placement(id, origin, _grid, _economy, _minerals)
+	if session_ended():
+		result["ok"] = false
+		result["reason"] = "本局已结束"
+	return result
 
 
 func preview_wall_line(cells: Array[Vector2i]) -> Dictionary:
-	return _construction.preview_wall_line(cells, _grid, _economy, _minerals)
+	var result: Dictionary = _construction.preview_wall_line(cells, _grid, _economy, _minerals)
+	if session_ended():
+		result["ok"] = false
+		result["reason"] = "本局已结束"
+	return result
 
 
 func building_action_error(type: MechCommand.Type, entity_id: int) -> String:
@@ -401,6 +425,8 @@ func building_action_error(type: MechCommand.Type, entity_id: int) -> String:
 
 func damage_building(entity_id: int, amount: int) -> Dictionary:
 	# Simulation-side hook for enemy attacks, not a player damage/debug command.
+	if session_ended():
+		return _reject("本局已结束")
 	var building: MechBuildingState = _construction.get_building(entity_id)
 	if building == null or amount <= 0:
 		return _reject("伤害目标或数值无效")
@@ -453,6 +479,10 @@ func _remove_building(entity_id: int, refund: Vector4i, refund_orders: bool = fa
 	_economy.credit(refund + _production.remove_factory(entity_id, refund_orders))
 	if entity_id == _mainbrain_id:
 		_grid.set_core_coverage(Vector2i.ZERO, Vector2i.ONE, -1)
+		_outcome = &"defeat"
+		_clock.set_paused(true)
+		_registry.suspend_motion()
+		print("[Billions Mech] session ended: defeat; tick=", _clock.snapshot()["tick"])
 	_recompute_economy()
 
 
@@ -572,6 +602,7 @@ func _wall_connections(origin: Vector2i) -> int:
 
 func _reset() -> void:
 	_generation += 1
+	_outcome = &"ongoing"
 	_tick_counter = 0
 	_clock.reset()
 	_registry.clear()
