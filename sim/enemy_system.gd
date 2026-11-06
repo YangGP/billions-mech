@@ -14,10 +14,10 @@ const SEPARATION_WEIGHT: float = 0.6
 const SEPARATION_RADIUS: float = 0.6
 const CROWD_SEPARATION_RADIUS: float = 0.3
 const VISION_SCAN_INTERVAL: int = 5
-const FIELD_HP_REFRESH_TICKS: int = 30
-const CONVERGE_REPATH_TICKS: int = 60
+const FIELD_HP_REFRESH_SECONDS: float = 1.0
+const CONVERGE_REPATH_SECONDS: float = 2.0
 const CONVERGE_ARRIVAL: float = 1.0
-const SHUFFLE_DECISION_TICKS: int = 120
+const SHUFFLE_DECISION_SECONDS: float = 4.0
 const SHUFFLE_RADIUS: int = 5
 const SHUFFLE_ATTEMPTS: int = 6
 
@@ -34,19 +34,20 @@ func configure_noise(emitter: Callable) -> void:
 
 
 func reset(grid: MechGridState, goal: Vector2i, buildings: Array[MechBuildingState]) -> void:
+	_tick_counter = 0
 	_goal = goal
 	_field_revision = -1
 	_field_hp.clear()
 	_refresh_field(grid, buildings)
 
 
-func _refresh_field(grid: MechGridState, buildings: Array[MechBuildingState]) -> void:
+func _refresh_field(grid: MechGridState, buildings: Array[MechBuildingState], hz: int = 30) -> void:
 	# Occupancy changes (place/cancel/destroy) rebuild immediately; plain HP drift
 	# (walls being chewed) is throttled to once per refresh interval.
 	if grid.revision() != _field_revision:
 		_rebuild_field(grid, buildings)
 		return
-	if _tick_counter % FIELD_HP_REFRESH_TICKS != 0:
+	if _tick_counter % maxi(1, ceili(FIELD_HP_REFRESH_SECONDS * hz)) != 0:
 		return
 	for building: MechBuildingState in buildings:
 		if _field_hp.get(building.entity_id, -1) != building.hp:
@@ -79,7 +80,7 @@ func create(registry: MechEntityRegistry, rules: MechEnemyDefinition, position: 
 ## removal/economy paths so refunds and capacity follow the existing rules.
 func advance(registry: MechEntityRegistry, grid: MechGridState, navigation: MechGridNavigation, buildings: Array[MechBuildingState], hz: int, noises: Array[Dictionary]) -> Dictionary:
 	var result: Dictionary = {"dead_units": [], "building_hits": []}
-	_refresh_field(grid, buildings)
+	_refresh_field(grid, buildings, hz)
 	var building_ids: Dictionary = {}
 	var buildings_by_id: Dictionary = {}
 	var building_cells: Dictionary = {}
@@ -145,7 +146,7 @@ func _advance_one(enemy: MechEntityState, registry: MechEntityRegistry, grid: Me
 		return
 	# Wanderers never march to the core: noise convergence or TAB-style shuffling.
 	if not enemy.enemy_definition.marches_to_core:
-		_advance_wandering(enemy, noises, grid, navigation, enemy_buckets, building_ids, dt)
+		_advance_wandering(enemy, noises, grid, navigation, enemy_buckets, building_ids, buildings_by_id, dt)
 		return
 	_advance_marching(enemy, grid, enemy_buckets, building_ids, dt)
 
@@ -155,7 +156,8 @@ func _advance_one(enemy: MechEntityState, registry: MechEntityRegistry, grid: Me
 ## cadence; the current walk always finishes, so losing a noise source leaves
 ## them lingering wherever they stopped.
 func _advance_wandering(enemy: MechEntityState, noises: Array[Dictionary], grid: MechGridState,
-		navigation: MechGridNavigation, enemy_buckets: Dictionary, building_ids: Dictionary, dt: float) -> void:
+		navigation: MechGridNavigation, enemy_buckets: Dictionary, building_ids: Dictionary,
+		buildings_by_id: Dictionary, dt: float) -> void:
 	var heard: Dictionary = {}
 	var best_radius: float = 0.0
 	var best_distance: float = INF
@@ -172,18 +174,26 @@ func _advance_wandering(enemy: MechEntityState, noises: Array[Dictionary], grid:
 		var goal: Vector2 = heard["position"]
 		if enemy.position.distance_to(goal) <= CONVERGE_ARRIVAL:
 			enemy.set_move_path(PackedVector2Array())
-			enemy.repath_ticks = CONVERGE_REPATH_TICKS
+			enemy.repath_ticks = maxi(1, ceili(CONVERGE_REPATH_SECONDS / dt))
 			return
 		if enemy.repath_ticks == 0 and (not enemy.has_move_order or enemy.order_goal.distance_to(goal) > 1.0):
-			var path: PackedVector2Array = navigation.find_path(enemy.position, Vector2i(goal.floor()))
-			enemy.repath_ticks = CONVERGE_REPATH_TICKS
+			var goal_cell := Vector2i(goal.floor())
+			var source_building: MechBuildingState = buildings_by_id.get(grid.occupant_at(goal_cell))
+			# Building noise originates inside solid occupancy. Reuse the combat
+			# approach cell so AStarGrid2D can lead listeners to its perimeter.
+			if source_building != null:
+				goal_cell = _building_chase_cell(enemy, source_building, grid)
+			var path := PackedVector2Array()
+			if grid.is_walkable(goal_cell):
+				path = navigation.find_path(enemy.position, goal_cell)
+			enemy.repath_ticks = maxi(1, ceili(CONVERGE_REPATH_SECONDS / dt))
 			if not path.is_empty():
 				enemy.order_goal = goal
 				enemy.set_move_path(path)
 	elif enemy.repath_ticks == 0 and not enemy.has_move_order:
 		# TAB-style idle shuffle: sometimes drift to a random walkable cell nearby.
-		enemy.repath_ticks = SHUFFLE_DECISION_TICKS
-		var shuffle_target: Vector2i = _shuffle_cell(enemy, grid)
+		enemy.repath_ticks = maxi(1, ceili(SHUFFLE_DECISION_SECONDS / dt))
+		var shuffle_target: Vector2i = _shuffle_cell(enemy, grid) if randf() < 0.5 else Vector2i(-1, -1)
 		if shuffle_target.x >= 0:
 			var path: PackedVector2Array = navigation.find_path(enemy.position, shuffle_target)
 			if not path.is_empty():
@@ -345,6 +355,9 @@ func _acquire_target(enemy: MechEntityState, grid: MechGridState, unit_buckets: 
 		for x: int in range(center.x - radius, center.x + radius + 1):
 			var cell := Vector2i(x, y)
 			for unit: MechEntityState in unit_buckets.get(cell, []):
+				# Earlier enemies may have killed this unit during the same pass.
+				if unit.hp <= 0:
+					continue
 				var distance: float = enemy.position.distance_squared_to(unit.position)
 				if distance <= vision_squared and distance < best_distance and grid.terrain_line_clear(enemy.position, unit.position):
 					best = unit.entity_id

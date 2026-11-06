@@ -15,7 +15,7 @@ const COMBAT_NOISE_SECONDS: float = 3.0
 const CONSTRUCTION_NOISE_SECONDS: float = 5.0
 const OPERATION_NOISE_SECONDS: float = 5.0
 const MOVEMENT_NOISE_SECONDS: float = 2.5
-const OPERATION_EVERY_TICKS: int = 150
+const OPERATION_NOISE_INTERVAL_SECONDS: float = 5.0
 
 var _active: bool = false
 var _wanderer: MechEnemyDefinition
@@ -91,9 +91,10 @@ func advance(buildings: Array[MechBuildingState]) -> Array[Dictionary]:
 		return []
 	_tick_counter += 1
 	_decay_noises()
+	var operation_ticks: int = maxi(1, ceili(OPERATION_NOISE_INTERVAL_SECONDS * _tick_rate))
 	for building: MechBuildingState in buildings:
 		# Operating facilities keep a weak continuous hum, staggered per building.
-		if building.operating() and (_tick_counter + building.entity_id) % OPERATION_EVERY_TICKS == 0:
+		if building.operating() and (_tick_counter + building.entity_id) % operation_ticks == 0:
 			note_operation(Vector2(building.origin) + Vector2(building.definition.footprint) * 0.5)
 	var requests: Array[Dictionary] = []
 	if not _pending_scatter.is_empty():

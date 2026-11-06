@@ -21,7 +21,7 @@ var _enemy_defs: Dictionary = {}
 var _tick_counter: int = 0
 
 ## Marching player units emit weak movement noise every two seconds (staggered).
-const MOVEMENT_NOISE_EVERY_TICKS: int = 60
+const MOVEMENT_NOISE_SECONDS: float = 2.0
 var _settings: MechFoundationSettings
 var _unit_definition: MechUnitDefinition
 var _map_definition: MechMapDefinition
@@ -116,13 +116,16 @@ func execute_command(command: MechCommand) -> Dictionary:
 		MechCommand.Type.PLACE_WALL_LINE:
 			var placed: int = 0
 			var spent := Vector4i.ZERO
+			var noise_origin := Vector2i.ZERO
 			for cell: Vector2i in result["origins"]:
 				var placement: Dictionary = _place(&"armored_wall", cell)
 				if placement["ok"]:
+					if placed == 0:
+						noise_origin = cell
 					placed += 1
 					spent += placement["cost"]
 			if placed > 0:
-				_threat.note_construction(Vector2(command.payload["origins"][0]) + Vector2(0.5, 0.5))
+				_threat.note_construction(Vector2(noise_origin) + Vector2(0.5, 0.5))
 			result = {"ok": placed > 0, "reason": "" if placed > 0 else "墙线没有可下单的格子",
 				"placed": placed, "skipped": result["origins"].size() - placed, "cost": spent}
 		MechCommand.Type.CANCEL_CONSTRUCTION:
@@ -261,8 +264,9 @@ func advance_one_tick() -> void:
 	_registry.step(_clock.step_seconds(), _grid)
 	# Marching units hum: the expansion itself attracts wanderers (values.md §13).
 	_tick_counter += 1
+	var movement_noise_ticks: int = maxi(1, ceili(MOVEMENT_NOISE_SECONDS * _tick_rate))
 	for entity: MechEntityState in _registry.all():
-		if entity.team == 1 and entity.unit_definition != null and entity.has_move_order and (_tick_counter + entity.entity_id) % MOVEMENT_NOISE_EVERY_TICKS == 0:
+		if entity.team == 1 and entity.unit_definition != null and entity.has_move_order and (_tick_counter + entity.entity_id) % movement_noise_ticks == 0:
 			_threat.note_movement(entity.position)
 
 
@@ -568,6 +572,7 @@ func _wall_connections(origin: Vector2i) -> int:
 
 func _reset() -> void:
 	_generation += 1
+	_tick_counter = 0
 	_clock.reset()
 	_registry.clear()
 	_construction.clear()
@@ -602,7 +607,6 @@ func _reset() -> void:
 	_navigation_revision = -1
 	_sync_navigation()
 	# Weighted march field toward the fixed mainbrain cell; rebuilt on building changes.
-	var brain: MechBuildingDefinition = _construction.definition(&"mainbrain")
 	_enemies.reset(_grid, _map_definition.mainbrain_origin + (brain.footprint - Vector2i.ONE) / 2, _construction.all())
 	_waves.reset(_grid, _map_definition, _settings.threat_enabled, _tick_rate)
 	_threat.reset(_grid, _settings.threat_enabled, _tick_rate)

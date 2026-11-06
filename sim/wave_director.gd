@@ -95,7 +95,8 @@ func advance(grid: MechGridState, buildings: Array[MechBuildingState]) -> Array[
 			if _tick_counter >= _announce_delay_ticks:
 				_queue_wave()
 		&"active":
-			if _tick_counter >= _wave_interval_ticks:
+			# The interval measures release-to-release; announce within that span.
+			if _tick_counter >= maxi(1, _wave_interval_ticks - _announce_delay_ticks):
 				_announce()
 	return requests
 

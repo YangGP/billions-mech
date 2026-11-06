@@ -79,5 +79,6 @@ func snapshot() -> Dictionary:
 		"build_progress": float(elapsed_build_ticks) / build_ticks,
 		"demolition_progress": float(elapsed_demolition_ticks) / demolition_ticks,
 		"demolition_seconds": definition.demolition_seconds, "refund": refund(),
-		"repairing": repairing, "powered": powered, "waiting_for_clearance": waiting_for_clearance}, true)
+		"repairing": repairing, "powered": powered, "waiting_for_clearance": waiting_for_clearance,
+		"shot_ticks": shot_ticks, "shot_target": shot_target}, true)
 	return result
