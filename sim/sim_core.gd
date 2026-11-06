@@ -530,7 +530,7 @@ func _validate_move(payload: Dictionary) -> Dictionary:
 	if typeof(payload.get("target")) != TYPE_VECTOR2:
 		return _reject("目标坐标无效")
 	var target: Vector2 = payload["target"]
-	if not target.is_finite() or not Rect2(Vector2.ZERO, Vector2(_grid.dimensions())).has_point(target):
+	if not target.is_finite() or not _grid.point_inside(target):
 		return _reject("超出地图边界")
 	var entity_id: int = payload["entity_id"]
 	if not _grid.is_walkable(Vector2i(_registry.position_of(entity_id).floor())):
@@ -652,7 +652,8 @@ func _reset() -> void:
 	# Weighted march field toward the fixed mainbrain cell; rebuilt on building changes.
 	_enemies.reset(_grid, _map_definition.mainbrain_origin + (brain.footprint - Vector2i.ONE) / 2, _construction.all())
 	_waves.reset(_grid, _map_definition, _settings.threat_enabled, _tick_rate)
-	_threat.reset(_grid, _settings.threat_enabled, _tick_rate)
+	_threat.reset(_grid, _map_definition, _settings.threat_enabled, _tick_rate)
+	print("[Billions Mech] playable cells=", _grid.playable_cell_count())
 
 
 func _settings_error(settings: MechFoundationSettings) -> String:
@@ -676,6 +677,14 @@ func _settings_error(settings: MechFoundationSettings) -> String:
 	grid.configure(settings.map_definition)
 	if not grid.is_walkable(settings.map_definition.main_gate) or not grid.is_walkable(settings.map_definition.flank):
 		return "地图入口标记必须可通行"
+	if settings.threat_enabled:
+		var has_spawn_edge: bool = false
+		for cell: Vector2i in grid.boundary_cells():
+			if grid.is_walkable(cell):
+				has_spawn_edge = true
+				break
+		if not has_spawn_edge:
+			return "地图边界没有可用的机潮出生格"
 	var brain: MechBuildingDefinition = construction.definition(&"mainbrain")
 	if brain.footprint != settings.map_definition.mainbrain_footprint:
 		return "地图与主脑占地不一致"

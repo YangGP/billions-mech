@@ -128,6 +128,8 @@ func _queue_wave() -> void:
 	var band: Array[Vector2i] = _flank_band if wave_number % _flank_every == 0 and not _flank_band.is_empty() else _main_band
 	if band.is_empty():
 		band = _main_band
+	if band.is_empty():
+		return
 	# Composition: prototype first from WAVE 3, builders fill the remaining budget.
 	var entries: Array[StringName] = []
 	if wave_number >= PROTOTYPE_FROM_WAVE:
@@ -163,18 +165,10 @@ func _operating_nodes(buildings: Array[MechBuildingState]) -> int:
 ## carries the minority of waves (map-terrain.md §2/§5).
 func _collect_bands(grid: MechGridState, map_definition: MechMapDefinition) -> void:
 	var sides: Dictionary = {}
-	for cell: Vector2i in _border_ring(grid.dimensions()):
-		if grid.terrain_at(cell) == MechGridState.Terrain.OBSTACLE:
+	for cell: Vector2i in grid.boundary_cells():
+		if not grid.is_walkable(cell):
 			continue
-		var side: StringName = &"north"
-		if cell.y == 0:
-			side = &"north"
-		elif cell.y == grid.dimensions().y - 1:
-			side = &"south"
-		elif cell.x == 0:
-			side = &"west"
-		else:
-			side = &"east"
+		var side: StringName = grid.boundary_side(cell)
 		if not sides.has(side):
 			sides[side] = [] as Array[Vector2i]
 		(sides[side] as Array[Vector2i]).append(cell)
@@ -182,17 +176,6 @@ func _collect_bands(grid: MechGridState, map_definition: MechMapDefinition) -> v
 	_main_edge = _nearest_side(sides, map_definition.main_gate)
 	_flank_band = _nearest_band(sides, map_definition.flank)
 	_flank_edge = _nearest_side(sides, map_definition.flank)
-
-
-func _border_ring(dimensions: Vector2i) -> Array[Vector2i]:
-	var cells: Array[Vector2i] = []
-	for x: int in range(dimensions.x):
-		cells.append(Vector2i(x, 0))
-		cells.append(Vector2i(x, dimensions.y - 1))
-	for y: int in range(1, dimensions.y - 1):
-		cells.append(Vector2i(0, y))
-		cells.append(Vector2i(dimensions.x - 1, y))
-	return cells
 
 
 func _nearest_band(sides: Dictionary, marker: Vector2i) -> Array[Vector2i]:

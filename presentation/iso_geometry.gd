@@ -28,6 +28,18 @@ static func footprint_polygon(origin: Vector2i, footprint: Vector2i) -> PackedVe
 		project(start + Vector2(footprint)), project(start + Vector2(0, footprint.y))])
 
 
-static func map_bounds(dimensions: Vector2i) -> Rect2:
+static func project_polygon(polygon: PackedVector2Array) -> PackedVector2Array:
+	var result := PackedVector2Array()
+	for point: Vector2 in polygon:
+		result.append(project(point))
+	return result
+
+
+static func map_bounds(dimensions: Vector2i, outline: PackedVector2Array = PackedVector2Array()) -> Rect2:
+	if not outline.is_empty():
+		var bounds := Rect2(project(outline[0]), Vector2.ZERO)
+		for point: Vector2 in outline:
+			bounds = bounds.expand(project(point))
+		return bounds
 	return Rect2(Vector2(-dimensions.y * HALF_TILE.x, 0.0),
 		Vector2((dimensions.x + dimensions.y) * HALF_TILE.x, (dimensions.x + dimensions.y) * HALF_TILE.y))

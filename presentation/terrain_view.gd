@@ -41,11 +41,26 @@ func _draw() -> void:
 		return
 	var dimensions: Vector2i = _map["dimensions"]
 	var terrain: PackedByteArray = _map["terrain"]
+	var playable: PackedByteArray = _map["playable"]
+	var boundary: PackedVector2Array = MechIsoGeometry.project_polygon(_map["outline"])
+	draw_colored_polygon(boundary, Color("122a34"))
 	for y: int in range(dimensions.y):
 		for x: int in range(dimensions.x):
+			if playable[y * dimensions.x + x] == 0:
+				continue
 			var cell := Vector2i(x, y)
 			var kind: int = terrain[y * dimensions.x + x]
 			var polygon: PackedVector2Array = MechIsoGeometry.footprint_polygon(cell, Vector2i.ONE)
+			var edge: bool = false
+			for point: Vector2 in polygon:
+				if not Geometry2D.is_point_in_polygon(point, boundary):
+					edge = true
+					break
+			if edge:
+				var clipped: Array[PackedVector2Array] = Geometry2D.intersect_polygons(polygon, boundary)
+				if clipped.is_empty() or clipped[0].size() < 3:
+					continue
+				polygon = clipped[0]
 			var fill := Color("122a34") if (x + y) % 2 == 0 else Color("142e38")
 			if kind == MechGridState.Terrain.ROUGH:
 				fill = Color("47493a") if (x + y) % 2 == 0 else Color("424535")
@@ -63,9 +78,9 @@ func _draw() -> void:
 	for diagonal: int in range(dimensions.x + dimensions.y - 1):
 		for x: int in range(maxi(0, diagonal - dimensions.y + 1), mini(dimensions.x, diagonal + 1)):
 			var y: int = diagonal - x
-			if terrain[y * dimensions.x + x] == MechGridState.Terrain.OBSTACLE:
-				_draw_rock(MechIsoGeometry.cell_center(Vector2i(x, y)), x + y)
-	var border: PackedVector2Array = MechIsoGeometry.footprint_polygon(Vector2i.ZERO, dimensions)
+			if playable[y * dimensions.x + x] != 0 and terrain[y * dimensions.x + x] == MechGridState.Terrain.OBSTACLE:
+				_draw_rock(MechIsoGeometry.cell_center(Vector2i(x, y)), x + y, boundary)
+	var border: PackedVector2Array = boundary.duplicate()
 	border.append(border[0])
 	draw_polyline(border, Color("587b8c"), 2.0, true)
 	_draw_marker(_map["main_gate"], "主口", Color("f0bc79"))
@@ -73,12 +88,19 @@ func _draw() -> void:
 	_draw_marker(_map["mainbrain_origin"] + Vector2i(1, 5), "初始腹地", Color("72e9d0"))
 
 
-func _draw_rock(center: Vector2, variation: int) -> void:
+func _draw_rock(center: Vector2, variation: int, boundary: PackedVector2Array) -> void:
 	var rise: float = 7.0 + float(variation % 3) * 2.0
 	var peak: Vector2 = center + Vector2(-3, -rise - 9.0)
-	draw_colored_polygon(PackedVector2Array([center + Vector2(-24, 1), peak, center + Vector2(3, 10)]), Color("465b68"))
-	draw_colored_polygon(PackedVector2Array([peak, center + Vector2(23, 0), center + Vector2(3, 10)]), Color("314653"))
-	draw_line(center + Vector2(-24, 1), peak, Color("637783"), 1.0, true)
+	var facets: Array[PackedVector2Array] = [PackedVector2Array([center + Vector2(-24, 1), peak, center + Vector2(3, 10)]),
+		PackedVector2Array([peak, center + Vector2(23, 0), center + Vector2(3, 10)])]
+	var colors: Array[Color] = [Color("465b68"), Color("314653")]
+	for index: int in range(facets.size()):
+		for clipped: PackedVector2Array in Geometry2D.intersect_polygons(facets[index], boundary):
+			if clipped.size() >= 3:
+				draw_colored_polygon(clipped, colors[index])
+	for segment: PackedVector2Array in Geometry2D.intersect_polyline_with_polygon(PackedVector2Array([center + Vector2(-24, 1), peak]), boundary):
+		if segment.size() >= 2:
+			draw_polyline(segment, Color("637783"), 1.0, true)
 
 
 func _draw_marker(cell: Vector2i, text: String, color: Color) -> void:

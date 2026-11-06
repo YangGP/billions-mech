@@ -104,7 +104,7 @@ offset_bottom = 45.0
 mouse_filter = 2
 modulate = Color(0.8352941176470589, 0.9019607843137255, 0.9215686274509803, 1)
 theme_override_font_sizes/font_size = 20
-text = "隘口前哨   /   48 × 48"
+text = "隘口前哨   /   正方形地图"
 
 [node name="Clock" type="Label" parent="Root/Header"]
 layout_mode = 0

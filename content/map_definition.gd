@@ -6,6 +6,10 @@ extends Resource
 @export var map_id: StringName = &"first_outpost"
 @export var display_name: String = "隘口前哨"
 @export var dimensions: Vector2i = Vector2i(48, 48)
+## Clockwise boundary in logical coordinates; edges are north/east/south/west.
+## Empty preserves the rectangular grid used by older maps.
+@export var playable_polygon := PackedVector2Array()
+@export_range(0.0, 64.0, 1.0) var wanderer_exclusion_radius: float = 20.0
 @export var obstacle_rects: Array[Rect2i] = []
 @export var rough_rects: Array[Rect2i] = []
 @export_range(1.0, 10.0, 0.1) var rough_movement_weight: float = 2.0
@@ -21,12 +25,24 @@ func validation_error() -> String:
 	if dimensions.x < 8 or dimensions.y < 8 or dimensions.x > 256 or dimensions.y > 256:
 		return "地图尺寸必须在 8–256 格之间"
 	var bounds := Rect2i(Vector2i.ZERO, dimensions)
+	if not playable_polygon.is_empty():
+		if playable_polygon.size() != 4 or Geometry2D.triangulate_polygon(playable_polygon).size() != 6:
+			return "可玩边界必须是有效的四边形"
+		for point: Vector2 in playable_polygon:
+			if not point.is_finite() or point.x < 0 or point.y < 0 or point.x > dimensions.x or point.y > dimensions.y:
+				return "可玩边界超出网格"
+	if not is_finite(wanderer_exclusion_radius) or wanderer_exclusion_radius < 0.0:
+		return "基地游荡敌禁刷半径无效"
 	if mainbrain_footprint.x < 1 or mainbrain_footprint.y < 1:
 		return "主脑占地无效"
 	if not bounds.encloses(Rect2i(mainbrain_origin, mainbrain_footprint)):
 		return "主脑占地超出地图"
+	for y: int in range(mainbrain_footprint.y):
+		for x: int in range(mainbrain_footprint.x):
+			if not contains_cell(mainbrain_origin + Vector2i(x, y)):
+				return "主脑占地超出可玩边界"
 	for cell: Vector2i in [probe_cell, main_gate, flank]:
-		if not bounds.has_point(cell):
+		if not contains_cell(cell):
 			return "出生点或地图标记超出边界"
 	for rectangles: Array[Rect2i] in [obstacle_rects, rough_rects]:
 		for rectangle: Rect2i in rectangles:
@@ -42,7 +58,7 @@ func validation_error() -> String:
 			return "矿点定义或储量无效"
 		if not mineral.resource_kind in ["ore", "metal", "rare"]:
 			return "矿点类型无效"
-		if not bounds.has_point(mineral.cell) or Rect2i(mainbrain_origin, mainbrain_footprint).has_point(mineral.cell):
+		if not contains_cell(mineral.cell) or Rect2i(mainbrain_origin, mainbrain_footprint).has_point(mineral.cell):
 			return "矿点超界或与主脑重叠"
 		if terrain[mineral.cell.y * dimensions.x + mineral.cell.x] != MechGridState.Terrain.OPEN:
 			return "矿点必须位于可建造地形"
@@ -51,6 +67,39 @@ func validation_error() -> String:
 		ids[mineral.mineral_id] = true
 		occupied_cells[mineral.cell] = true
 	return ""
+
+
+func outline() -> PackedVector2Array:
+	if not playable_polygon.is_empty():
+		return playable_polygon.duplicate()
+	return PackedVector2Array([Vector2.ZERO, Vector2(dimensions.x, 0), Vector2(dimensions), Vector2(0, dimensions.y)])
+
+
+func contains_cell(cell: Vector2i) -> bool:
+	if not Rect2i(Vector2i.ZERO, dimensions).has_point(cell):
+		return false
+	if playable_polygon.is_empty():
+		return true
+	# Gameplay uses complete tiles, so spawn bodies and building footprints
+	# never start on a tile cut in half by the visible boundary.
+	for offset: Vector2 in [Vector2.ZERO, Vector2.RIGHT, Vector2.ONE, Vector2.DOWN]:
+		if not Geometry2D.is_point_in_polygon(Vector2(cell) + offset, playable_polygon):
+			return false
+	return true
+
+
+func playable_cells() -> PackedByteArray:
+	var mask := PackedByteArray()
+	mask.resize(dimensions.x * dimensions.y)
+	for y: int in range(dimensions.y):
+		for x: int in range(dimensions.x):
+			mask[y * dimensions.x + x] = int(contains_cell(Vector2i(x, y)))
+	return mask
+
+
+func wanderer_spawn_allowed(point: Vector2) -> bool:
+	var core := Rect2(Vector2(mainbrain_origin), Vector2(mainbrain_footprint))
+	return point.distance_squared_to(point.clamp(core.position, core.end)) > wanderer_exclusion_radius * wanderer_exclusion_radius
 
 
 func terrain_cells() -> PackedByteArray:
@@ -64,11 +113,16 @@ func terrain_cells() -> PackedByteArray:
 			for y: int in range(rectangle.position.y, rectangle.end.y):
 				for x: int in range(rectangle.position.x, rectangle.end.x):
 					cells[y * dimensions.x + x] = kind
+	for y: int in range(dimensions.y):
+		for x: int in range(dimensions.x):
+			if not contains_cell(Vector2i(x, y)):
+				cells[y * dimensions.x + x] = MechGridState.Terrain.OBSTACLE
 	return cells
 
 
 func terrain_snapshot() -> Dictionary:
 	return {"dimensions": dimensions, "terrain": terrain_cells(), "name": display_name,
+		"playable": playable_cells(), "outline": outline(),
 		"main_gate": main_gate, "flank": flank, "mainbrain_origin": mainbrain_origin,
 		"mainbrain_footprint": mainbrain_footprint, "minerals": mineral_snapshots()}
 

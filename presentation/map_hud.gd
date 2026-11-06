@@ -111,7 +111,8 @@ func blocks_point(point: Vector2) -> bool:
 
 func present_map(map_state: Dictionary) -> void:
 	var dimensions: Vector2i = map_state["dimensions"]
-	_map_label.text = "%s   /   %d × %d" % [map_state["name"], dimensions.x, dimensions.y]
+	var bounds: Rect2 = MechIsoGeometry.map_bounds(dimensions, map_state["outline"])
+	_map_label.text = "%s   /   正方形地图" % map_state["name"] if is_equal_approx(bounds.size.x, bounds.size.y) else "%s   /   %d × %d" % [map_state["name"], dimensions.x, dimensions.y]
 
 
 func present_state(state: Dictionary) -> void:

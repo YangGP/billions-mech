@@ -2,7 +2,7 @@ class_name MechMapCamera
 extends Camera2D
 ## Native Camera2D with view-only controls; never reads or writes sim internals.
 
-const MIN_ZOOM: float = 0.28
+const MIN_ZOOM: float = 0.18
 const MAX_ZOOM: float = 2.0
 const PAN_SPEED: float = 850.0
 const EDGE_WIDTH: float = 16.0

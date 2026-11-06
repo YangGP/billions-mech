@@ -57,7 +57,7 @@ func configure(definitions: Array[MechEnemyDefinition], settings: MechFoundation
 	return ""
 
 
-func reset(grid: MechGridState, active: bool, hz: int) -> void:
+func reset(grid: MechGridState, map_definition: MechMapDefinition, active: bool, hz: int) -> void:
 	_active = active
 	_backfill_ticks = 0
 	_tick_counter = 0
@@ -67,23 +67,23 @@ func reset(grid: MechGridState, active: bool, hz: int) -> void:
 	_edge_cells.clear()
 	if not _active or _wanderer == null:
 		return
-	# Scatter positions: walkable cells outside the initial core coverage, taken in
-	# shuffled order at 1 wanderer per CELLS_PER_WANDERER eligible cells.
+	# Both scatter and backfill exclude the map's fixed base safety radius,
+	# independently of power coverage. Noise can still attract existing enemies.
 	var eligible: Array[Vector2] = []
 	for y: int in range(grid.dimensions().y):
 		for x: int in range(grid.dimensions().x):
 			var cell := Vector2i(x, y)
-			if grid.terrain_at(cell) != MechGridState.Terrain.OBSTACLE and not grid.is_covered(cell):
+			if grid.is_walkable(cell) and not grid.is_covered(cell) and map_definition.wanderer_spawn_allowed(Vector2(cell) + Vector2(0.5, 0.5)):
 				eligible.append(Vector2(cell) + Vector2(0.5, 0.5))
 	eligible.shuffle()
 	var count: int = eligible.size() / CELLS_PER_WANDERER
 	for index: int in range(mini(count, eligible.size())):
 		_pending_scatter.append(eligible[index])
-	for y: int in range(grid.dimensions().y):
-		for x: int in range(grid.dimensions().x):
-			var cell := Vector2i(x, y)
-			if (cell.x == 0 or cell.y == 0 or cell.x == grid.dimensions().x - 1 or cell.y == grid.dimensions().y - 1) and grid.terrain_at(cell) != MechGridState.Terrain.OBSTACLE:
-				_edge_cells.append(Vector2(cell) + Vector2(0.5, 0.5))
+	print("[Billions Mech] ambient spawn: ", _pending_scatter.size(), "; eligible cells=", eligible.size(), "; base exclusion=", map_definition.wanderer_exclusion_radius)
+	for cell: Vector2i in grid.boundary_cells():
+		var point := Vector2(cell) + Vector2(0.5, 0.5)
+		if grid.is_walkable(cell) and map_definition.wanderer_spawn_allowed(point):
+			_edge_cells.append(point)
 
 
 func advance(buildings: Array[MechBuildingState]) -> Array[Dictionary]:

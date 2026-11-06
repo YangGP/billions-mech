@@ -12,12 +12,19 @@ var _occupancy := PackedInt32Array()
 var _coverage := PackedByteArray()
 var _rough_weight: float = 2.0
 var _revision: int = 0
+var _playable := PackedByteArray()
+var _outline := PackedVector2Array()
+var _boundary: Array[Vector2i] = []
+var _boundary_sides: Dictionary = {}
 
 
 func configure(definition: MechMapDefinition) -> void:
 	_dimensions = definition.dimensions
 	_rough_weight = definition.rough_movement_weight
 	_terrain = definition.terrain_cells()
+	_playable = definition.playable_cells()
+	_outline = definition.outline()
+	_cache_boundary()
 	_occupancy.resize(_terrain.size())
 	_occupancy.fill(0)
 	_coverage.resize(_terrain.size())
@@ -29,12 +36,50 @@ func dimensions() -> Vector2i:
 	return _dimensions
 
 
+func playable_cell_count() -> int:
+	return _playable.count(1)
+
+
 func revision() -> int:
 	return _revision
 
 
 func contains(cell: Vector2i) -> bool:
-	return Rect2i(Vector2i.ZERO, _dimensions).has_point(cell)
+	return Rect2i(Vector2i.ZERO, _dimensions).has_point(cell) and _playable[_index(cell)] != 0
+
+
+func point_inside(point: Vector2) -> bool:
+	return contains(Vector2i(point.floor())) and Geometry2D.is_point_in_polygon(point, _outline)
+
+
+func boundary_cells() -> Array[Vector2i]:
+	return _boundary.duplicate()
+
+
+func boundary_side(cell: Vector2i) -> StringName:
+	return _boundary_sides.get(cell, &"north")
+
+
+func _cache_boundary() -> void:
+	_boundary.clear()
+	_boundary_sides.clear()
+	var sides: Array[StringName] = [&"north", &"east", &"south", &"west"]
+	for y: int in range(_dimensions.y):
+		for x: int in range(_dimensions.x):
+			var cell := Vector2i(x, y)
+			if not contains(cell):
+				continue
+			if contains(cell + Vector2i.UP) and contains(cell + Vector2i.RIGHT) and contains(cell + Vector2i.DOWN) and contains(cell + Vector2i.LEFT):
+				continue
+			_boundary.append(cell)
+			var center := Vector2(cell) + Vector2(0.5, 0.5)
+			var best: float = INF
+			for edge: int in range(_outline.size()):
+				var closest: Vector2 = Geometry2D.get_closest_point_to_segment(center, _outline[edge], _outline[(edge + 1) % _outline.size()])
+				var distance: float = center.distance_squared_to(closest)
+				if distance < best:
+					best = distance
+					_boundary_sides[cell] = sides[edge]
 
 
 func terrain_at(cell: Vector2i) -> Terrain:
@@ -66,7 +111,7 @@ func set_core_coverage(origin: Vector2i, footprint: Vector2i, radius: int) -> vo
 			for x: int in range(_dimensions.x):
 				var dx: int = maxi(maxi(origin.x - x, 0), x - (origin.x + footprint.x - 1))
 				var dy: int = maxi(maxi(origin.y - y, 0), y - (origin.y + footprint.y - 1))
-				if dx * dx + dy * dy <= radius * radius:
+				if contains(Vector2i(x, y)) and dx * dx + dy * dy <= radius * radius:
 					_coverage[_index(Vector2i(x, y))] = 1
 	_revision += 1
 
@@ -83,6 +128,8 @@ func is_walkable(cell: Vector2i, include_buildings: bool = true) -> bool:
 
 
 func mobile_position_clear(point: Vector2) -> bool:
+	if not point_inside(point):
+		return false
 	# Match the native RVO circle, including at building corners.
 	var low := Vector2i((point - Vector2.ONE * MOBILE_RADIUS).floor())
 	var high := Vector2i((point + Vector2.ONE * MOBILE_RADIUS).floor())
@@ -170,6 +217,7 @@ func try_occupy(entity_id: int, origin: Vector2i, footprint: Vector2i) -> Dictio
 
 func snapshot() -> Dictionary:
 	return {"dimensions": _dimensions, "terrain": _terrain.duplicate(),
+		"playable": _playable.duplicate(), "outline": _outline.duplicate(),
 		"occupancy": _occupancy.duplicate(), "coverage": _coverage.duplicate(),
 		"rough_weight": _rough_weight, "revision": _revision}
 

@@ -447,6 +447,8 @@ func _slide_step(enemy: MechEntityState, direction: Vector2, speed: float, dt: f
 ## Circle-body check mirroring grid mobile rules; classifies the blocker so the
 ## caller can engage buildings. Non-building occupants behave like static walls.
 func _blocker_at(point: Vector2, grid: MechGridState, building_ids: Dictionary) -> Dictionary:
+	if not grid.point_inside(point):
+		return {"blocked": true, "building": 0}
 	var radius: float = MechGridState.MOBILE_RADIUS
 	var low := Vector2i((point - Vector2.ONE * radius).floor())
 	var high := Vector2i((point + Vector2.ONE * radius).floor())

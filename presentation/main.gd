@@ -59,6 +59,8 @@ func _ready() -> void:
 	get_window().mouse_exited.connect(_cancel_selection_drag)
 	_sim.state_changed.connect(_refresh)
 	_publish_state()
+	if OS.get_cmdline_user_args().has("--overview"):
+		_fit_map()
 	print("[Billions Mech] M5 threat and defense ready; 1920x1080; whitebox; ", initial_settings.scenario_name)
 
 
@@ -481,7 +483,7 @@ func _publish_state() -> void:
 		if _last_generation != state["generation"]:
 			_selected = Vector2i(-1, -1)
 			var focus: Vector2 = MechIsoGeometry.project(Vector2(map_state["mainbrain_origin"]) + Vector2(map_state["mainbrain_footprint"]) * 0.5)
-			_camera.configure(MechIsoGeometry.map_bounds(_dimensions), focus)
+			_camera.configure(MechIsoGeometry.map_bounds(_dimensions, map_state["outline"]), focus)
 		_last_generation = state["generation"]
 		_last_map_revision = state["map_revision"]
 	if generation_changed:

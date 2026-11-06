@@ -140,3 +140,9 @@ Godot 当前项目使用的 NavigationServer2D 与 AStarGrid2D 提供逐 agent �
 引擎 [SceneTree.paused](https://docs.godotengine.org/en/stable/classes/class_scenetree.html#class-scenetree-property-paused) 会影响节点处理与物理推进，不能直接表达本作“模拟停止、镜头/查看/重开继续”的会话规则。直接复用已有 MechSimulationClock 暂停、MechEntityRegistry.suspend_motion 及其原生 NavigationServer2D 地图停用能力，SimCore 只新增主脑死亡锁定结果、终局命令校验与快照字段；这属于项目业务接线，不新增调度或避让算法。
 
 读模型直接复用 Godot 原生 `_process` 渲染帧回调：状态信号只标脏，帧内输入读取最近发布的同一份快照，下一帧统一发布新状态。命令仍走实时权威校验；暂停/场景切换读取廉价会话查询，不为它们再次打包全量状态。无需引入带场景节点依赖的外部状态管理框架。
+
+## 12. 等距正方形地图与基地禁刷区
+
+已比较 [Clipper2](https://github.com/AngusJohnson/Clipper2)（Boost Software License 1.0，C++/C#/Delphi 多边形布尔运算）与 [Godot Geometry2D](https://docs.godotengine.org/en/stable/classes/class_geometry2d.html)。单独接入 Clipper2 需要新增原生或 .NET 适配，而引擎已提供本次所需接口，因此直接调用原生 `is_point_in_polygon`、`intersect_polygons`、`get_closest_point_to_segment`、`triangulate_polygon`；不自写多边形判断或裁剪算法、不新增 vendor。
+
+保留既有等距投影，以地图 Resource 中的逻辑多边形定义可玩边界，投影后外轮廓为正方形。网格缓存范围掩码，玩家 A*、敌方加权场、放置/拾取与边缘出生共同读取；表现使用原生多边形裁剪。基地禁刷按主脑占地矩形的原生 `Rect2` 钳制距离过滤初始散布与回填候选，是项目玩法规则；后续正常行走、波次和感疫沿用原有规则。
