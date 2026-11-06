@@ -4,7 +4,7 @@
 script = ExtResource("1")
 building_id = &"mainbrain"
 display_name = "主脑"
-footprint = Vector2i(3, 3)
+footprint = Vector2i(4, 4)
 max_hp = 4000
 capacity_provided = 10
 power_provided = 60

@@ -14,7 +14,7 @@ extends Resource
 @export var rough_rects: Array[Rect2i] = []
 @export_range(1.0, 10.0, 0.1) var rough_movement_weight: float = 2.0
 @export var mainbrain_origin: Vector2i = Vector2i(23, 28)
-@export var mainbrain_footprint: Vector2i = Vector2i(3, 3)
+@export var mainbrain_footprint: Vector2i = Vector2i(4, 4)
 @export var probe_cell: Vector2i = Vector2i(21, 33)
 @export var main_gate: Vector2i = Vector2i(24, 11)
 @export var flank: Vector2i = Vector2i(46, 21)

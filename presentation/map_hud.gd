@@ -208,7 +208,8 @@ func present_selection(building: Dictionary, errors: Dictionary) -> void:
 	if building.is_empty():
 		_selection_title.text = "空间信息"
 		return
-	_selection_title.text = building["name"]
+	var footprint: Vector2i = building["footprint"]
+	_selection_title.text = "%s · %d×%d" % [building["name"], footprint.x, footprint.y]
 	_status_label.text = building["status"]
 	_status_label.modulate = ACCENT if building["phase"] == MechBuildingState.Phase.OPERATING else Color("f0bc79")
 	_build_bar.value = 100.0 * float(building["demolition_progress"] if building["phase"] == MechBuildingState.Phase.DEMOLISHING else building["build_progress"])

@@ -162,3 +162,7 @@ Godot 当前项目使用的 NavigationServer2D 与 AStarGrid2D 提供逐 agent �
 先检索 [Maaack/Godot-Menus-Template](https://github.com/Maaack/Godot-Menus-Template)（MIT，持续维护的菜单模板）。其配套插件覆盖完整菜单与场景加载体系；本项目已有独立模拟暂停命令、HUD 和镜头，整套接入会引入重复的应用生命周期管理。此次直接复用引擎内置 Control/Container、[DisplayServer](https://docs.godotengine.org/en/stable/classes/class_displayserver.html)、[Engine.max_fps](https://docs.godotengine.org/en/stable/classes/class_engine.html) 和 [ConfigFile](https://docs.godotengine.org/en/stable/classes/class_configfile.html)，不复制或仿写模板代码、不新增依赖。
 
 项目代码仅负责设置字段校验、控件与原生 API 绑定、ConfigFile 读写，以及设置页与既有暂停/输入命令的衔接。首版提供窗口/全屏、垂直同步、帧率上限、镜头移动/缩放倍率与边缘滚屏；应用后保存，取消丢弃草稿，默认值须应用才生效。界面使用独立可编辑场景。
+
+## 15. 建筑占地分级
+
+核对 [Godot 官方等距演示](https://github.com/godotengine/godot-demo-projects/tree/master/2d/isometric)（MIT）和当前项目 Resource/footprint 链路：四档建筑大小属于内容配置，已有放置、占用、覆盖、A*、出厂与轮廓直接读取 footprint，无需新增瓦片/建筑模块。主脑改为 4×4；既有白模通过原生 [CanvasItem.draw_set_transform](https://docs.godotengine.org/en/stable/classes/class_canvasitem.html) 按占地缩放，点击轮廓同步缩放，继续复用 Geometry2D 判断。仅调整内容数据、表现适配和训练场点位，不新增算法或依赖；发电厂/中继只确定设计规格。

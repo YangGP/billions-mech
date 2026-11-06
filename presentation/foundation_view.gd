@@ -4,6 +4,7 @@ extends Node2D
 ## Disposable projection of snapshots; never writes simulation state.
 
 const CYAN := Color("72e9d0")
+const MAINBRAIN_REFERENCE_SIZE := Vector2(3, 3)
 
 var _state: Dictionary = {}
 var _preview: Dictionary = {}
@@ -67,6 +68,9 @@ func pick_building(screen_point: Vector2) -> int:
 		var hull := PackedVector2Array()
 		if entity["kind"] == &"mainbrain":
 			hull = PackedVector2Array([Vector2(0, -100), Vector2(65, -68), Vector2(65, -20), Vector2(0, 12), Vector2(-65, -20), Vector2(-65, -68)])
+			var visual_scale: Vector2 = Vector2(entity["footprint"]) / MAINBRAIN_REFERENCE_SIZE
+			for index: int in range(hull.size()):
+				hull[index] *= visual_scale
 		else:
 			var metrics: Vector3 = _building_metrics(entity["kind"])
 			var height: float = metrics.x
@@ -115,7 +119,7 @@ func _draw() -> void:
 			var footprint: Vector2i = entity["footprint"]
 			var origin := Vector2i((entity["position"] - Vector2(footprint) * 0.5).floor())
 			_outline_cell(origin, footprint, CYAN, 2.0)
-			_draw_mainbrain(point)
+			_draw_mainbrain(point, footprint)
 		elif entity.get("is_building", false):
 			_draw_building(entity, point)
 		elif entity["kind"] == &"practice_target":
@@ -293,7 +297,9 @@ func _outline_cell(origin: Vector2i, footprint: Vector2i, color: Color, width: f
 	draw_polyline(polygon, color, width, true)
 
 
-func _draw_mainbrain(point: Vector2) -> void:
+func _draw_mainbrain(world_point: Vector2, footprint: Vector2i) -> void:
+	draw_set_transform(world_point, 0.0, Vector2(footprint) / MAINBRAIN_REFERENCE_SIZE)
+	var point := Vector2.ZERO
 	_draw_shadow(point, Vector2(82.0, 34.0))
 	var top := PackedVector2Array([point + Vector2(0, -100), point + Vector2(65, -68), point + Vector2(0, -36), point + Vector2(-65, -68)])
 	var left := PackedVector2Array([point + Vector2(-65, -68), point + Vector2(0, -36), point + Vector2(0, 12), point + Vector2(-65, -20)])
@@ -308,6 +314,7 @@ func _draw_mainbrain(point: Vector2) -> void:
 	draw_line(point + Vector2(-20, -69), point + Vector2(20, -69), CYAN, 4.0, true)
 	draw_circle(point + Vector2(-43, -31), 3.0, CYAN)
 	draw_circle(point + Vector2(-29, -24), 3.0, CYAN)
+	draw_set_transform(Vector2.ZERO)
 
 
 func _draw_probe(point: Vector2) -> void:
