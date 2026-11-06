@@ -21,6 +21,10 @@ func set_paused(value: bool) -> void:
 	_paused = value
 
 
+func is_paused() -> bool:
+	return _paused
+
+
 func advance() -> bool:
 	if _paused:
 		return false

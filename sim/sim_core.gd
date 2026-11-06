@@ -51,6 +51,18 @@ func session_ended() -> bool:
 	return _outcome != &"ongoing"
 
 
+func is_paused() -> bool:
+	return _clock.is_paused()
+
+
+func scenario_name() -> String:
+	return _settings.scenario_name
+
+
+func tick_rate() -> int:
+	return _tick_rate
+
+
 func configure(settings: MechFoundationSettings) -> bool:
 	var settings_error: String = _settings_error(settings)
 	if not settings_error.is_empty():

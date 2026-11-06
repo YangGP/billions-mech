@@ -29,6 +29,8 @@ var _attack_move_mode: bool = false
 var _last_group: int = -1
 var _last_group_time: int = 0
 var _last_threat_key: String = ""
+var _state: Dictionary = {}
+var _state_dirty: bool = true
 var _last_session_ended: bool = false
 
 
@@ -56,8 +58,7 @@ func _ready() -> void:
 	get_window().focus_exited.connect(_cancel_selection_drag)
 	get_window().mouse_exited.connect(_cancel_selection_drag)
 	_sim.state_changed.connect(_refresh)
-	_refresh()
-	_select_starting_units()
+	_publish_state()
 	print("[Billions Mech] M5 threat and defense ready; 1920x1080; whitebox; ", initial_settings.scenario_name)
 
 
@@ -70,6 +71,7 @@ func _exit_tree() -> void:
 
 
 func _process(_delta: float) -> void:
+	_publish_state()
 	_update_cursor()
 	_hud.present_zoom(_camera.zoom.x)
 
@@ -217,8 +219,7 @@ func _handle_key(key: int) -> bool:
 
 
 func _toggle_pause() -> void:
-	var clock: Dictionary = _sim.snapshot()["clock"]
-	_commands.submit(MechCommand.new(MechCommand.Type.SET_PAUSED, {"paused": not clock["paused"]}))
+	_commands.submit(MechCommand.new(MechCommand.Type.SET_PAUSED, {"paused": not _sim.is_paused()}))
 
 
 func _restart() -> void:
@@ -244,7 +245,7 @@ func _request_build(id: StringName) -> void:
 	_cancel_selection_drag()
 	_attack_move_mode = false
 	_cancel_wall_drag()
-	var state: Dictionary = _sim.snapshot()
+	var state: Dictionary = _state
 	for entry: Dictionary in state["catalog"]:
 		if entry["building_id"] != id:
 			continue
@@ -288,14 +289,13 @@ func _cancel_production(factory_id: int, ticket: int) -> void:
 func _toggle_scenario() -> void:
 	_cancel_selection_drag()
 	_cancel_build()
-	var settings: MechFoundationSettings = TRAINING_SETTINGS if _sim.snapshot()["scenario"] != TRAINING_SETTINGS.scenario_name else SETTINGS
+	var settings: MechFoundationSettings = TRAINING_SETTINGS if _sim.scenario_name() != TRAINING_SETTINGS.scenario_name else SETTINGS
 	_commands.submit(MechCommand.new(MechCommand.Type.LOAD_SCENARIO, {"settings": settings}))
-	_select_starting_units()
 
 
 func _select_starting_units() -> void:
 	var ids: Array[int] = []
-	for entity: Dictionary in _sim.snapshot()["entities"]:
+	for entity: Dictionary in _state["entities"]:
 		if entity.get("is_unit", false) and entity["team"] == 1:
 			ids.append(entity["id"])
 	_selection.select(ids)
@@ -317,7 +317,7 @@ func _screen_position(entity: Dictionary) -> Vector2:
 func _hit_entity(point: Vector2, enemy: bool = false) -> int:
 	var best: float = INF
 	var result: int = 0
-	for entity: Dictionary in _sim.snapshot()["entities"]:
+	for entity: Dictionary in _state["entities"]:
 		if (entity.get("team", 1) == 2) != enemy or entity.get("is_building", false):
 			continue
 		var distance: float = (_screen_position(entity) - Vector2(0, 15) * _camera.zoom.x).distance_to(point)
@@ -343,7 +343,7 @@ func _finish_selection() -> void:
 					ids.append(building["entity_id"])
 	else:
 		var rect := Rect2(_selection_start, _selection_end - _selection_start).abs()
-		for entity: Dictionary in _sim.snapshot()["entities"]:
+		for entity: Dictionary in _state["entities"]:
 			if entity.get("team", 1) == 1 and rect.has_point(_screen_position(entity)):
 				ids.append(entity["id"])
 	_selection.select(ids, _selection_additive, _selection_toggle)
@@ -355,7 +355,7 @@ func _finish_selection() -> void:
 
 func _selected_units() -> Array[int]:
 	var ids: Array[int] = []
-	for entity: Dictionary in _sim.snapshot()["entities"]:
+	for entity: Dictionary in _state["entities"]:
 		if entity["id"] in _selection.ids and entity.get("is_unit", false) and entity["team"] == 1:
 			ids.append(entity["id"])
 	return ids
@@ -373,7 +373,7 @@ func _issue_unit_order(attack_move: bool) -> void:
 			"ids": ids, "kind": &"attack" if target_id > 0 else (&"attack_move" if attack_move else &"move"),
 			"goal": Vector2(cell) + Vector2(0.5, 0.5), "target_id": target_id}))
 	else:
-		for entity: Dictionary in _sim.snapshot()["entities"]:
+		for entity: Dictionary in _state["entities"]:
 			if not entity["id"] in _selection.ids:
 				continue
 			if entity.get("produced_unit", &"") != &"":
@@ -389,13 +389,13 @@ func _handle_group(number: int, store: bool) -> void:
 		var now: int = Time.get_ticks_msec()
 		if _last_group == number and now - _last_group_time < 400:
 			var kind: StringName = &""
-			for entity: Dictionary in _sim.snapshot()["entities"]:
+			for entity: Dictionary in _state["entities"]:
 				if entity["id"] in _selection.ids and entity.get("is_building", false):
 					kind = entity["kind"]
 					break
 			if kind != &"":
 				var ids: Array[int] = []
-				for entity: Dictionary in _sim.snapshot()["entities"]:
+				for entity: Dictionary in _state["entities"]:
 					if entity["kind"] == kind:
 						ids.append(entity["id"])
 				_selection.select(ids)
@@ -415,7 +415,7 @@ func _on_command_finished(command_type: int, result: Dictionary) -> void:
 		return
 	match command_type:
 		MechCommand.Type.SET_PAUSED:
-			_hud.feedback("已暂停，可继续建造、取消和下令；施工与收入已冻结。" if _sim.snapshot()["clock"]["paused"] else "模拟已恢复。")
+			_hud.feedback("已暂停，可继续建造、取消和下令；施工与收入已冻结。" if _sim.is_paused() else "模拟已恢复。")
 		MechCommand.Type.PLACE_BUILDING:
 			_selected = result["origin"]
 			_selection.select([int(result["entity_id"])])
@@ -432,12 +432,11 @@ func _on_command_finished(command_type: int, result: Dictionary) -> void:
 		MechCommand.Type.TOGGLE_REPAIR:
 			_hud.feedback("维修开关已更新；按模拟时间扣费回血，资金不足时等待。")
 		MechCommand.Type.MOVE_ENTITY:
-			_hud.feedback("移动目标已更新。" if not _sim.snapshot()["clock"]["paused"] else "目标已更新，恢复后移动。")
+			_hud.feedback("移动目标已更新。" if not _sim.is_paused() else "目标已更新，恢复后移动。")
 		MechCommand.Type.RESET_SESSION:
-			_select_starting_units()
 			_hud.feedback("当前场景已重置，队列、部队、编队、矿点和账本已恢复。")
 		MechCommand.Type.LOAD_SCENARIO:
-			Engine.physics_ticks_per_second = _sim.snapshot()["clock"]["tick_rate"]
+			Engine.physics_ticks_per_second = _sim.tick_rate()
 			_hud.feedback("已进入%s。选择部队右键移动/攻击，选工厂生产或设置集结点。" % result["scenario"])
 		MechCommand.Type.QUEUE_UNIT:
 			_hud.feedback("已付款并预留容量，卫兵进入工厂队列。")
@@ -452,7 +451,18 @@ func _on_command_finished(command_type: int, result: Dictionary) -> void:
 
 
 func _refresh() -> void:
-	var state: Dictionary = _sim.snapshot()
+	# Commands, damage and RVO may all notify during a frame. Pack once from
+	# _process; input and rendering keep reading the same published state.
+	_state_dirty = true
+
+
+func _publish_state() -> void:
+	if not _state_dirty:
+		return
+	_state_dirty = false
+	_state = _sim.snapshot()
+	var state: Dictionary = _state
+	var generation_changed: bool = _last_generation != state["generation"]
 	var ended: bool = state["session"]["ended"]
 	_present_threat(state)
 	if _last_generation != state["generation"]:
@@ -474,8 +484,10 @@ func _refresh() -> void:
 			_camera.configure(MechIsoGeometry.map_bounds(_dimensions), focus)
 		_last_generation = state["generation"]
 		_last_map_revision = state["map_revision"]
-	_refresh_selection()
-	_update_cursor()
+	if generation_changed:
+		_select_starting_units()
+	else:
+		_refresh_selection()
 	if ended and not _last_session_ended:
 		_cancel_selection_drag()
 		_cancel_build()
@@ -500,8 +512,7 @@ func _present_threat(state: Dictionary) -> void:
 
 
 func _refresh_selection() -> void:
-	var state: Dictionary = _sim.snapshot()
-	_selection.reconcile(state["entities"])
+	var state: Dictionary = _state
 	var building: Dictionary = {}
 	var units: Array[Dictionary] = []
 	for entity: Dictionary in state["entities"]:

@@ -133,8 +133,10 @@ Godot 当前项目使用的 NavigationServer2D 与 AStarGrid2D 提供逐 agent �
 
 采用结论：沿用无头固定步长模拟、命令队列、波次流场与空间分区；参考项目的原生多线程方案未接入。本项目出兵遵循两个口径：**波内分批出生**（BAR squad/冷却思路的简化版，避免单 tick 批量插入的峰值）；**波次配置数据驱动**（对标 SpawnGroup/波次表，本作即数值稿 §12 预算曲线，不写死在代码）。
 
-## 11. M5 主脑失败
+## 11. M5 主脑失败与读模型更新
 
 实施前已下载并通读 OpenRA 的 [ConquestVictoryConditions](https://github.com/OpenRA/OpenRA/blob/bleed/OpenRA.Mods.Common/Traits/Player/ConquestVictoryConditions.cs)、依赖的 MissionObjectives 与 COPYING，副本位于忽略的 `.godot/references/openra/`。前者 SHA256 为 `399b64e55e7a9fc63ee593756eb2d8958cc88de0e89ae41a262a4a96d9a9d0ec`。模块按玩家必需资产和任务目标判定结果，依赖 C# Actor/Trait、World、Player、任务系统与通知服务，许可为 GPL-3.0-or-later；不能直接接入本项目纯数据 GDScript 会话。本轮仅核对终局状态与通知边界，不复制或移植其源码。
 
 引擎 [SceneTree.paused](https://docs.godotengine.org/en/stable/classes/class_scenetree.html#class-scenetree-property-paused) 会影响节点处理与物理推进，不能直接表达本作“模拟停止、镜头/查看/重开继续”的会话规则。直接复用已有 MechSimulationClock 暂停、MechEntityRegistry.suspend_motion 及其原生 NavigationServer2D 地图停用能力，SimCore 只新增主脑死亡锁定结果、终局命令校验与快照字段；这属于项目业务接线，不新增调度或避让算法。
+
+读模型直接复用 Godot 原生 `_process` 渲染帧回调：状态信号只标脏，帧内输入读取最近发布的同一份快照，下一帧统一发布新状态。命令仍走实时权威校验；暂停/场景切换读取廉价会话查询，不为它们再次打包全量状态。无需引入带场景节点依赖的外部状态管理框架。
