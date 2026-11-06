@@ -22,6 +22,10 @@ extends Resource
 @export var buildable: bool = true
 @export var produced_unit: StringName = &""
 @export_range(1, 20, 1) var queue_limit: int = 5
+## Tower-style autofire; attack_damage 0 marks an unarmed building.
+@export var attack_damage: int = 0
+@export_range(0.1, 10.0, 0.1) var attack_seconds: float = 1.0
+@export_range(0.0, 24.0, 0.5) var attack_range: float = 0.0
 
 
 func validation_error() -> String:
@@ -39,6 +43,8 @@ func validation_error() -> String:
 		return "采集站类型与产率须同时配置"
 	if queue_limit < 1:
 		return "生产队列长度无效"
+	if attack_damage < 0 or (attack_damage > 0 and (attack_seconds <= 0.0 or attack_range <= 0.0)):
+		return "建筑攻击参数无效"
 	if not is_finite(construction_seconds) or construction_seconds <= 0.0 or not is_finite(demolition_seconds) or demolition_seconds <= 0.0:
 		return "建筑工程时间无效"
 	if not is_finite(refund_ratio) or refund_ratio < 0.0 or refund_ratio > 1.0 or (is_core and buildable):
@@ -53,4 +59,5 @@ func snapshot() -> Dictionary:
 		"capacity_provided": capacity_provided, "power_provided": power_provided,
 		"income_per_minute": income_per_minute, "mined_resource": mined_resource,
 		"extraction_per_minute": extraction_per_minute, "is_core": is_core, "buildable": buildable,
-		"produced_unit": produced_unit, "queue_limit": queue_limit}
+		"produced_unit": produced_unit, "queue_limit": queue_limit,
+		"attack_damage": attack_damage, "attack_seconds": attack_seconds, "attack_range": attack_range}

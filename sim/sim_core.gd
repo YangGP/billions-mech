@@ -14,6 +14,7 @@ var _minerals := MechMineralSystem.new()
 var _production := MechProductionSystem.new()
 var _units := MechUnitSystem.new()
 var _enemies := MechEnemySystem.new()
+var _towers := MechTowerSystem.new()
 var _waves := MechWaveDirector.new()
 var _threat := MechThreatSystem.new()
 var _enemy_defs: Dictionary = {}
@@ -62,9 +63,10 @@ func configure(settings: MechFoundationSettings) -> bool:
 	_enemy_defs.clear()
 	for rules: MechEnemyDefinition in settings.enemy_definitions:
 		_enemy_defs[rules.enemy_id] = rules
-	# Combat noise flows to the threat system from both firing sides.
+	# Combat noise flows to the threat system from every firing side.
 	_enemies.configure_noise(_threat.note_combat)
 	_units.combat_noise = _threat.note_combat
+	_towers.combat_noise = _threat.note_combat
 	_probe_speed = maxf(0.1, settings.probe_speed)
 	_tick_rate = maxi(1, settings.simulation_hz)
 	_starting_resources = settings.starting_resources
@@ -240,6 +242,22 @@ func advance_one_tick() -> void:
 	if not enemy_result["dead_units"].is_empty():
 		_recompute_economy()
 		_sync_navigation()
+	# Towers fire after enemy movement; hits return as results and share the
+	# unit-kill removal bookkeeping (grid release, economy, navigation).
+	var tower_hits: Array[Dictionary] = _towers.advance(_registry, _construction.all(), _tick_rate)
+	var tower_dead: Array[int] = []
+	for hit: Dictionary in tower_hits:
+		var target: MechEntityState = _registry.get_entity(hit["id"])
+		if target == null or target.hp <= 0:
+			continue
+		target.hp = maxi(0, target.hp - hit["damage"])
+		if target.hp == 0:
+			tower_dead.append(target.entity_id)
+	for id: int in tower_dead:
+		_remove_entity(id)
+	if not tower_dead.is_empty():
+		_recompute_economy()
+		_sync_navigation()
 	_registry.step(_clock.step_seconds(), _grid)
 	# Marching units hum: the expansion itself attracts wanderers (values.md §13).
 	_tick_counter += 1
@@ -359,21 +377,6 @@ func _remove_entity(id: int) -> void:
 	if _grid.occupant_at(Vector2i(entity.position.floor())) == id:
 		_grid.release(id)
 	_registry.remove(id)
-
-
-func damage_entity(id: int, amount: int) -> Dictionary:
-	if _construction.get_building(id) != null:
-		return damage_building(id, amount)
-	var entity: MechEntityState = _registry.get_entity(id)
-	if entity == null or entity.max_hp <= 0 or amount <= 0:
-		return _reject("伤害目标无效")
-	entity.hp = maxi(0, entity.hp - amount)
-	if entity.hp == 0:
-		_remove_entity(id)
-		_recompute_economy()
-		_sync_navigation()
-	state_changed.emit()
-	return {"ok": true, "reason": ""}
 
 
 func preview_footprint(origin: Vector2i, footprint: Vector2i) -> Dictionary:

@@ -24,6 +24,9 @@ var repairing: bool = false
 var repair_waiting_for_funds: bool = false
 var repair_remainder: int = 0
 var income_remainder: int = 0
+var attack_cooldown_ticks: int = 0
+var shot_ticks: int = 0
+var shot_target: Vector2 = Vector2.ZERO
 
 
 func configure(id: int, rules: MechBuildingDefinition, cell: Vector2i, hz: int, completed: bool = false) -> void:
