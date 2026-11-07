@@ -14,6 +14,9 @@ var _map: RID
 var _agents: Dictionary[int, RID] = {}
 var _obstacles: Array[RID] = []
 var _grid_revision: int = -1
+var _terrain_revision: int = -1
+var _source_grid: MechGridState
+var _row_obstacles: Dictionary[int, Array] = {}
 var _request_id: int = 0
 var _pending: Dictionary[int, bool] = {}
 var _velocities: Dictionary[int, Vector2] = {}
@@ -84,7 +87,9 @@ func teleport(id: int, position: Vector2) -> void:
 
 
 func dispose() -> void:
-	suspend()
+	# Freeing the map already removes it. Queuing map_set_active immediately
+	# before free_rid can leave a deferred command targeting a freed map.
+	cancel_pending()
 	for id: int in _agents.keys():
 		remove(id)
 	_clear_obstacles()
@@ -92,6 +97,8 @@ func dispose() -> void:
 		NavigationServer2D.free_rid(_map)
 		_map = RID()
 	_grid_revision = -1
+	_terrain_revision = -1
+	_source_grid = null
 
 
 func _create_agent() -> RID:
@@ -121,30 +128,47 @@ func _on_velocity(velocity: Vector2, id: int, request_id: int) -> void:
 
 
 func _sync_obstacles(grid: MechGridState) -> void:
-	if _grid_revision == grid.revision():
+	if _source_grid == grid and _grid_revision == grid.revision():
 		return
-	_clear_obstacles()
-	# Coalesce blocked cells into row rectangles; the native solver owns avoidance.
-	for y: int in range(grid.dimensions().y):
-		var x: int = 0
-		while x < grid.dimensions().x:
-			if grid.is_walkable(Vector2i(x, y)):
-				x += 1
-				continue
-			var start: int = x
-			while x < grid.dimensions().x and not grid.is_walkable(Vector2i(x, y)):
-				x += 1
-			_add_obstacle(Rect2(Vector2(start, y), Vector2(x - start, 1)))
-	# The map boundary also constrains agents displaced by avoidance.
-	var size := Vector2(grid.dimensions())
-	_add_obstacle(Rect2(Vector2(-1, -1), Vector2(size.x + 2, 1)))
-	_add_obstacle(Rect2(Vector2(-1, size.y), Vector2(size.x + 2, 1)))
-	_add_obstacle(Rect2(Vector2(-1, 0), Vector2(1, size.y)))
-	_add_obstacle(Rect2(Vector2(size.x, 0), Vector2(1, size.y)))
+	if _source_grid != grid or _terrain_revision != grid.terrain_revision():
+		_clear_obstacles()
+		for y: int in range(grid.dimensions().y):
+			_sync_row(y, grid)
+		# Boundary RIDs survive ordinary placement/removal updates.
+		var size := Vector2(grid.dimensions())
+		_obstacles.append(_add_obstacle(Rect2(Vector2(-1, -1), Vector2(size.x + 2, 1))))
+		_obstacles.append(_add_obstacle(Rect2(Vector2(-1, size.y), Vector2(size.x + 2, 1))))
+		_obstacles.append(_add_obstacle(Rect2(Vector2(-1, 0), Vector2(1, size.y))))
+		_obstacles.append(_add_obstacle(Rect2(Vector2(size.x, 0), Vector2(1, size.y))))
+	else:
+		var dirty_rows: Dictionary[int, bool] = {}
+		for cell: Vector2i in grid.navigation_changes_since(_grid_revision):
+			dirty_rows[cell.y] = true
+		for y: int in dirty_rows:
+			_sync_row(y, grid)
 	_grid_revision = grid.revision()
+	_terrain_revision = grid.terrain_revision()
+	_source_grid = grid
 
 
-func _add_obstacle(area: Rect2) -> void:
+func _sync_row(y: int, grid: MechGridState) -> void:
+	for obstacle: RID in _row_obstacles.get(y, []):
+		NavigationServer2D.free_rid(obstacle)
+	var row: Array[RID] = []
+	# Keep the existing row coalescing; only affected rows are regenerated.
+	var x: int = 0
+	while x < grid.dimensions().x:
+		if grid.is_walkable(Vector2i(x, y)):
+			x += 1
+			continue
+		var start: int = x
+		while x < grid.dimensions().x and not grid.is_walkable(Vector2i(x, y)):
+			x += 1
+		row.append(_add_obstacle(Rect2(Vector2(start, y), Vector2(x - start, 1))))
+	_row_obstacles[y] = row
+
+
+func _add_obstacle(area: Rect2) -> RID:
 	var obstacle: RID = NavigationServer2D.obstacle_create()
 	var vertices := PackedVector2Array([Vector2.ZERO, Vector2(area.size.x, 0), area.size, Vector2(0, area.size.y)])
 	# NavigationServer requires counterclockwise winding to push agents outside.
@@ -155,10 +179,14 @@ func _add_obstacle(area: Rect2) -> void:
 	NavigationServer2D.obstacle_set_vertices(obstacle, vertices)
 	NavigationServer2D.obstacle_set_avoidance_layers(obstacle, 1)
 	NavigationServer2D.obstacle_set_avoidance_enabled(obstacle, true)
-	_obstacles.append(obstacle)
+	return obstacle
 
 
 func _clear_obstacles() -> void:
+	for row: Array in _row_obstacles.values():
+		for obstacle: RID in row:
+			NavigationServer2D.free_rid(obstacle)
+	_row_obstacles.clear()
 	for obstacle: RID in _obstacles:
 		NavigationServer2D.free_rid(obstacle)
 	_obstacles.clear()

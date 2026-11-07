@@ -22,6 +22,8 @@
 
 [M6 bundle 本地审查](../validation/m6-bundle-review.md) 记录本次合入的两个提交、原生导入发现的编译/接线问题、穿墙寻路修复，以及本地 43 个脚本、49 项既有回归、启动和原生画面的复验结果与限制。
 
+[卡顿与游荡节奏调整](../validation/performance-wanderers.md) 记录 0.5.18-dev 的后台行军场、局部 A*/RVO 更新、视野记忆复用、开局禁刷与游荡移速调整，以及加速战斗性能证据和待验项。
+
 [M5 实施与检查](../validation/m5-threat-defense.md) 汇总当前实现及有效检查结果，[bundle 审查记录](../validation/m5-bundle-review.md) 保留逐提交结论；待验收清单与后续顺序统一看[开发计划](development-plan.md)。
 
 [视野迷雾实施与检查](../validation/m6-vision-fog.md) 记录 2026-11-07 接入的三态迷雾、视野与信息过滤、49 项行为检查及原生画面验证。

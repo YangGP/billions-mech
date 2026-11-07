@@ -209,3 +209,9 @@ Agent-Reach 不可用，使用网页检索。先核对高星候选 [Mindustry](h
 纯 sim 规则变更：维修暂停（被攻击后交战状态判定，周边无敌军即恢复）、被毁留基座、重建/清除、一键修复。先核对 [Mindustry](https://github.com/Anuken/Mindustry)（GPL-3.0，Java）与 [OpenRA](https://github.com/OpenRA/OpenRA)（GPL）的废墟/重建处理：两者均把废墟作为引擎内地图实体或 Actor 特性，绑定其各自世界/规则运行时，不能作为本项目无头纯数据 GDScript 模块接入，未复制源码；仅确认"废墟保留占位、付费重建"是成熟 RTS 常见形态。
 
 实际全部复用项目与引擎既有能力：基座复用 `MechBuildingState` 的 Phase 枚举扩展与 CONSTRUCTING 进度/血量爬升机制、`MechResources.scaled` 比例计价、`remove_factory` 队列清理、`_wall_connections` 邻接查询与 ConfirmationDialog 确认框；一键修复复用命令队列与 `building_action_error` 同源校验模式；交战状态复用注册表位置与矩形距离判定。无新增 vendor、无新算法；基座通行豁免（grid 占用保留、寻路放行）是项目自有规则接线。检查记录见 [基座与维修检查](../validation/ruins-repair.md)。
+
+## 21. 卡顿优化与游荡节奏（2026-11-07）
+
+维护现有导航/战斗模块，不更换行军场算法。直接复用 Godot 原生 [WorkerThreadPool](https://docs.godotengine.org/en/stable/classes/class_workerthreadpool.html)、Mutex、AStarGrid2D 和 NavigationServer2D。按官方[线程安全约束](https://docs.godotengine.org/en/stable/tutorials/performance/thread_safe_apis.html)，工作线程只读取独立地图与建筑状态副本，图纸 Resource 在会话内只读；AStarGrid2D 为任务私有实例，任务完成后交接主线程，禁止同一实例并发读写。主线程轮询完成状态，不等待未完成任务；重开/退出才回收仍在运行的任务。只保留一个在途任务，旧地图版本结果丢弃后按最新状态补算。
+
+项目适配仅负责需要判定、版本/脏格记录、输入复制、结果交接和原生 API 调用：玩家 A* 就地更新变更格，RVO 沿用既有按行合并算法但只更新变更行，视野通过原生 PackedByteArray 复制已有探索状态。没有新增线程池、路径求解器、避让算法或 vendor。游荡敌调整复用原有资源字段、状态与移速计算，详见[实施与检查](../validation/performance-wanderers.md)。

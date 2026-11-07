@@ -22,12 +22,13 @@ const ACTIVITY_BUCKET_SIZE: int = 16
 const FIELD_HP_REFRESH_SECONDS: float = 1.0
 const CONVERGE_REPATH_SECONDS: float = 2.0
 const CONVERGE_ARRIVAL: float = 1.0
-const SHUFFLE_DECISION_SECONDS: float = 4.0
-const SHUFFLE_RADIUS: int = 5
+const SHUFFLE_DECISION_SECONDS: float = 8.0
+const SHUFFLE_RADIUS: int = 2
 const SHUFFLE_ATTEMPTS: int = 6
 
 const WALL_ID: StringName = &"armored_wall"
 
+var profiling_enabled: bool = false
 var _field := MechMarchField.new()
 ## Prototype march field: identical to _field but armored walls contribute no
 ## building cost, so the flow leads wall passers straight over them.
@@ -37,51 +38,152 @@ var _wall_ids: Dictionary = {}
 var _goal: Vector2i = Vector2i.ZERO
 var _field_revision: int = -1
 var _field_hp: Dictionary = {}
+var _proto_field_revision: int = -1
+var _proto_field_hp: Dictionary = {}
+var _proto_navigation_revision: int = -1
 var _tick_counter: int = 0
 var _combat_noise: Callable = Callable()
+var _field_task: int = -1
+var _field_result: Dictionary = {}
+var _field_mutex := Mutex.new()
 
 
 func configure_noise(emitter: Callable) -> void:
 	_combat_noise = emitter
 
 
-func reset(grid: MechGridState, goal: Vector2i, buildings: Array[MechBuildingState]) -> void:
+func reset(_grid: MechGridState, goal: Vector2i, _buildings: Array[MechBuildingState]) -> void:
+	shutdown()
 	_tick_counter = 0
 	_goal = goal
+	_field = MechMarchField.new()
+	_proto_field = MechMarchField.new()
+	_proto_navigation = MechGridNavigation.new()
 	_field_revision = -1
 	_field_hp.clear()
-	_refresh_field(grid, buildings)
-
-
-func _refresh_field(grid: MechGridState, buildings: Array[MechBuildingState], hz: int = 30) -> void:
-	# Occupancy changes (place/cancel/destroy) rebuild immediately; plain HP drift
-	# (walls being chewed) is throttled to once per refresh interval.
-	if grid.revision() != _field_revision:
-		_rebuild_field(grid, buildings)
-		return
-	if _tick_counter % maxi(1, ceili(FIELD_HP_REFRESH_SECONDS * hz)) != 0:
-		return
-	for building: MechBuildingState in buildings:
-		if _field_hp.get(building.entity_id, -1) != building.hp:
-			_rebuild_field(grid, buildings)
-			return
-
-
-func _rebuild_field(grid: MechGridState, buildings: Array[MechBuildingState]) -> void:
-	_field.rebuild(grid, _goal, buildings)
-	var non_walls: Array[MechBuildingState] = []
+	_proto_field_revision = -1
+	_proto_field_hp.clear()
+	_proto_navigation_revision = -1
 	_wall_ids.clear()
+
+
+func shutdown() -> void:
+	if _field_task >= 0:
+		WorkerThreadPool.wait_for_task_completion(_field_task)
+		_field_task = -1
+	_field_result = {}
+
+
+func _refresh_field(grid: MechGridState, buildings: Array[MechBuildingState], hz: int, need_main: bool, need_proto: bool) -> void:
+	# Wanderers use the existing A* and never consume the core march fields.
+	# Keep each field invalid until a live enemy actually needs it. HP drift
+	# affects soft costs, not the native A* occupancy map.
+	_collect_field_result(grid)
+	if _field_task >= 0 or (not need_main and not need_proto):
+		return
+	var revision: int = grid.revision()
+	var hp_due: bool = _tick_counter % maxi(1, ceili(FIELD_HP_REFRESH_SECONDS * hz)) == 0
+	var check_main: bool = need_main and (_field_revision != revision or hp_due)
+	var check_proto: bool = need_proto and (_proto_field_revision != revision or hp_due)
+	if not check_main and not check_proto:
+		return
+	var started: int = Time.get_ticks_usec() if profiling_enabled else 0
+	var main_costs: Dictionary = {}
+	var proto_costs: Dictionary = {}
+	var wall_ids: Dictionary = {}
 	for building: MechBuildingState in buildings:
+		if building.definition.building_id == WALL_ID:
+			wall_ids[building.entity_id] = true
+		if building.hp <= 0 or Rect2i(building.origin, building.definition.footprint).has_point(_goal):
+			continue
+		# Compare the exact capped HP used by MechMarchField. Changes above the
+		# cap, or to the exempt mainbrain, do not change any cell's soft cost.
+		var cost_hp: int = mini(building.hp, MechMarchField.SOFT_COST_CAP)
+		main_costs[building.entity_id] = cost_hp
 		if building.definition.building_id != WALL_ID:
-			non_walls.append(building)
-		else:
-			_wall_ids[building.entity_id] = true
-	_proto_field.rebuild(grid, _goal, non_walls)
-	_proto_navigation.rebuild(grid, _wall_ids)
-	_field_revision = grid.revision()
-	_field_hp.clear()
+			proto_costs[building.entity_id] = cost_hp
+	var rebuild_main: bool = check_main and (_field_revision != revision or _field_hp != main_costs)
+	var rebuild_proto: bool = check_proto and (_proto_field_revision != revision or _proto_field_hp != proto_costs)
+	var rebuild_nav: bool = need_proto and _proto_navigation_revision != revision
+	if not rebuild_main and not rebuild_proto and not rebuild_nav:
+		return
+	var frozen_buildings: Array[MechBuildingState] = []
 	for building: MechBuildingState in buildings:
-		_field_hp[building.entity_id] = building.hp
+		var frozen := MechBuildingState.new()
+		frozen.entity_id = building.entity_id
+		frozen.origin = building.origin
+		frozen.hp = building.hp
+		# Definition resources are read-only throughout a running session.
+		frozen.definition = building.definition
+		frozen_buildings.append(frozen)
+	var job: Dictionary = {"grid": grid.navigation_copy(), "goal": _goal,
+		"buildings": frozen_buildings, "wall_ids": wall_ids, "revision": revision,
+		"main": rebuild_main, "proto": rebuild_proto, "nav": rebuild_nav,
+		"main_costs": main_costs, "proto_costs": proto_costs, "profiling": profiling_enabled}
+	_field_task = WorkerThreadPool.add_task(_compute_fields.bind(job), false, "Mech march fields")
+	if profiling_enabled:
+		print("[perf:fields] submit_ms=%.3f revision=%d" % [(Time.get_ticks_usec() - started) / 1000.0, revision])
+
+
+func _compute_fields(job: Dictionary) -> void:
+	var started: int = Time.get_ticks_usec() if job["profiling"] else 0
+	var output: Dictionary = {"revision": job["revision"], "main_costs": job["main_costs"],
+		"proto_costs": job["proto_costs"], "wall_ids": job["wall_ids"]}
+	var grid: MechGridState = job["grid"]
+	var buildings: Array[MechBuildingState] = job["buildings"]
+	if job["main"]:
+		var field := MechMarchField.new()
+		field.rebuild(grid, job["goal"], buildings)
+		output["field"] = field
+	if job["proto"]:
+		var non_walls: Array[MechBuildingState] = []
+		for building: MechBuildingState in buildings:
+			if building.definition.building_id != WALL_ID:
+				non_walls.append(building)
+		var field := MechMarchField.new()
+		field.rebuild(grid, job["goal"], non_walls)
+		output["proto_field"] = field
+	if job["nav"]:
+		# Each AStarGrid2D is owned by one thread at a time, then handed off
+		# after task completion; no live A* object is accessed concurrently.
+		var navigation := MechGridNavigation.new()
+		navigation.rebuild(grid, job["wall_ids"])
+		output["navigation"] = navigation
+	if job["profiling"]:
+		output["worker_ms"] = (Time.get_ticks_usec() - started) / 1000.0
+	_field_mutex.lock()
+	_field_result = output
+	_field_mutex.unlock()
+
+
+func _collect_field_result(grid: MechGridState) -> void:
+	if _field_task < 0 or not WorkerThreadPool.is_task_completed(_field_task):
+		return
+	WorkerThreadPool.wait_for_task_completion(_field_task)
+	_field_task = -1
+	_field_mutex.lock()
+	var result: Dictionary = _field_result
+	_field_result = {}
+	_field_mutex.unlock()
+	# Commands may have changed geometry while the worker was running. Discard
+	# stale output and coalesce a replacement from the latest state.
+	if result.get("revision", -1) != grid.revision():
+		return
+	if result.has("field"):
+		_field = result["field"]
+		_field_revision = result["revision"]
+		_field_hp = result["main_costs"]
+	if result.has("proto_field"):
+		_proto_field = result["proto_field"]
+		_proto_field_revision = result["revision"]
+		_proto_field_hp = result["proto_costs"]
+	if result.has("navigation"):
+		_proto_navigation = result["navigation"]
+		_proto_navigation_revision = result["revision"]
+		_wall_ids = result["wall_ids"]
+	if result.has("worker_ms"):
+		print("[perf:fields] worker_ms=%.3f main=%s proto=%s nav=%s revision=%d" % [
+			result["worker_ms"], result.has("field"), result.has("proto_field"), result.has("navigation"), result["revision"]])
 
 
 func create(registry: MechEntityRegistry, rules: MechEnemyDefinition, position: Vector2) -> int:
@@ -101,7 +203,6 @@ func create(registry: MechEntityRegistry, rules: MechEnemyDefinition, position: 
 ## removal/economy paths so refunds and capacity follow the existing rules.
 func advance(registry: MechEntityRegistry, grid: MechGridState, navigation: MechGridNavigation, buildings: Array[MechBuildingState], hz: int, noises: Array[Dictionary], vision: MechVisionSystem) -> Dictionary:
 	var result: Dictionary = {"dead_units": [], "building_hits": []}
-	_refresh_field(grid, buildings, hz)
 	var buildings_by_id: Dictionary = {}
 	var building_cells: Dictionary = {}
 	var non_wall_cells: Dictionary = {}
@@ -119,6 +220,8 @@ func advance(registry: MechEntityRegistry, grid: MechGridState, navigation: Mech
 	var unit_buckets: Dictionary = {}
 	var enemy_buckets: Dictionary = {}
 	var enemies: Array[MechEntityState] = []
+	var need_main: bool = false
+	var need_proto: bool = false
 	for entity: MechEntityState in registry.all():
 		if entity.hp <= 0:
 			continue
@@ -130,10 +233,13 @@ func advance(registry: MechEntityRegistry, grid: MechGridState, navigation: Mech
 			_mark_active_region(unit_cell, active_regions)
 		elif entity.team == 2 and entity.enemy_definition != null:
 			enemies.append(entity)
+			need_proto = need_proto or entity.enemy_definition.passes_walls
+			need_main = need_main or (entity.enemy_definition.marches_to_core and not entity.enemy_definition.passes_walls)
 			var enemy_cell := Vector2i(entity.position.floor())
 			if not enemy_buckets.has(enemy_cell):
 				enemy_buckets[enemy_cell] = []
 			enemy_buckets[enemy_cell].append(entity)
+	_refresh_field(grid, buildings, hz, need_main, need_proto)
 	var dt: float = 1.0 / float(hz)
 	var tick: int = _tick_counter
 	_tick_counter += 1
@@ -170,6 +276,8 @@ func _advance_one(enemy: MechEntityState, registry: MechEntityRegistry, grid: Me
 		noises: Array[Dictionary], tick: int, dt: float, hz: int, result: Dictionary, coarse: bool) -> void:
 	var rules: MechEnemyDefinition = enemy.enemy_definition
 	if rules == null:
+		return
+	if rules.passes_walls and _proto_navigation_revision < 0:
 		return
 	enemy.cooldown_ticks = maxi(0, enemy.cooldown_ticks - 1)
 	enemy.shot_ticks = maxi(0, enemy.shot_ticks - 1)
@@ -258,7 +366,7 @@ func _walk_wanderer(enemy: MechEntityState, grid: MechGridState, enemy_buckets: 
 	if not enemy.has_move_order:
 		return
 	var cell: Vector2i = Vector2i(enemy.position.floor())
-	var speed: float = enemy.enemy_definition.move_speed / grid.movement_weight(cell)
+	var speed: float = enemy.enemy_definition.move_speed * enemy.enemy_definition.wandering_speed_ratio / grid.movement_weight(cell)
 	var velocity: Vector2 = enemy.preferred_velocity(speed, dt, grid.mobile_segment_clear.bind(_wall_ids if enemy.enemy_definition.passes_walls else {}))
 	if velocity == Vector2.ZERO:
 		enemy.finish_path_if_arrived()
@@ -280,6 +388,8 @@ func _shuffle_cell(enemy: MechEntityState, grid: MechGridState) -> Vector2i:
 
 
 func _advance_marching(enemy: MechEntityState, grid: MechGridState, enemy_buckets: Dictionary, buildings_by_id: Dictionary, dt: float) -> void:
+	if (_proto_field_revision if enemy.enemy_definition.passes_walls else _field_revision) < 0:
+		return
 	var cell: Vector2i = Vector2i(enemy.position.floor())
 	# Wall passers march on the wall-free field; everyone else follows the
 	# standard gap-chewing flow.
@@ -487,7 +597,8 @@ func _slide_step(enemy: MechEntityState, direction: Vector2, speed: float, dt: f
 		if offset == Vector2i.ZERO:
 			continue
 		var neighbour: Vector2i = cell + offset
-		var cost: float = field.cost_at(neighbour)
+		var cost: float = field.cost_at(neighbour) if enemy.order == &"marching" else \
+			(Vector2(neighbour) + Vector2(0.5, 0.5)).distance_squared_to(enemy.next_waypoint())
 		if not is_finite(cost) or cost >= best_cost and found:
 			continue
 		var center: Vector2 = Vector2(neighbour) + Vector2(0.5, 0.5)

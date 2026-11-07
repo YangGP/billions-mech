@@ -13,6 +13,11 @@ var _pass_through: Dictionary[int, bool] = {}
 var _coverage := PackedByteArray()
 var _rough_weight: float = 2.0
 var _revision: int = 0
+var _terrain_revision: int = 0
+var _coverage_revision: int = 0
+## Last change per occupied/cleared cell; bounded by map size, independently
+## consumed by A* and RVO without clearing another consumer's dirty cells.
+var _navigation_changes: Dictionary[int, int] = {}
 var _playable := PackedByteArray()
 var _outline := PackedVector2Array()
 var _boundary: Array[Vector2i] = []
@@ -32,6 +37,9 @@ func configure(definition: MechMapDefinition) -> void:
 	_coverage.resize(_terrain.size())
 	_coverage.fill(0)
 	_revision += 1
+	_terrain_revision = _revision
+	_coverage_revision = _revision
+	_navigation_changes.clear()
 
 
 func dimensions() -> Vector2i:
@@ -44,6 +52,38 @@ func playable_cell_count() -> int:
 
 func revision() -> int:
 	return _revision
+
+
+func terrain_revision() -> int:
+	return _terrain_revision
+
+
+func coverage_revision() -> int:
+	return _coverage_revision
+
+
+func navigation_changes_since(since: int) -> Array[Vector2i]:
+	var cells: Array[Vector2i] = []
+	for index: int in _navigation_changes:
+		if _navigation_changes[index] > since:
+			cells.append(Vector2i(index % _dimensions.x, index / _dimensions.x))
+	return cells
+
+
+## Independent immutable input for background path-data construction. The
+## worker never reads the live grid while commands mutate its occupancy.
+func navigation_copy() -> MechGridState:
+	var copy := MechGridState.new()
+	copy._dimensions = _dimensions
+	copy._rough_weight = _rough_weight
+	copy._terrain = _terrain.duplicate()
+	copy._playable = _playable.duplicate()
+	copy._outline = _outline.duplicate()
+	copy._occupancy = _occupancy.duplicate()
+	copy._pass_through = _pass_through.duplicate()
+	copy._revision = _revision
+	copy._terrain_revision = _terrain_revision
+	return copy
 
 
 func contains(cell: Vector2i) -> bool:
@@ -116,25 +156,32 @@ func set_core_coverage(origin: Vector2i, footprint: Vector2i, radius: int) -> vo
 				if contains(Vector2i(x, y)) and dx * dx + dy * dy <= radius * radius:
 					_coverage[_index(Vector2i(x, y))] = 1
 	_revision += 1
+	_coverage_revision = _revision
 
 
 func release(entity_id: int) -> void:
+	_revision += 1
 	for index: int in range(_occupancy.size()):
 		if _occupancy[index] == entity_id:
 			_occupancy[index] = 0
+			_navigation_changes[index] = _revision
 	_pass_through.erase(entity_id)
-	_revision += 1
 
 
 ## Pass-through occupants keep their cells (placement checks and mineral
 ## bindings still see them) while pathfinding, RVO obstacles and movement
 ## validation treat the cells as open ground — used by destroyed bases.
 func set_pass_through(entity_id: int, enabled: bool) -> void:
+	if _pass_through.has(entity_id) == enabled:
+		return
 	if enabled:
 		_pass_through[entity_id] = true
 	else:
 		_pass_through.erase(entity_id)
 	_revision += 1
+	for index: int in range(_occupancy.size()):
+		if _occupancy[index] == entity_id:
+			_navigation_changes[index] = _revision
 
 
 func is_walkable(cell: Vector2i, include_buildings: bool = true, ignored_occupants: Dictionary = {}) -> bool:
@@ -258,9 +305,11 @@ func try_occupy(entity_id: int, origin: Vector2i, footprint: Vector2i) -> Dictio
 	var result: Dictionary = preview_footprint(origin, footprint)
 	if not result["ok"]:
 		return result
-	for cell_info: Dictionary in result["cells"]:
-		_occupancy[_index(cell_info["cell"])] = entity_id
 	_revision += 1
+	for cell_info: Dictionary in result["cells"]:
+		var index: int = _index(cell_info["cell"])
+		_occupancy[index] = entity_id
+		_navigation_changes[index] = _revision
 	return result
 
 

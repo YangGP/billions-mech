@@ -17,6 +17,8 @@ extends Resource
 ## false = wanderer-style: never marches to the core; idles with slow TAB-style
 ## shuffling, converges on noise, and engages when seen or attacked.
 @export var marches_to_core: bool = true
+## Unengaged wandering/noise convergence only; combat pursuit retains move_speed.
+@export_range(0.1, 1.0, 0.05) var wandering_speed_ratio: float = 1.0
 ## Electromagnetic shelter (prototype): enemies within shelter_radius of this
 ## unit take reduced damage from every source; killing it lifts the shelter.
 @export var shelter_radius: float = 0.0
@@ -38,6 +40,8 @@ func validation_error() -> String:
 			return "敌种时间、射程或移速无效"
 	if threat_cost <= 0.0:
 		return "敌种威胁单价无效"
+	if not is_finite(wandering_speed_ratio) or wandering_speed_ratio < 0.1 or wandering_speed_ratio > 1.0:
+		return "游荡速度倍率无效"
 	if shelter_radius < 0.0 or not is_finite(shelter_radius):
 		return "敌种庇护半径无效"
 	if shelter_radius > 0.0 and (not is_finite(shelter_reduction) or shelter_reduction <= 0.0 or shelter_reduction > 1.0):
@@ -55,5 +59,5 @@ func snapshot() -> Dictionary:
 		"attack_seconds": attack_seconds, "attack_range": attack_range,
 		"move_speed": move_speed, "vision_radius": vision_radius,
 		"threat_cost": threat_cost, "prefers_buildings": prefers_buildings,
-		"marches_to_core": marches_to_core, "shelter_radius": shelter_radius,
+		"marches_to_core": marches_to_core, "wandering_speed_ratio": wandering_speed_ratio, "shelter_radius": shelter_radius,
 		"shelter_reduction": shelter_reduction, "passes_walls": passes_walls}

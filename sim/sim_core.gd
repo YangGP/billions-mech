@@ -4,6 +4,7 @@ extends RefCounted
 
 signal state_changed
 
+var profiling_enabled: bool = false
 var _clock := MechSimulationClock.new()
 var _registry := MechEntityRegistry.new()
 var _grid := MechGridState.new()
@@ -46,6 +47,7 @@ func _init() -> void:
 
 
 func shutdown() -> void:
+	_enemies.shutdown()
 	_registry.clear()
 
 
@@ -89,6 +91,7 @@ func configure(settings: MechFoundationSettings) -> bool:
 		_enemy_defs[rules.enemy_id] = rules
 	# Combat noise flows to the threat system from every firing side.
 	_enemies.configure_noise(_threat.note_combat)
+	_enemies.profiling_enabled = profiling_enabled
 	_units.combat_noise = _threat.note_combat
 	_towers.combat_noise = _threat.note_combat
 	_probe_speed = maxf(0.1, settings.probe_speed)

@@ -42,16 +42,17 @@ func update(grid: MechGridState, registry: MechEntityRegistry, buildings: Array[
 		if radius > 0.0:
 			var center: Vector2 = entity.position.floor() + Vector2(0.5, 0.5)
 			sources[entity.entity_id] = Vector3(center.x, center.y, radius)
-	if sources == _sources and _grid_revision == grid.revision():
+	if sources == _sources and _grid_revision == grid.coverage_revision():
 		return false
-	var next := PackedByteArray()
-	next.resize(_states.size())
-	for y: int in range(_dimensions.y):
-		for x: int in range(_dimensions.x):
-			var index: int = y * _dimensions.x + x
-			if grid.is_covered(Vector2i(x, y)):
-				_explored[index] = 1
-			next[index] = State.EXPLORED if _explored[index] != 0 else State.UNEXPLORED
+	if _grid_revision != grid.coverage_revision():
+		for y: int in range(_dimensions.y):
+			for x: int in range(_dimensions.x):
+				if grid.is_covered(Vector2i(x, y)):
+					_explored[y * _dimensions.x + x] = State.EXPLORED
+	# Exploration stores exactly UNEXPLORED/EXPLORED (0/1). Native copying
+	# restores remembered cells without a script loop over the whole map on
+	# every source movement, production spawn or tower destruction.
+	var next: PackedByteArray = _explored.duplicate()
 	var footprints: Dictionary = {}
 	for id: int in sources:
 		var source: Vector3 = sources[id]
@@ -66,7 +67,7 @@ func update(grid: MechGridState, registry: MechEntityRegistry, buildings: Array[
 			_explored[index] = 1
 	_sources = sources
 	_footprints = footprints
-	_grid_revision = grid.revision()
+	_grid_revision = grid.coverage_revision()
 	if next == _states:
 		return false
 	_states = next

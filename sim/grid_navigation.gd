@@ -6,23 +6,34 @@ extends RefCounted
 var _navigation := AStarGrid2D.new()
 var _grid: MechGridState
 var _ignored_occupants: Dictionary = {}
+var _revision: int = -1
+var _terrain_revision: int = -1
 
 
 func rebuild(grid: MechGridState, ignored_occupants: Dictionary = {}) -> void:
+	var full_refresh: bool = _grid != grid or _terrain_revision != grid.terrain_revision() or _ignored_occupants != ignored_occupants
 	_grid = grid
 	_ignored_occupants = ignored_occupants.duplicate()
-	_navigation.region = Rect2i(Vector2i.ZERO, grid.dimensions())
-	_navigation.cell_size = Vector2.ONE
-	_navigation.diagonal_mode = AStarGrid2D.DIAGONAL_MODE_ONLY_IF_NO_OBSTACLES
-	_navigation.default_compute_heuristic = AStarGrid2D.HEURISTIC_OCTILE
-	_navigation.default_estimate_heuristic = AStarGrid2D.HEURISTIC_OCTILE
-	_navigation.jumping_enabled = false
-	_navigation.update()
-	for y: int in range(grid.dimensions().y):
-		for x: int in range(grid.dimensions().x):
-			var cell := Vector2i(x, y)
+	if full_refresh:
+		_navigation.region = Rect2i(Vector2i.ZERO, grid.dimensions())
+		_navigation.cell_size = Vector2.ONE
+		_navigation.diagonal_mode = AStarGrid2D.DIAGONAL_MODE_ONLY_IF_NO_OBSTACLES
+		_navigation.default_compute_heuristic = AStarGrid2D.HEURISTIC_OCTILE
+		_navigation.default_estimate_heuristic = AStarGrid2D.HEURISTIC_OCTILE
+		_navigation.jumping_enabled = false
+		_navigation.update()
+		for y: int in range(grid.dimensions().y):
+			for x: int in range(grid.dimensions().x):
+				var cell := Vector2i(x, y)
+				_navigation.set_point_solid(cell, not grid.is_walkable(cell, true, _ignored_occupants))
+				_navigation.set_point_weight_scale(cell, grid.movement_weight(cell))
+	else:
+		# set_point_solid updates the native grid in place; update() would erase
+		# all point data and force a full-map rewrite for every wall segment.
+		for cell: Vector2i in grid.navigation_changes_since(_revision):
 			_navigation.set_point_solid(cell, not grid.is_walkable(cell, true, _ignored_occupants))
-			_navigation.set_point_weight_scale(cell, grid.movement_weight(cell))
+	_revision = grid.revision()
+	_terrain_revision = grid.terrain_revision()
 
 
 func find_path(from: Vector2, target_cell: Vector2i) -> PackedVector2Array:
