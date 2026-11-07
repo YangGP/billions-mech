@@ -135,7 +135,7 @@ Godot 当前项目使用的 NavigationServer2D 与 AStarGrid2D 提供逐 agent �
 
 ## 11. M5 主脑失败与读模型更新
 
-实施前已下载并通读 OpenRA 的 [ConquestVictoryConditions](https://github.com/OpenRA/OpenRA/blob/bleed/OpenRA.Mods.Common/Traits/Player/ConquestVictoryConditions.cs)、依赖的 MissionObjectives 与 COPYING，副本位于忽略的 `.godot/references/openra/`。前者 SHA256 为 `399b64e55e7a9fc63ee593756eb2d8958cc88de0e89ae41a262a4a96d9a9d0ec`。模块按玩家必需资产和任务目标判定结果，依赖 C# Actor/Trait、World、Player、任务系统与通知服务，许可为 GPL-3.0-or-later；不能直接接入本项目纯数据 GDScript 会话。本轮仅核对终局状态与通知边界，不复制或移植其源码。
+实施前已下载并通读 OpenRA 的 [ConquestVictoryConditions](https://github.com/OpenRA/OpenRA/blob/bleed/OpenRA.Mods.Common/Traits/Player/ConquestVictoryConditions.cs)、依赖的 MissionObjectives 与 COPYING，副本现统一位于忽略的 `reference/openra/`。前者 SHA256 为 `399b64e55e7a9fc63ee593756eb2d8958cc88de0e89ae41a262a4a96d9a9d0ec`。模块按玩家必需资产和任务目标判定结果，依赖 C# Actor/Trait、World、Player、任务系统与通知服务，许可为 GPL-3.0-or-later；不能直接接入本项目纯数据 GDScript 会话。本轮仅核对终局状态与通知边界，不复制或移植其源码。
 
 引擎 [SceneTree.paused](https://docs.godotengine.org/en/stable/classes/class_scenetree.html#class-scenetree-property-paused) 会影响节点处理与物理推进，不能直接表达本作“模拟停止、镜头/查看/重开继续”的会话规则。直接复用已有 MechSimulationClock 暂停、MechEntityRegistry.suspend_motion 及其原生 NavigationServer2D 地图停用能力，SimCore 只新增主脑死亡锁定结果、终局命令校验与快照字段；这属于项目业务接线，不新增调度或避让算法。
 
@@ -166,3 +166,27 @@ Godot 当前项目使用的 NavigationServer2D 与 AStarGrid2D 提供逐 agent �
 ## 15. 建筑占地分级
 
 核对 [Godot 官方等距演示](https://github.com/godotengine/godot-demo-projects/tree/master/2d/isometric)（MIT）和当前项目 Resource/footprint 链路：四档建筑大小属于内容配置，已有放置、占用、覆盖、A*、出厂与轮廓直接读取 footprint，无需新增瓦片/建筑模块。主脑改为 4×4；既有白模通过原生 [CanvasItem.draw_set_transform](https://docs.godotengine.org/en/stable/classes/class_canvasitem.html) 按占地缩放，点击轮廓同步缩放，继续复用 Geometry2D 判断。仅调整内容数据、表现适配和训练场点位，不新增算法或依赖；发电厂/中继只确定设计规格。
+
+## 16. 可直达路点引导（2026-11-07）
+
+Agent-Reach 在当前环境未提供，改用网页检索与公开源码核查。先检索 [Godot 官方演示](https://github.com/godotengine/godot-demo-projects)（约 9.8k 星，MIT，持续维护）、[Recast/Detour](https://github.com/recastnavigation/recastnavigation)（约 8.2k 星，zlib）与 [PathFinding.js](https://github.com/qiao/PathFinding.js)（约 8.7k 星，MIT）。官方导航网格演示使用原生漏斗路径，但整体替换会引入导航网格重烘焙/同步，并需另行表达当前逐格崎岖地权重；Recast 为 C++ 导航网格工具链，非当前 GDScript 2D 运行接口。PathFinding.js 的 `smoothenPath` 以可通行射线跳过格点，但为 JavaScript 运行接口，未表达本项目圆形单位宽度和地形时间成本，不能直接接入当前 GDScript 模拟。需由现有网格守卫提供本项目的可达路点选择，不能原样调用上述点单位网格判断。
+
+已下载 Godot **4.7.2-stable** 的 `godot_navigation_server_2d.cpp`、`curve.cpp` 及 PathFinding.js 的 `src/core/Util.js`/README，现统一放在本机 `reference/navigation/`，核对许可证、接口、依赖与关键实现。Godot 的 `simplify_path` 调用原生 NavMeshQueries2D 返回原路径索引，但自身不检测地图障碍；本次只用零容差删除共线点，保留原生 A* 的通路形状。Curve2D 与整个导航网格迁移均不用于最终实现。
+
+实际复用原生 AStarGrid2D、[NavigationServer2D.simplify_path](https://docs.godotengine.org/en/stable/classes/class_navigationserver2d.html#class-navigationserver2d-method-simplify-path) 与既有 RVO。自写适配是带单位宽度和地形时间成本守卫的路点选择：从当前锚点向路径末尾检查最远可直达点，整段能直达就只保留终点，受阻时才保留绕障拐点。碰撞检查复用 `mobile_segment_clear`，不会只检测中心射线；崎岖地的时间成本不能因捷径变差。移动命令保留点击位置，重寻路不重新吸附格心；成组落点仍保持独立分配。没有实现新的 A*、RDP、曲线求值或局部避让器，也没有把外部参考描述为已接入模块。机潮主脑流场保留原实现；玩家移动、出厂、噪声游荡和接敌追踪共用改后的 A* 路径。未新增测试脚本，执行原生检查与已有回归；交互检查受 computer-use 连接不可用限制。
+
+## 17. 按行进方向安排抵达队列（2026-11-07，实施前核查）
+
+按用户确认的规则，移动方向决定抵达队形的前后/左右，单位就近占据对应落点；掉头时原后排可成为新前排；短距离改点保持相对位置，途中落点稳定，窄口允许散开通过。抵达朝向与实际行走/攻击朝向分别保存。
+
+Agent-Reach 不可用，使用网页检索。先核对高星候选 [Mindustry](https://github.com/Anuken/Mindustry)（约 29.7k 星，GPL-3.0，Java/Arc）、[gdx-ai](https://github.com/libgdx/gdx-ai)（约 1.3k 星，Apache-2.0，Java/libGDX 的 Formation/SlotAssignment 接口）及 Godot 原生导航。前两者不能直接在 GDScript 模拟运行，原生 A*/RVO 不负责队形落点分配。继续核对项目已评估的 [RTS Advanced Lite](https://github.com/openclawaimac/godot-rts-advanced-lite)（MIT，小型项目，不称为高星成熟框架）。
+
+已下载 Lite `rts_formation.gd`、README、LICENSE 和 gdx-ai `FreeSlotAssignmentStrategy.java`，现统一放在本机 `reference/formations/`，逐项核对。Lite 的整个框架是 3D，但 **RTSFormation 本身仅依赖 RefCounted、Array、Vector2/Vector3 与内置数学，无 Node3D/场景依赖**：`box` 生成垂直于行进方向的居中行列，`assign` 按距离贪心分配独立槽位。因此直接保留原文件及 MIT 许可于 `vendor/rts_advanced_lite/`，由适配层将逻辑 Vector2 映射到 XZ 平面后调用，不重写槽位生成/分配算法。此采用范围细化了 §7/§8 的整框架不采用结论。
+
+项目适配负责：以部队中心和目标/路线末段确定朝向，把相对位置平移到目的区域后交给原分配函数以减少远距离命令的前后抢位；短距离或相近方向的新命令优先沿用旧偏移；落点按圆形单位宽度、相互间距和原生 A* 可达性修正，整队校验后一次提交。朝向、稳定落点与显示标记属于本项目业务状态。原生 RVO 保持独立避让，不让单位先原地排齐，也不逐帧重排。贪心分配不宣称全局最短或绝对无交叉。未新增测试脚本；导入/语法、现有回归及画面检查与人工交互验收分别记录。
+
+## 18. 普通移动抵达后的原地开火（2026-11-07）
+
+按用户规则调整已有战斗行为：普通移动途中优先赶路，到达后转待命，只对实际射程内、玩家可见且地形视线畅通的目标开火；敌人离开射程/视线立即放弃，不生成追击路径。A 移执行期间保留较大的索敌半径与追击，指定攻击继续按显式命令追击；两者结束进入待命后采用同一原地开火规则。
+
+先核对持续维护的 [OpenRA AutoTarget](https://github.com/OpenRA/OpenRA/blob/bleed/OpenRA.Mods.Common/Traits/AutoTarget.cs) 的扫描半径、`allowMove` 与武器射程区分，源码下载到 `reference/openra/AutoTarget.cs` 并检查既有 COPYING。该模块依赖 C# Actor/Trait、AttackBase 和活动系统，GPL-3.0-or-later，不能直接作为本项目 GDScript 战斗模块接入，未复制或移植。项目已有空间桶、射程/LOS、目标保持、攻击冷却和 A*，只在这些既有接口处限定待命状态的候选范围、缓存目标有效性与追击许可，不新增搜索/战斗算法，也不引入姿态按钮。Agent-Reach 不可用，使用网页和本地源码核对。

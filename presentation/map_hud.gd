@@ -270,14 +270,14 @@ func present_units(units: Array[Dictionary]) -> void:
 		orders[unit["order"]] = true
 	_selection_title.text = "卫兵 × %d" % units.size()
 	_status_label.show()
-	_status_label.text = {&"idle": "待命 / 自动索敌", &"move": "移动中", &"attack_move": "攻击移动中", &"attack": "攻击指定目标"}.get(orders.keys()[0], "待命") if orders.size() == 1 else "多种指令执行中"
+	_status_label.text = {&"idle": "待命 / 射程内开火 · 不追击", &"move": "移动中", &"attack_move": "攻击移动中", &"attack": "攻击指定目标"}.get(orders.keys()[0], "待命") if orders.size() == 1 else "多种指令执行中"
 	_status_label.modulate = ACCENT
 	_hp_label.show()
 	_hp_label.text = "总血量 %d / %d · 占容 %d" % [hp, max_hp, capacity]
 	_hp_bar.show()
 	_hp_bar.value = 100.0 * hp / maxi(1, max_hp)
 	_details.show()
-	_details.text = "右键：移动 / 攻击训练靶\nA＋左键：沿途交战后继续前进\nCtrl＋数字：编队，数字：召回\nShift 追加，Ctrl 点击切换选择"
+	_details.text = "右键：移动 / 攻击目标\n移动抵达后：射程内开火，不追击\nA＋左键：沿途索敌追击后继续前进\nCtrl＋数字：编队，数字：召回\nShift 追加，Ctrl 点击切换选择"
 
 
 func present_drag(rect: Rect2, active: bool) -> void:

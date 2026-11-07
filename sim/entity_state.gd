@@ -31,6 +31,13 @@ var blocked_ticks: int = 0
 var shot_ticks: int = 0
 var shot_target: Vector2 = Vector2.ZERO
 var fog_coarse: bool = false
+var facing: Vector2 = Vector2.UP
+var arrival_facing: Vector2 = Vector2.UP
+var has_arrival_facing: bool = false
+var formation_id: int = 0
+var formation_size: int = 0
+var formation_center: Vector2 = Vector2.ZERO
+var formation_offset: Vector2 = Vector2.ZERO
 var _waypoints := PackedVector2Array()
 var _waypoint_index: int = 0
 
@@ -67,6 +74,17 @@ func finish_path_if_arrived() -> void:
 	if has_move_order and _waypoint_index == _waypoints.size() - 1 and position.distance_to(_waypoints[_waypoint_index]) <= ARRIVAL_TOLERANCE:
 		_waypoint_index = _waypoints.size()
 		has_move_order = false
+		face_arrival()
+
+
+func face_direction(direction: Vector2) -> void:
+	if direction.length_squared() > 0.000001:
+		facing = direction.normalized()
+
+
+func face_arrival() -> void:
+	if has_arrival_facing and attack_target_id == 0 and position.distance_to(order_goal) <= ARRIVAL_TOLERANCE:
+		facing = arrival_facing
 
 
 func snapshot() -> Dictionary:
@@ -77,6 +95,8 @@ func snapshot() -> Dictionary:
 		"is_enemy": enemy_definition != null,
 		"enemy_id": enemy_definition.enemy_id if enemy_definition != null else &"",
 		"order": order, "order_goal": order_goal, "attack_target_id": attack_target_id,
+		"facing": facing, "arrival_facing": arrival_facing, "has_arrival_facing": has_arrival_facing,
+		"formation_id": formation_id, "formation_center": formation_center, "formation_offset": formation_offset,
 		"shot_ticks": shot_ticks, "shot_target": shot_target,
 		"capacity_cost": unit_definition.capacity_cost if unit_definition != null else 0,
 		"damage": unit_definition.damage if unit_definition != null else 0,

@@ -142,7 +142,10 @@ func _apply_velocities(request_id: int, velocities: Dictionary) -> void:
 		# Final static guard only; all dynamic avoidance is performed by native RVO.
 		if _motion_grid.mobile_segment_clear(entity.position, desired):
 			entity.position = desired
+		entity.face_direction(entity.position - _starting_positions[id])
 		entity.finish_path_if_arrived()
+		if not entity.has_move_order:
+			entity.face_arrival()
 		var waypoint: Vector2 = _starting_waypoints[id]
 		var advanced: bool = not entity.has_move_order or entity.position.distance_to(waypoint) < _starting_positions[id].distance_to(waypoint) - 0.001
 		entity.blocked_ticks = 0 if advanced else entity.blocked_ticks + 1

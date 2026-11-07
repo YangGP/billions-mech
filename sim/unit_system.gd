@@ -4,6 +4,8 @@ extends RefCounted
 
 ## Combat-level noise emitter (set by SimCore); fired at each shot's impact point.
 var combat_noise: Callable = Callable()
+var _formations := MechFormationPlanner.new()
+var _formation_sequence: int = 0
 
 
 func create(registry: MechEntityRegistry, rules: MechUnitDefinition, cell: Vector2i) -> int:
@@ -39,6 +41,7 @@ func plan_order(ids: Array, kind: StringName, goal: Vector2, target_id: int, reg
 			return {"ok": false, "reason": "部队位于施工占地，待完工移出后再下令"}
 		selected[raw_id] = true
 	var paths: Dictionary = {}
+	var formation: Dictionary = {}
 	if kind == &"attack":
 		var enemy: MechEntityState = registry.get_entity(target_id)
 		if enemy == null or enemy.team != 2 or enemy.hp <= 0:
@@ -47,32 +50,22 @@ func plan_order(ids: Array, kind: StringName, goal: Vector2, target_id: int, reg
 	else:
 		if not goal.is_finite() or not grid.contains(Vector2i(goal.floor())) or not grid.is_walkable(Vector2i(goal.floor())):
 			return {"ok": false, "reason": "目标超界或被地形/建筑阻挡"}
-		var slots: Array[Vector2i] = [Vector2i(goal.floor())]
-		if selected.size() > 1:
-			slots = _formation_cells(Vector2i(goal.floor()), selected.size(), grid)
-		var unassigned: Array = selected.keys()
-		for slot: Vector2i in slots:
-			# Assign nearby units first instead of crossing paths in entity-ID order.
-			var point: Vector2 = Vector2(slot) + Vector2(0.5, 0.5)
-			unassigned.sort_custom(func(a: int, b: int) -> bool: return registry.position_of(a).distance_squared_to(point) < registry.position_of(b).distance_squared_to(point))
-			for index: int in range(unassigned.size()):
-				var id: int = unassigned[index]
-				var unit: MechEntityState = registry.get_entity(id)
-				var path: PackedVector2Array = navigation.find_path(unit.position, slot)
-				if path.is_empty():
-					continue
-				paths[id] = path
-				unassigned.remove_at(index)
-				break
-			if unassigned.is_empty():
-				break
-		if not unassigned.is_empty():
-			return {"ok": false, "reason": "无法为整支部队找到可达位置，原指令保持"}
+		if not grid.mobile_position_clear(goal):
+			return {"ok": false, "reason": "目标过于贴近障碍，无法容纳单位"}
+		var members: Array[MechEntityState] = []
+		for id: int in selected:
+			members.append(registry.get_entity(id))
+		formation = _formations.plan(members, goal, grid, navigation)
+		if not formation["ok"]:
+			return formation
+		paths = formation["paths"]
 	return {"ok": true, "reason": "", "ids": selected.keys(), "kind": kind,
-		"goal": goal, "target_id": target_id, "paths": paths}
+		"goal": goal, "target_id": target_id, "paths": paths, "formation": formation}
 
 
 func apply_order(plan: Dictionary, registry: MechEntityRegistry) -> void:
+	_formation_sequence += 1
+	var formation: Dictionary = plan.get("formation", {})
 	for id: int in plan["ids"]:
 		var unit: MechEntityState = registry.get_entity(id)
 		unit.order = plan["kind"]
@@ -80,29 +73,19 @@ func apply_order(plan: Dictionary, registry: MechEntityRegistry) -> void:
 		unit.order_goal = plan["goal"]
 		unit.repath_ticks = 0
 		unit.blocked_ticks = 0
+		unit.formation_id = _formation_sequence if not formation.is_empty() else 0
+		unit.formation_size = plan["ids"].size() if not formation.is_empty() else 0
+		unit.has_arrival_facing = not formation.is_empty()
+		if not formation.is_empty():
+			unit.arrival_facing = formation["facing"]
+			unit.formation_center = formation["center"]
+			unit.formation_offset = formation["slots"][id] - formation["center"]
 		if plan["paths"].has(id):
 			var path: PackedVector2Array = plan["paths"][id]
 			unit.order_goal = path[path.size() - 1]
 			unit.set_move_path(path)
 		else:
 			unit.set_move_path(PackedVector2Array())
-
-
-func _formation_cells(goal: Vector2i, count: int, grid: MechGridState) -> Array[Vector2i]:
-	# Mobile allies are temporary avoidance constraints, never replacement goals.
-	# Assign this order's distinct slots once, using static walkability only.
-	var result: Array[Vector2i] = []
-	for radius: int in range(21):
-		for y: int in range(-radius, radius + 1):
-			for x: int in range(-radius, radius + 1):
-				if maxi(absi(x), absi(y)) != radius:
-					continue
-				var cell: Vector2i = goal + Vector2i(x, y)
-				if grid.is_walkable(cell):
-					result.append(cell)
-		if result.size() >= count * 3 + 8:
-			break
-	return result
 
 
 func spawn(building: MechBuildingState, rally: Vector2i, rules: MechUnitDefinition, registry: MechEntityRegistry, grid: MechGridState, navigation: MechGridNavigation) -> bool:
@@ -171,8 +154,14 @@ func advance(registry: MechEntityRegistry, grid: MechGridState, navigation: Mech
 			unit.attack_target_id = 0
 			if unit.order == &"attack":
 				unit.order = &"idle"
+		# An idle unit can fire from its position, but never leave its slot to
+		# chase or obtain LOS. Revalidate retained targets as well as new ones.
+		if target != null and unit.order == &"idle" and not _can_hit(unit, target, grid):
+			unit.attack_target_id = 0
+			unit.set_move_path(PackedVector2Array())
+			target = null
 		if target == null:
-			target = _nearest_enemy(unit, enemies)
+			target = _nearest_enemy(unit, enemies, grid)
 			if target != null:
 				unit.attack_target_id = target.entity_id
 				unit.set_move_path(PackedVector2Array())
@@ -180,7 +169,8 @@ func advance(registry: MechEntityRegistry, grid: MechGridState, navigation: Mech
 		if target != null:
 			if unit.order == &"attack":
 				unit.order_goal = target.position
-			if unit.position.distance_to(target.position) <= unit.unit_definition.attack_range and _line_clear(unit.position, target.position, grid):
+			if _can_hit(unit, target, grid):
+				unit.face_direction(target.position - unit.position)
 				unit.set_move_path(PackedVector2Array())
 				if unit.cooldown_ticks == 0:
 					target.hp = maxi(0, target.hp - unit.unit_definition.damage)
@@ -191,7 +181,7 @@ func advance(registry: MechEntityRegistry, grid: MechGridState, navigation: Mech
 						combat_noise.call(target.position)
 					if target.hp == 0:
 						dead.append(target.entity_id)
-			elif unit.repath_ticks == 0 and (not unit.has_move_order or unit.move_target.distance_to(target.position) > unit.unit_definition.attack_range or not _line_clear(unit.move_target, target.position, grid)):
+			elif unit.order != &"idle" and unit.repath_ticks == 0 and (not unit.has_move_order or unit.move_target.distance_to(target.position) > unit.unit_definition.attack_range or not _line_clear(unit.move_target, target.position, grid)):
 				unit.set_move_path(_attack_path(unit, target, registry, grid, navigation))
 				unit.repath_ticks = maxi(1, hz / 2)
 		else:
@@ -201,19 +191,25 @@ func advance(registry: MechEntityRegistry, grid: MechGridState, navigation: Mech
 	return dead
 
 
-func _nearest_enemy(unit: MechEntityState, buckets: Dictionary) -> MechEntityState:
+func _nearest_enemy(unit: MechEntityState, buckets: Dictionary, grid: MechGridState) -> MechEntityState:
 	var center := Vector2i(unit.position.floor())
-	var radius: int = ceili(unit.unit_definition.acquisition_range)
-	var best: float = unit.unit_definition.acquisition_range * unit.unit_definition.acquisition_range
+	var range_cells: float = unit.unit_definition.attack_range if unit.order == &"idle" else unit.unit_definition.acquisition_range
+	var radius: int = ceili(range_cells)
+	var best: float = range_cells * range_cells
 	var result: MechEntityState
 	for y: int in range(center.y - radius, center.y + radius + 1):
 		for x: int in range(center.x - radius, center.x + radius + 1):
 			for candidate: MechEntityState in buckets.get(Vector2i(x, y), []):
 				var distance: float = unit.position.distance_squared_to(candidate.position)
-				if candidate.hp > 0 and distance <= best:
+				if candidate.hp > 0 and distance <= best and (unit.order != &"idle" or _line_clear(unit.position, candidate.position, grid)):
 					best = distance
 					result = candidate
 	return result
+
+
+func _can_hit(unit: MechEntityState, target: MechEntityState, grid: MechGridState) -> bool:
+	var range_cells: float = unit.unit_definition.attack_range
+	return unit.position.distance_squared_to(target.position) <= range_cells * range_cells and _line_clear(unit.position, target.position, grid)
 
 
 func _line_clear(from: Vector2, to: Vector2, grid: MechGridState) -> bool:
@@ -248,12 +244,13 @@ func _attack_path(unit: MechEntityState, target: MechEntityState, registry: Mech
 func _resume_order_path(unit: MechEntityState, navigation: MechGridNavigation, hz: int) -> void:
 	if unit.position.distance_to(unit.order_goal) <= MechEntityState.ARRIVAL_TOLERANCE:
 		unit.order = &"idle"
+		unit.face_arrival()
 		return
 	if unit.repath_ticks > 0:
 		return
 	# An interrupted/empty route is not completion. Retry the original goal,
 	# including after displacement, without choosing a nearby substitute.
-	unit.set_move_path(navigation.find_path(unit.position, Vector2i(unit.order_goal.floor())))
+	unit.set_move_path(navigation.find_path_to_point(unit.position, unit.order_goal))
 	unit.repath_ticks = hz
 
 
@@ -263,7 +260,7 @@ func _repath_blocked(unit: MechEntityState, navigation: MechGridNavigation, hz: 
 	var goal: Vector2 = unit.move_target
 	if unit.order == &"move" or (unit.order == &"attack_move" and unit.attack_target_id == 0):
 		goal = unit.order_goal
-	var path: PackedVector2Array = navigation.find_path(unit.position, Vector2i(goal.floor()))
+	var path: PackedVector2Array = navigation.find_path_to_point(unit.position, goal)
 	if not path.is_empty():
 		unit.set_move_path(path)
 	unit.repath_ticks = hz

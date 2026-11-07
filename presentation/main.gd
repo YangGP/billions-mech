@@ -446,11 +446,12 @@ func _issue_unit_order(attack_move: bool) -> void:
 		return
 	var ids: Array[int] = _selected_units()
 	var cell: Vector2i = _mouse_cell()
+	var goal: Vector2 = MechIsoGeometry.unproject(_world.get_local_mouse_position())
 	if not ids.is_empty():
 		var target_id: int = _hit_entity(get_viewport().get_mouse_position(), true)
 		_commands.submit(MechCommand.new(MechCommand.Type.ISSUE_UNIT_ORDER, {
 			"ids": ids, "kind": &"attack" if target_id > 0 else (&"attack_move" if attack_move else &"move"),
-			"goal": Vector2(cell) + Vector2(0.5, 0.5), "target_id": target_id}))
+			"goal": goal, "target_id": target_id}))
 	else:
 		for entity: Dictionary in _state["entities"]:
 			if not entity["id"] in _selection.ids:
@@ -459,7 +460,7 @@ func _issue_unit_order(attack_move: bool) -> void:
 				_commands.submit(MechCommand.new(MechCommand.Type.SET_RALLY, {"factory_id": entity["id"], "cell": cell}))
 				break
 			elif entity["kind"] == &"probe":
-				_commands.submit(MechCommand.new(MechCommand.Type.MOVE_ENTITY, {"entity_id": entity["id"], "target": Vector2(cell) + Vector2(0.5, 0.5)}))
+				_commands.submit(MechCommand.new(MechCommand.Type.MOVE_ENTITY, {"entity_id": entity["id"], "target": goal}))
 	_attack_move_mode = false
 
 

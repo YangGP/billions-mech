@@ -24,4 +24,8 @@
 
 [视野迷雾实施与检查](../validation/m6-vision-fog.md) 记录 2026-11-07 接入的三态迷雾、视野与信息过滤、49 项行为检查及原生画面验证。
 
+[单位队列与朝向](../validation/formation-movement.md) 记录方向队列、稳定落点、单位朝向和实际采用的 MIT 编队模块；[直达路径检查](../validation/movement-paths.md) 记录路径引导与交互验收边界。
+
+[待命开火检查](../validation/idle-fire.md) 记录普通移动结束后只在射程内开火、不主动追击的规则与检查边界。
+
 旧设计稿和 M1–M4 实施流水已清理，仍有效的检查结果与待验项已汇总；旧版本从 Git 历史追溯。[旧原型资源](../archive/README.md) 仅保留非运行依赖的场景和素材。

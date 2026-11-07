@@ -110,6 +110,8 @@ func _draw() -> void:
 		var point: Vector2 = _project(entity["position"])
 		if entity.get("id", 0) in _selection_ids:
 			draw_arc(point, 23.0, 0.0, TAU, 36, CYAN, 2.0, true)
+			if entity.get("is_unit", false):
+				_draw_facing(point, entity.get("facing", Vector2.UP), CYAN)
 			var production: Dictionary = entity.get("production", {})
 			if not production.is_empty():
 				var rally: Vector2 = MechIsoGeometry.cell_center(production["rally"])
@@ -129,7 +131,7 @@ func _draw() -> void:
 		elif entity.get("is_unit", false):
 			_draw_sentinel(entity, point)
 		else:
-			_draw_probe(point)
+			_draw_probe(point, entity.get("facing", Vector2.UP))
 		if entity.get("shot_ticks", 0) > 0:
 			var target: Vector2 = _project(entity["shot_target"]) + Vector2(0, -20)
 			draw_line(point + Vector2(0, -24), target, Color("f0d594"), 2.0, true)
@@ -141,8 +143,12 @@ func _draw_sentinel(entity: Dictionary, point: Vector2) -> void:
 	var body := PackedVector2Array([point + Vector2(-12, -9), point + Vector2(-12, -29),
 		point + Vector2(0, -36), point + Vector2(12, -29), point + Vector2(12, -9), point])
 	draw_colored_polygon(body, Color("d8e0e4"))
-	draw_line(point + Vector2(-7, -25), point + Vector2(7, -25), CYAN, 3.0, true)
-	draw_line(point + Vector2(7, -18), point + Vector2(24, -26), Color("8d9ea9"), 5.0, true)
+	var direction: Vector2 = _project(entity.get("facing", Vector2.UP)).normalized()
+	var side := Vector2(-direction.y, direction.x)
+	var visor: Vector2 = point + Vector2(0, -25) + direction * 7.0
+	draw_line(visor - side * 5.0, visor + side * 5.0, CYAN, 3.0, true)
+	var weapon: Vector2 = point + Vector2(0, -21)
+	draw_line(weapon, weapon + direction * 25.0, Color("8d9ea9"), 5.0, true)
 	if entity["hp"] < entity["max_hp"] or entity["id"] in _selection_ids:
 		draw_rect(Rect2(point + Vector2(-18, -46), Vector2(36, 3)), Color("213540"))
 		draw_rect(Rect2(point + Vector2(-18, -46), Vector2(36.0 * float(entity["hp"]) / entity["max_hp"], 3)), CYAN)
@@ -200,6 +206,15 @@ func _draw_target(entity: Dictionary) -> void:
 	draw_arc(target, 14.0, 0.0, TAU, 32, CYAN, 1.5, true)
 	draw_line(target + Vector2(-20.0, 0.0), target + Vector2(20.0, 0.0), CYAN, 1.0, true)
 	draw_line(target + Vector2(0.0, -10.0), target + Vector2(0.0, 10.0), CYAN, 1.0, true)
+	if entity.get("has_arrival_facing", false) and entity.get("attack_target_id", 0) == 0:
+		_draw_facing(target, entity["arrival_facing"], Color(CYAN, 0.6))
+
+
+func _draw_facing(point: Vector2, facing: Vector2, color: Color) -> void:
+	var direction: Vector2 = _project(facing).normalized()
+	var side := Vector2(-direction.y, direction.x)
+	draw_colored_polygon(PackedVector2Array([point + direction * 31.0,
+		point + direction * 22.0 + side * 4.5, point + direction * 22.0 - side * 4.5]), color)
 
 
 func _draw_cursor() -> void:
@@ -318,13 +333,15 @@ func _draw_mainbrain(world_point: Vector2, footprint: Vector2i) -> void:
 	draw_set_transform(Vector2.ZERO)
 
 
-func _draw_probe(point: Vector2) -> void:
+func _draw_probe(point: Vector2, facing: Vector2 = Vector2.UP) -> void:
 	_draw_shadow(point, Vector2(24.0, 11.0))
 	draw_arc(point, 23.0, 0.0, TAU, 40, Color(0.45, 0.91, 0.82, 0.45), 1.0, true)
 	var body := PackedVector2Array([point + Vector2(0, -29), point + Vector2(14, -18), point + Vector2(10, -6), point + Vector2(-10, -6), point + Vector2(-14, -18)])
 	draw_colored_polygon(body, Color("d9f2ec"))
 	draw_line(point + Vector2(-7, -16), point + Vector2(7, -16), Color("173942"), 4.0, true)
 	draw_circle(point + Vector2(0, -17), 2.0, CYAN)
+	var direction: Vector2 = _project(facing).normalized()
+	draw_line(point + Vector2(0, -19), point + Vector2(0, -19) + direction * 16.0, CYAN, 2.0, true)
 
 
 func _draw_shadow(point: Vector2, radius: Vector2) -> void:

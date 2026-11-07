@@ -108,6 +108,12 @@ func execute_command(command: MechCommand) -> Dictionary:
 			if command.payload["paused"]:
 				_registry.suspend_motion()
 		MechCommand.Type.MOVE_ENTITY:
+			var mover: MechEntityState = _registry.get_entity(command.payload["entity_id"])
+			mover.order_goal = command.payload["target"]
+			mover.arrival_facing = mover.position.direction_to(mover.order_goal)
+			if mover.arrival_facing.is_zero_approx():
+				mover.arrival_facing = mover.facing
+			mover.has_arrival_facing = true
 			_registry.set_move_path(command.payload["entity_id"], result["path"])
 		MechCommand.Type.LOAD_SCENARIO:
 			configure(command.payload["settings"])
@@ -608,7 +614,9 @@ func _validate_move(payload: Dictionary) -> Dictionary:
 	var cell := Vector2i(target.floor())
 	if not _grid.is_walkable(cell):
 		return _reject("目标被障碍或建筑阻挡")
-	var path: PackedVector2Array = _navigation.find_path(_registry.position_of(entity_id), cell)
+	if not _grid.mobile_position_clear(target):
+		return _reject("目标过于贴近障碍，无法容纳单位")
+	var path: PackedVector2Array = _navigation.find_path_to_point(_registry.position_of(entity_id), target)
 	if path.is_empty():
 		return _reject("目标无法到达")
 	return {"ok": true, "reason": "", "path": path}
@@ -624,7 +632,7 @@ func _sync_navigation() -> void:
 		if not _grid.is_walkable(Vector2i(unit["position"].floor())):
 			_registry.stop(entity_id)
 		elif unit["has_order"]:
-			_registry.set_move_path(entity_id, _navigation.find_path(unit["position"], Vector2i(unit["target"].floor())))
+			_registry.set_move_path(entity_id, _navigation.find_path_to_point(unit["position"], unit["target"]))
 
 
 func _sync_vision() -> void:
