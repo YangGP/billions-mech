@@ -26,6 +26,9 @@ extends Resource
 @export_range(1.0, 3.0, 0.01) var wave_budget_growth: float = 1.6
 @export_range(1, 32, 1) var development_node_threshold: int = 8
 @export_range(2, 32, 1) var flank_wave_interval: int = 4
+## First-slice victory gate (development-plan M6): 0 = endless waves; otherwise
+## the director stops after this many waves and a cleared field wins.
+@export_range(0, 32, 1) var total_waves: int = 4
 ## Noise radii and infection conversion (values.md §13/§14).
 @export_range(1.0, 64.0, 1.0) var noise_radius_combat: float = 24.0
 @export_range(1.0, 64.0, 1.0) var noise_radius_construction: float = 12.0

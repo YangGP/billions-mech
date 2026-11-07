@@ -309,12 +309,12 @@ func advance_one_tick() -> void:
 	# Noise emitted last tick reaches wanderers this tick (combat during the
 	# units/enemies passes below lands next tick).
 	var noises: Array[Dictionary] = _threat.noises()
-	var dead: Array[int] = _units.advance(_registry, _grid, _navigation, _tick_rate, _vision)
-	for id: int in dead:
-		_remove_entity(id)
-	if not dead.is_empty():
-		_recompute_economy()
-		_sync_navigation()
+	# Shelter sources are gathered once per tick; the damage entry re-checks hp
+	# so a prototype killed by earlier fire stops shielding later hits.
+	var shelters: Array[MechEntityState] = _collect_shelter_sources()
+	var unit_result: Dictionary = _units.advance(_registry, _grid, _navigation, _tick_rate, _vision)
+	for hit: Dictionary in unit_result["enemy_hits"]:
+		_damage_enemy(hit["id"], hit["damage"], shelters)
 	var enemy_result: Dictionary = _enemies.advance(_registry, _grid, _navigation, _construction.all(), _tick_rate, noises, _vision)
 	for hit: Dictionary in enemy_result["building_hits"]:
 		damage_building(hit["id"], hit["damage"])
@@ -335,19 +335,8 @@ func advance_one_tick() -> void:
 	# unit-kill removal bookkeeping (grid release, economy, navigation).
 	_sync_vision()
 	var tower_hits: Array[Dictionary] = _towers.advance(_registry, _construction.all(), _tick_rate, _grid, _vision)
-	var tower_dead: Array[int] = []
 	for hit: Dictionary in tower_hits:
-		var target: MechEntityState = _registry.get_entity(hit["id"])
-		if target == null or target.hp <= 0:
-			continue
-		target.hp = maxi(0, target.hp - hit["damage"])
-		if target.hp == 0:
-			tower_dead.append(target.entity_id)
-	for id: int in tower_dead:
-		_remove_entity(id)
-	if not tower_dead.is_empty():
-		_recompute_economy()
-		_sync_navigation()
+		_damage_enemy(hit["id"], hit["damage"], shelters)
 	_registry.step(_clock.step_seconds(), _grid)
 	# Marching units hum: the expansion itself attracts wanderers (values.md §13).
 	_tick_counter += 1
@@ -355,14 +344,40 @@ func advance_one_tick() -> void:
 	for entity: MechEntityState in _registry.all():
 		if entity.team == 1 and entity.unit_definition != null and entity.has_move_order and (_tick_counter + entity.entity_id) % movement_noise_ticks == 0:
 			_threat.note_movement(entity.position)
+	_check_victory()
+
+
+## First-slice victory gate (development-plan M6): every scheduled wave has
+## released, no wave enemy remains and nobody is still fighting — wandering
+## stragglers alone do not hold the session open. Infection builders count as
+## wave enemies; the training ground never schedules waves.
+func _check_victory() -> void:
+	if _outcome != &"ongoing" or not _waves.exhausted():
+		return
+	for entity: MechEntityState in _registry.all():
+		if entity.team != 2 or entity.hp <= 0 or entity.enemy_definition == null:
+			continue
+		if entity.enemy_definition.marches_to_core or entity.order == &"engaged":
+			return
+	_outcome = &"victory"
+	_clock.set_paused(true)
+	_registry.suspend_motion()
+	print("[Billions Mech] session ended: victory; tick=", _clock.snapshot()["tick"])
+	# This runs at the very end of the tick, past every other emit; publish so
+	# the presentation layer opens the victory panel on this frame.
+	state_changed.emit()
 
 
 func snapshot() -> Dictionary:
 	var entities: Array[Dictionary] = []
+	var shelters: Array[MechEntityState] = _collect_shelter_sources()
 	for current: MechEntityState in _registry.all():
 		if current.team == 2 and not _vision.is_visible(current.position):
 			continue
-		entities.append(current.snapshot())
+		var entry: Dictionary = current.snapshot()
+		if current.team == 2 and current.enemy_definition != null and _sheltered_by(current, shelters) != null:
+			entry["sheltered"] = true
+		entities.append(entry)
 	for entity: Dictionary in entities:
 		var building: MechBuildingState = _construction.get_building(entity["id"])
 		if building != null:
@@ -388,7 +403,7 @@ func snapshot() -> Dictionary:
 		"catalog": _construction.catalog(_economy), "probe_id": _probe_id,
 		"mainbrain_id": _mainbrain_id, "generation": _generation,
 		"session": {"outcome": _outcome, "ended": session_ended(),
-			"reason": "主脑已被摧毁" if _outcome == &"defeat" else ""},
+			"reason": {"defeat": "主脑已被摧毁", "victory": "威胁已清除"}.get(String(_outcome), "")},
 		"threat": _waves.state(),
 		"alert": _alert.duplicate(),
 		"map_revision": _grid.revision(), "map_name": _map_definition.display_name}
@@ -514,6 +529,43 @@ func _remove_entity(id: int) -> void:
 	if _grid.occupant_at(Vector2i(entity.position.floor())) == id:
 		_grid.release(id)
 	_registry.remove(id)
+
+
+## Live shelter providers for this tick (prototype electromagnetic shelter,
+## waves-enemies.md §8.2); usually empty or a single prototype.
+func _collect_shelter_sources() -> Array[MechEntityState]:
+	var sources: Array[MechEntityState] = []
+	for entity: MechEntityState in _registry.all():
+		if entity.team == 2 and entity.hp > 0 and entity.enemy_definition != null and entity.enemy_definition.shelter_radius > 0.0:
+			sources.append(entity)
+	return sources
+
+
+## Single damage entry for enemies (unit and tower fire alike): applies the
+## shelter reduction once per hit, then settles deaths through the shared
+## removal path. Infection never fires here; it only covers player assets.
+func _damage_enemy(entity_id: int, damage: int, shelters: Array[MechEntityState]) -> void:
+	var entity: MechEntityState = _registry.get_entity(entity_id)
+	if entity == null or entity.hp <= 0:
+		return
+	var source: MechEntityState = _sheltered_by(entity, shelters)
+	if source != null:
+		damage = maxi(1, ceili(damage * (1.0 - source.enemy_definition.shelter_reduction)))
+	entity.hp = maxi(0, entity.hp - damage)
+	if entity.hp > 0:
+		return
+	_remove_entity(entity_id)
+	_recompute_economy()
+	_sync_navigation()
+
+
+## The live shelter provider covering this entity, if any (first match wins;
+## overlapping shelters never stack).
+func _sheltered_by(entity: MechEntityState, shelters: Array[MechEntityState]) -> MechEntityState:
+	for source: MechEntityState in shelters:
+		if source.hp > 0 and entity.position.distance_to(source.position) <= source.enemy_definition.shelter_radius:
+			return source
+	return null
 
 
 func preview_footprint(origin: Vector2i, footprint: Vector2i) -> Dictionary:

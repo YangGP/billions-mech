@@ -8,6 +8,9 @@ extends RefCounted
 ## or building HP drift. Enemies are not native RVO agents; stepping is guarded
 ## here and crowd separation comes from the vendored Steering over grid-bucket
 ## neighbours. Enemies attacking buildings crowd tighter (partial overlap).
+## Wall passers (prototype, passes_walls) march on a second field that omits
+## armored walls and skip wall collision, so they walk straight over them at
+## normal speed (waves-enemies.md §8.2); other buildings and terrain still block.
 
 const FLOW_WEIGHT: float = 1.0
 const SEPARATION_WEIGHT: float = 0.6
@@ -23,7 +26,12 @@ const SHUFFLE_DECISION_SECONDS: float = 4.0
 const SHUFFLE_RADIUS: int = 5
 const SHUFFLE_ATTEMPTS: int = 6
 
+const WALL_ID: StringName = &"armored_wall"
+
 var _field := MechMarchField.new()
+## Prototype march field: identical to _field but armored walls contribute no
+## building cost, so the flow leads wall passers straight over them.
+var _proto_field := MechMarchField.new()
 var _goal: Vector2i = Vector2i.ZERO
 var _field_revision: int = -1
 var _field_hp: Dictionary = {}
@@ -59,6 +67,11 @@ func _refresh_field(grid: MechGridState, buildings: Array[MechBuildingState], hz
 
 func _rebuild_field(grid: MechGridState, buildings: Array[MechBuildingState]) -> void:
 	_field.rebuild(grid, _goal, buildings)
+	var non_walls: Array[MechBuildingState] = []
+	for building: MechBuildingState in buildings:
+		if building.definition.building_id != WALL_ID:
+			non_walls.append(building)
+	_proto_field.rebuild(grid, _goal, non_walls)
 	_field_revision = grid.revision()
 	_field_hp.clear()
 	for building: MechBuildingState in buildings:
@@ -83,14 +96,12 @@ func create(registry: MechEntityRegistry, rules: MechEnemyDefinition, position: 
 func advance(registry: MechEntityRegistry, grid: MechGridState, navigation: MechGridNavigation, buildings: Array[MechBuildingState], hz: int, noises: Array[Dictionary], vision: MechVisionSystem) -> Dictionary:
 	var result: Dictionary = {"dead_units": [], "building_hits": []}
 	_refresh_field(grid, buildings, hz)
-	var building_ids: Dictionary = {}
 	var buildings_by_id: Dictionary = {}
 	var building_cells: Dictionary = {}
 	var active_regions: Dictionary = {}
 	for building: MechBuildingState in buildings:
 		if building.hp <= 0:
 			continue
-		building_ids[building.entity_id] = true
 		buildings_by_id[building.entity_id] = building
 		for y: int in range(building.definition.footprint.y):
 			for x: int in range(building.definition.footprint.x):
@@ -125,7 +136,7 @@ func advance(registry: MechEntityRegistry, grid: MechGridState, navigation: Mech
 		if enemy.fog_coarse and not coarse:
 			enemy.repath_ticks = 0
 		enemy.fog_coarse = coarse
-		_advance_one(enemy, registry, grid, navigation, buildings_by_id, building_ids,
+		_advance_one(enemy, registry, grid, navigation, buildings_by_id,
 			building_cells, unit_buckets, enemy_buckets, noises, tick, dt, hz, result, coarse)
 	return result
 
@@ -144,7 +155,7 @@ func _mark_active_region(cell: Vector2i, regions: Dictionary) -> void:
 
 
 func _advance_one(enemy: MechEntityState, registry: MechEntityRegistry, grid: MechGridState,
-		navigation: MechGridNavigation, buildings_by_id: Dictionary, building_ids: Dictionary,
+		navigation: MechGridNavigation, buildings_by_id: Dictionary,
 		building_cells: Dictionary, unit_buckets: Dictionary, enemy_buckets: Dictionary,
 		noises: Array[Dictionary], tick: int, dt: float, hz: int, result: Dictionary, coarse: bool) -> void:
 	var rules: MechEnemyDefinition = enemy.enemy_definition
@@ -159,7 +170,7 @@ func _advance_one(enemy: MechEntityState, registry: MechEntityRegistry, grid: Me
 	var stride: int = FOG_DECISION_STRIDE if coarse and not provoked else 1
 	var scan_due: bool = provoked or (tick + enemy.entity_id) % (VISION_SCAN_INTERVAL * stride) == 0
 	if enemy.order == &"engaged":
-		_advance_engaged(enemy, registry, grid, navigation, buildings_by_id, building_ids,
+		_advance_engaged(enemy, registry, grid, navigation, buildings_by_id,
 			building_cells, unit_buckets, enemy_buckets, dt, hz, result)
 		return
 	if scan_due:
@@ -167,15 +178,15 @@ func _advance_one(enemy: MechEntityState, registry: MechEntityRegistry, grid: Me
 		if target > 0:
 			_engage(enemy, target)
 	if enemy.order == &"engaged":
-		_advance_engaged(enemy, registry, grid, navigation, buildings_by_id, building_ids,
+		_advance_engaged(enemy, registry, grid, navigation, buildings_by_id,
 			building_cells, unit_buckets, enemy_buckets, dt, hz, result)
 		return
 	# Wanderers never march to the core: noise convergence or TAB-style shuffling.
 	if not enemy.enemy_definition.marches_to_core:
 		var decision_due: bool = (tick + enemy.entity_id) % stride == 0
-		_advance_wandering(enemy, noises, grid, navigation, enemy_buckets, building_ids, buildings_by_id, dt, decision_due, stride)
+		_advance_wandering(enemy, noises, grid, navigation, enemy_buckets, buildings_by_id, dt, decision_due, stride)
 		return
-	_advance_marching(enemy, grid, enemy_buckets, building_ids, dt)
+	_advance_marching(enemy, grid, enemy_buckets, buildings_by_id, dt)
 
 
 ## Idle wanderer behaviour: walk toward the loudest heard noise ("闻声缓慢聚拢")
@@ -183,10 +194,10 @@ func _advance_one(enemy: MechEntityState, registry: MechEntityRegistry, grid: Me
 ## cadence; the current walk always finishes, so losing a noise source leaves
 ## them lingering wherever they stopped.
 func _advance_wandering(enemy: MechEntityState, noises: Array[Dictionary], grid: MechGridState,
-		navigation: MechGridNavigation, enemy_buckets: Dictionary, building_ids: Dictionary,
-		buildings_by_id: Dictionary, dt: float, decision_due: bool, stride: int) -> void:
+		navigation: MechGridNavigation, enemy_buckets: Dictionary, buildings_by_id: Dictionary,
+		dt: float, decision_due: bool, stride: int) -> void:
 	if not decision_due:
-		_walk_wanderer(enemy, grid, enemy_buckets, building_ids, dt)
+		_walk_wanderer(enemy, grid, enemy_buckets, buildings_by_id, dt)
 		return
 	var heard: Dictionary = {}
 	var best_radius: float = 0.0
@@ -229,10 +240,10 @@ func _advance_wandering(enemy: MechEntityState, noises: Array[Dictionary], grid:
 			if not path.is_empty():
 				enemy.order_goal = Vector2(shuffle_target) + Vector2(0.5, 0.5)
 				enemy.set_move_path(path)
-	_walk_wanderer(enemy, grid, enemy_buckets, building_ids, dt)
+	_walk_wanderer(enemy, grid, enemy_buckets, buildings_by_id, dt)
 
 
-func _walk_wanderer(enemy: MechEntityState, grid: MechGridState, enemy_buckets: Dictionary, building_ids: Dictionary, dt: float) -> void:
+func _walk_wanderer(enemy: MechEntityState, grid: MechGridState, enemy_buckets: Dictionary, buildings_by_id: Dictionary, dt: float) -> void:
 	# Movement, collision, cooldowns and damage retain the normal tick duration.
 	if not enemy.has_move_order:
 		return
@@ -245,7 +256,7 @@ func _walk_wanderer(enemy: MechEntityState, grid: MechGridState, enemy_buckets: 
 	var direction: Vector2 = enemy.position.direction_to(enemy.next_waypoint())
 	var separation: Vector2 = Steering.separation(enemy.position, _separation_neighbors(enemy, enemy_buckets), SEPARATION_RADIUS)
 	var blended: Vector2 = Steering.combine(velocity, separation, FLOW_WEIGHT, SEPARATION_WEIGHT, speed)
-	_guarded_step(enemy, blended, direction, speed, dt, grid, building_ids)
+	_guarded_step(enemy, blended, direction, speed, dt, grid, buildings_by_id)
 	enemy.finish_path_if_arrived()
 
 
@@ -258,20 +269,23 @@ func _shuffle_cell(enemy: MechEntityState, grid: MechGridState) -> Vector2i:
 	return Vector2i(-1, -1)
 
 
-func _advance_marching(enemy: MechEntityState, grid: MechGridState, enemy_buckets: Dictionary, building_ids: Dictionary, dt: float) -> void:
+func _advance_marching(enemy: MechEntityState, grid: MechGridState, enemy_buckets: Dictionary, buildings_by_id: Dictionary, dt: float) -> void:
 	var cell: Vector2i = Vector2i(enemy.position.floor())
-	var flow_dir: Vector2 = _field.flow_at(cell)
+	# Wall passers march on the wall-free field; everyone else follows the
+	# standard gap-chewing flow.
+	var field: MechMarchField = _proto_field if enemy.enemy_definition.passes_walls else _field
+	var flow_dir: Vector2 = field.flow_at(cell)
 	if flow_dir == Vector2.ZERO:
 		return
 	var speed: float = enemy.enemy_definition.move_speed / grid.movement_weight(cell)
 	var desired: Vector2 = Steering.desired_velocity(flow_dir, speed)
 	var separation: Vector2 = Steering.separation(enemy.position, _separation_neighbors(enemy, enemy_buckets), SEPARATION_RADIUS)
 	var velocity: Vector2 = Steering.combine(desired, separation, FLOW_WEIGHT, SEPARATION_WEIGHT, speed)
-	_guarded_step(enemy, velocity, flow_dir, speed, dt, grid, building_ids)
+	_guarded_step(enemy, velocity, flow_dir, speed, dt, grid, buildings_by_id)
 
 
 func _advance_engaged(enemy: MechEntityState, registry: MechEntityRegistry, grid: MechGridState,
-		navigation: MechGridNavigation, buildings_by_id: Dictionary, building_ids: Dictionary,
+		navigation: MechGridNavigation, buildings_by_id: Dictionary,
 		building_cells: Dictionary, unit_buckets: Dictionary, enemy_buckets: Dictionary,
 		dt: float, hz: int, result: Dictionary) -> void:
 	var target_id: int = enemy.attack_target_id
@@ -320,12 +334,12 @@ func _advance_engaged(enemy: MechEntityState, registry: MechEntityRegistry, grid
 		return
 	# Enemies closing on a building may partially overlap so a crowd can all reach it.
 	var separation_radius: float = CROWD_SEPARATION_RADIUS if target_building != null else SEPARATION_RADIUS
-	_chase(enemy, grid, navigation, target_building, target_unit, enemy_buckets, building_ids, dt, separation_radius)
+	_chase(enemy, grid, navigation, target_building, target_unit, enemy_buckets, buildings_by_id, dt, separation_radius)
 
 
 func _chase(enemy: MechEntityState, grid: MechGridState, navigation: MechGridNavigation,
 		target_building: MechBuildingState, target_unit: MechEntityState,
-		enemy_buckets: Dictionary, building_ids: Dictionary, dt: float, separation_radius: float) -> void:
+		enemy_buckets: Dictionary, buildings_by_id: Dictionary, dt: float, separation_radius: float) -> void:
 	if enemy.repath_ticks == 0 and not enemy.has_move_order:
 		var chase_cell := Vector2i(-1, -1)
 		if target_building != null:
@@ -355,7 +369,7 @@ func _chase(enemy: MechEntityState, grid: MechGridState, navigation: MechGridNav
 	var direction: Vector2 = enemy.position.direction_to(enemy.next_waypoint())
 	var separation: Vector2 = Steering.separation(enemy.position, _separation_neighbors(enemy, enemy_buckets), separation_radius)
 	var blended: Vector2 = Steering.combine(velocity, separation, FLOW_WEIGHT, SEPARATION_WEIGHT, speed)
-	_guarded_step(enemy, blended, direction, speed, dt, grid, building_ids)
+	_guarded_step(enemy, blended, direction, speed, dt, grid, buildings_by_id)
 	enemy.finish_path_if_arrived()
 
 
@@ -423,12 +437,14 @@ func _separation_neighbors(enemy: MechEntityState, enemy_buckets: Dictionary) ->
 
 ## Escalating step guards adapted from the Crusade follower idea: blended step,
 ## direction-only step, then a cardinal slide toward lower integration cost.
-## A building blocker at any level engages that building instead of moving.
+## A building blocker at any level engages that building instead of moving;
+## armored walls do not stop wall passers (prototype, waves-enemies.md §8.2).
 func _guarded_step(enemy: MechEntityState, velocity: Vector2, direction: Vector2, speed: float,
-		dt: float, grid: MechGridState, building_ids: Dictionary) -> void:
+		dt: float, grid: MechGridState, buildings_by_id: Dictionary) -> void:
 	if velocity.length_squared() <= 0.0:
 		return
-	var blocker: Dictionary = _blocker_at(enemy.position + velocity * dt, grid, building_ids)
+	var ignore_walls: bool = enemy.enemy_definition.passes_walls
+	var blocker: Dictionary = _blocker_at(enemy.position + velocity * dt, grid, buildings_by_id, ignore_walls)
 	if blocker["building"] > 0:
 		_engage(enemy, blocker["building"])
 		return
@@ -437,19 +453,21 @@ func _guarded_step(enemy: MechEntityState, velocity: Vector2, direction: Vector2
 		return
 	var direct: Vector2 = Steering.desired_velocity(direction, speed) * dt
 	if direct.length_squared() > 0.0:
-		blocker = _blocker_at(enemy.position + direct, grid, building_ids)
+		blocker = _blocker_at(enemy.position + direct, grid, buildings_by_id, ignore_walls)
 		if blocker["building"] > 0:
 			_engage(enemy, blocker["building"])
 			return
 		if not blocker["blocked"]:
 			enemy.position += direct
 			return
-	_slide_step(enemy, direction, speed, dt, grid, building_ids)
+	_slide_step(enemy, direction, speed, dt, grid, buildings_by_id)
 
 
 func _slide_step(enemy: MechEntityState, direction: Vector2, speed: float, dt: float,
-		grid: MechGridState, building_ids: Dictionary) -> void:
+		grid: MechGridState, buildings_by_id: Dictionary) -> void:
 	var cell: Vector2i = Vector2i(enemy.position.floor())
+	var field: MechMarchField = _proto_field if enemy.enemy_definition.passes_walls else _field
+	var ignore_walls: bool = enemy.enemy_definition.passes_walls
 	var step_x: int = int(sign(direction.x))
 	var step_y: int = int(sign(direction.y))
 	var best_position: Vector2 = enemy.position
@@ -459,7 +477,7 @@ func _slide_step(enemy: MechEntityState, direction: Vector2, speed: float, dt: f
 		if offset == Vector2i.ZERO:
 			continue
 		var neighbour: Vector2i = cell + offset
-		var cost: float = _field.cost_at(neighbour)
+		var cost: float = field.cost_at(neighbour)
 		if not is_finite(cost) or cost >= best_cost and found:
 			continue
 		var center: Vector2 = Vector2(neighbour) + Vector2(0.5, 0.5)
@@ -467,7 +485,7 @@ func _slide_step(enemy: MechEntityState, direction: Vector2, speed: float, dt: f
 		if to_center.length_squared() <= 0.0:
 			continue
 		var candidate: Vector2 = enemy.position + to_center.normalized() * minf(speed * dt, to_center.length())
-		var blocker: Dictionary = _blocker_at(candidate, grid, building_ids)
+		var blocker: Dictionary = _blocker_at(candidate, grid, buildings_by_id, ignore_walls)
 		if blocker["building"] > 0:
 			_engage(enemy, blocker["building"])
 			return
@@ -481,7 +499,8 @@ func _slide_step(enemy: MechEntityState, direction: Vector2, speed: float, dt: f
 
 ## Circle-body check mirroring grid mobile rules; classifies the blocker so the
 ## caller can engage buildings. Non-building occupants behave like static walls.
-func _blocker_at(point: Vector2, grid: MechGridState, building_ids: Dictionary) -> Dictionary:
+## Wall passers treat armored-wall cells as open ground (normal-speed crossing).
+func _blocker_at(point: Vector2, grid: MechGridState, buildings_by_id: Dictionary, ignore_walls: bool = false) -> Dictionary:
 	if not grid.point_inside(point):
 		return {"blocked": true, "building": 0}
 	var radius: float = MechGridState.MOBILE_RADIUS
@@ -494,10 +513,21 @@ func _blocker_at(point: Vector2, grid: MechGridState, building_ids: Dictionary) 
 			var solid_terrain: bool = occupant == 0 and grid.terrain_at(cell) == MechGridState.Terrain.OBSTACLE
 			if (occupant == 0 and not solid_terrain) or grid.is_pass_through(cell):
 				continue
-			var closest := point.clamp(Vector2(cell), Vector2(cell + Vector2i.ONE))
-			if point.distance_squared_to(closest) < radius * radius:
-				return {"blocked": true, "building": occupant if occupant > 0 and building_ids.has(occupant) else 0}
+			if occupant > 0 and buildings_by_id.has(occupant):
+				var blocking: MechBuildingState = buildings_by_id[occupant]
+				if ignore_walls and blocking.definition.building_id == WALL_ID:
+					continue
+				if _circle_hits_cell(point, cell, radius):
+					return {"blocked": true, "building": occupant}
+				continue
+			if _circle_hits_cell(point, cell, radius):
+				return {"blocked": true, "building": 0}
 	return {"blocked": false, "building": 0}
+
+
+func _circle_hits_cell(point: Vector2, cell: Vector2i, radius: float) -> bool:
+	var closest := point.clamp(Vector2(cell), Vector2(cell + Vector2i.ONE))
+	return point.distance_squared_to(closest) < radius * radius
 
 
 func _building_in_range(enemy: MechEntityState, building: MechBuildingState, attack_range: float) -> bool:

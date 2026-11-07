@@ -168,6 +168,9 @@ func _draw_practice_target(entity: Dictionary, point: Vector2) -> void:
 
 
 func _draw_enemy(entity: Dictionary, point: Vector2) -> void:
+	if entity.get("enemy_id", &"") == &"prototype":
+		_draw_prototype(entity, point)
+		return
 	_draw_shadow(point, Vector2(16, 8))
 	var body := PackedVector2Array([point + Vector2(-10, -8), point + Vector2(-10, -24),
 		point + Vector2(0, -32), point + Vector2(10, -24), point + Vector2(10, -8), point])
@@ -176,6 +179,32 @@ func _draw_enemy(entity: Dictionary, point: Vector2) -> void:
 	draw_line(point + Vector2(-6, -13), point + Vector2(6, -13), Color("7a2e28"), 3.0, true)
 	draw_rect(Rect2(point + Vector2(-16, -42), Vector2(32, 3)), Color("213540"))
 	draw_rect(Rect2(point + Vector2(-16, -42), Vector2(32.0 * float(entity["hp"]) / entity["max_hp"], 3)), Color("f27c78"))
+	if entity.get("sheltered", false):
+		_draw_shelter_mark(point)
+
+
+## Prototype: a distinct heavy silhouette so "focus-fire it" reads at a glance
+## (waves-enemies.md §8.2); it also carries its own shelter aura marker.
+func _draw_prototype(entity: Dictionary, point: Vector2) -> void:
+	_draw_shadow(point, Vector2(26, 13))
+	var body := PackedVector2Array([point + Vector2(-18, -6), point + Vector2(-18, -34),
+		point + Vector2(0, -48), point + Vector2(18, -34), point + Vector2(18, -6), point])
+	draw_colored_polygon(body, Color("6e5a78"))
+	draw_colored_polygon(PackedVector2Array([point + Vector2(-11, -28), point + Vector2(-11, -40),
+		point + Vector2(0, -44), point + Vector2(11, -40), point + Vector2(11, -28)]), Color("4a3a55"))
+	draw_line(point + Vector2(-8, -34), point + Vector2(8, -34), Color("c9a0e8"), 3.0, true)
+	draw_line(point + Vector2(-8, -24), point + Vector2(8, -24), Color("c9a0e8"), 3.0, true)
+	draw_line(point + Vector2(-8, -14), point + Vector2(8, -14), Color("c9a0e8"), 3.0, true)
+	draw_rect(Rect2(point + Vector2(-24, -58), Vector2(48, 4)), Color("213540"))
+	draw_rect(Rect2(point + Vector2(-24, -58), Vector2(48.0 * float(entity["hp"]) / entity["max_hp"], 4)), Color("c9a0e8"))
+	if entity.get("sheltered", false):
+		_draw_shelter_mark(point)
+
+
+## Enemies under an active shelter get a faint ring so the 50% reduction is
+## visible before the player commits fire.
+func _draw_shelter_mark(point: Vector2) -> void:
+	draw_arc(point + Vector2(0, -10), 20.0, PI * 0.15, PI * 0.85, 16, Color("c9a0e8", 0.55), 2.0, true)
 
 
 func _draw_minerals() -> void:

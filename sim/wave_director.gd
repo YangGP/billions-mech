@@ -6,7 +6,9 @@ extends RefCounted
 ## release: each wave streams in from the edge band (outside the player's view)
 ## across a release window, entries ordered and staggered evenly. Composition is
 ## act-one: builders fill the budget, one prototype joins from WAVE 3. Spawns are
-## returned as requests; MechEnemySystem owns entity creation.
+## returned as requests; MechEnemySystem owns entity creation. With a positive
+## total_waves the director stops scheduling after that wave (first-slice
+## victory gate); 0 keeps the endless act loop.
 
 const NODE_ID: StringName = &"compute_node"
 const PROTOTYPE_FROM_WAVE: int = 3
@@ -27,6 +29,7 @@ var _wave_interval_ticks: int = 18000
 var _release_window_ticks: int = 9000
 var _first_wave_budget: float = 25.0
 var _budget_growth: float = 1.6
+var _total_waves: int = 0
 var _development_nodes: int = 8
 var _flank_every: int = 4
 var _tier_label: String = ""
@@ -54,6 +57,7 @@ func configure(settings: MechFoundationSettings) -> String:
 	_release_window_ticks = maxi(1, ceili(settings.wave_release_seconds * settings.simulation_hz))
 	_first_wave_budget = maxf(1.0, settings.first_wave_budget)
 	_budget_growth = maxf(1.0, settings.wave_budget_growth)
+	_total_waves = maxi(0, settings.total_waves)
 	_development_nodes = maxi(1, settings.development_node_threshold)
 	_flank_every = maxi(2, settings.flank_wave_interval)
 	return ""
@@ -103,7 +107,14 @@ func advance(grid: MechGridState, buildings: Array[MechBuildingState]) -> Array[
 
 func state() -> Dictionary:
 	return {"active": _active, "phase": _phase, "wave_index": _wave_index,
-		"edge": _edge, "edge_name": _edge_name, "tier": _tier_label}
+		"edge": _edge, "edge_name": _edge_name, "tier": _tier_label,
+		"total_waves": _total_waves, "exhausted": exhausted()}
+
+
+## First-slice victory gate (development-plan M6): every scheduled wave has
+## queued and its streaming release has fully drained.
+func exhausted() -> bool:
+	return _phase == &"done" and _pending.is_empty()
 
 
 func _announce() -> void:
@@ -150,6 +161,10 @@ func _queue_wave() -> void:
 	_wave_index = wave_number
 	_phase = &"active"
 	_tick_counter = 0
+	# First-slice victory gate: once the last scheduled wave has queued, the
+	# director goes quiet for good; the drained pending list finishes the wave.
+	if _total_waves > 0 and _wave_index >= _total_waves:
+		_phase = &"done"
 
 
 func _operating_nodes(buildings: Array[MechBuildingState]) -> int:

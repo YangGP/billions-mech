@@ -18,6 +18,7 @@ signal minimap_focus_requested(world_position: Vector2)
 const INK := Color("d5e6eb")
 const MUTED := Color("819ca9")
 const ACCENT := Color("72e9d0")
+const WIN := Color("8fe08f")
 const BUILD_IDS: Array[StringName] = [&"compute_node", &"armored_wall", &"sentry_tower", &"mining_station", &"assembly_plant"]
 const SHORTCUTS: Array[String] = ["Q", "W", "E", "", ""]
 
@@ -160,10 +161,14 @@ func present_state(state: Dictionary) -> void:
 	if _session_ended:
 		_pending_demolish = 0
 		_dialog.hide()
-		_state_label.text = "防守失败 · 本局结束"
-		_state_label.modulate = Color("f27c78")
+		var victory: bool = state["session"]["outcome"] == &"victory"
+		_state_label.text = "防守胜利 · 本局结束" if victory else "防守失败 · 本局结束"
+		_state_label.modulate = WIN if victory else Color("f27c78")
 		_pause_button.text = "本局已结束"
-		$Root/SessionResult/Details.text = "%s\n坚持了 %02d:%02d · 战场已停止\n可继续查看战场，或开始新的一局。" % [state["session"]["reason"], int(seconds / 60.0), int(fmod(seconds, 60.0))]
+		$Root/SessionResult/Title.text = "防守胜利" if victory else "防守失败"
+		$Root/SessionResult/Title.add_theme_color_override("font_color", WIN if victory else Color("f27c78"))
+		var summary: String = "威胁已清除，幕一防线守住了" if victory else "%s" % state["session"]["reason"]
+		$Root/SessionResult/Details.text = "%s\n坚守了 %02d:%02d · 战场已停止\n可继续查看战场，或开始新的一局。" % [summary, int(seconds / 60.0), int(fmod(seconds, 60.0))]
 		$Root/SessionResult/Scenario.text = "进入训练场" if state["scenario"] == "标准开局" else "返回标准开局"
 	var economy: Dictionary = state["economy"]
 	_coins_label.text = "算力币  %d   +%d/分钟" % [economy["coins"], economy["income_rate"]]

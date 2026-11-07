@@ -602,7 +602,10 @@ func _publish_state() -> void:
 		_cancel_selection_drag()
 		_cancel_build()
 		_attack_move_mode = false
-		_hud.feedback("主脑已被摧毁，本局结束。可查看战场或重新开始。", true)
+		if state["session"]["outcome"] == &"victory":
+			_hud.feedback("威胁已清除，防守胜利。可查看战场或重新开始。", true)
+		else:
+			_hud.feedback("主脑已被摧毁，本局结束。可查看战场或重新开始。", true)
 	_last_session_ended = ended
 
 

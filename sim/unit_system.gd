@@ -1,6 +1,8 @@
 class_name MechUnitSystem
 extends RefCounted
 ## Player orders and the M4 static-target combat loop. No scene dependencies.
+## Enemy hits return as results; SimCore applies damage so the prototype's
+## electromagnetic shelter funnels through one entry point.
 
 ## Combat-level noise emitter (set by SimCore); fired at each shot's impact point.
 var combat_noise: Callable = Callable()
@@ -115,8 +117,8 @@ func spawn(building: MechBuildingState, rally: Vector2i, rules: MechUnitDefiniti
 	return true
 
 
-func advance(registry: MechEntityRegistry, grid: MechGridState, navigation: MechGridNavigation, hz: int, vision: MechVisionSystem) -> Array[int]:
-	var dead: Array[int] = []
+func advance(registry: MechEntityRegistry, grid: MechGridState, navigation: MechGridNavigation, hz: int, vision: MechVisionSystem) -> Dictionary:
+	var enemy_hits: Array[Dictionary] = []
 	var enemies: Dictionary[Vector2i, Array] = {}
 	for entity: MechEntityState in registry.all():
 		if entity.team == 2 and entity.hp > 0 and vision.is_visible(entity.position):
@@ -173,14 +175,12 @@ func advance(registry: MechEntityRegistry, grid: MechGridState, navigation: Mech
 				unit.face_direction(target.position - unit.position)
 				unit.set_move_path(PackedVector2Array())
 				if unit.cooldown_ticks == 0:
-					target.hp = maxi(0, target.hp - unit.unit_definition.damage)
+					enemy_hits.append({"id": target.entity_id, "damage": unit.unit_definition.damage})
 					unit.cooldown_ticks = maxi(1, ceili(unit.unit_definition.attack_seconds * hz))
 					unit.shot_ticks = maxi(1, ceili(0.1 * hz))
 					unit.shot_target = target.position
 					if combat_noise.is_valid():
 						combat_noise.call(target.position)
-					if target.hp == 0:
-						dead.append(target.entity_id)
 			elif unit.order != &"idle" and unit.repath_ticks == 0 and (not unit.has_move_order or unit.move_target.distance_to(target.position) > unit.unit_definition.attack_range or not _line_clear(unit.move_target, target.position, grid)):
 				unit.set_move_path(_attack_path(unit, target, registry, grid, navigation))
 				unit.repath_ticks = maxi(1, hz / 2)
@@ -188,7 +188,7 @@ func advance(registry: MechEntityRegistry, grid: MechGridState, navigation: Mech
 			if unit.order == &"attack_move" and not unit.has_move_order:
 				_resume_order_path(unit, navigation, hz)
 		_repath_blocked(unit, navigation, hz)
-	return dead
+	return {"enemy_hits": enemy_hits}
 
 
 func _nearest_enemy(unit: MechEntityState, buckets: Dictionary, grid: MechGridState) -> MechEntityState:
