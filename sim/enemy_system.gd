@@ -32,6 +32,8 @@ var _field := MechMarchField.new()
 ## Prototype march field: identical to _field but armored walls contribute no
 ## building cost, so the flow leads wall passers straight over them.
 var _proto_field := MechMarchField.new()
+var _proto_navigation := MechGridNavigation.new()
+var _wall_ids: Dictionary = {}
 var _goal: Vector2i = Vector2i.ZERO
 var _field_revision: int = -1
 var _field_hp: Dictionary = {}
@@ -68,10 +70,14 @@ func _refresh_field(grid: MechGridState, buildings: Array[MechBuildingState], hz
 func _rebuild_field(grid: MechGridState, buildings: Array[MechBuildingState]) -> void:
 	_field.rebuild(grid, _goal, buildings)
 	var non_walls: Array[MechBuildingState] = []
+	_wall_ids.clear()
 	for building: MechBuildingState in buildings:
 		if building.definition.building_id != WALL_ID:
 			non_walls.append(building)
+		else:
+			_wall_ids[building.entity_id] = true
 	_proto_field.rebuild(grid, _goal, non_walls)
+	_proto_navigation.rebuild(grid, _wall_ids)
 	_field_revision = grid.revision()
 	_field_hp.clear()
 	for building: MechBuildingState in buildings:
@@ -98,6 +104,7 @@ func advance(registry: MechEntityRegistry, grid: MechGridState, navigation: Mech
 	_refresh_field(grid, buildings, hz)
 	var buildings_by_id: Dictionary = {}
 	var building_cells: Dictionary = {}
+	var non_wall_cells: Dictionary = {}
 	var active_regions: Dictionary = {}
 	for building: MechBuildingState in buildings:
 		if building.hp <= 0:
@@ -106,6 +113,8 @@ func advance(registry: MechEntityRegistry, grid: MechGridState, navigation: Mech
 		for y: int in range(building.definition.footprint.y):
 			for x: int in range(building.definition.footprint.x):
 				building_cells[building.origin + Vector2i(x, y)] = building.entity_id
+				if building.definition.building_id != WALL_ID:
+					non_wall_cells[building.origin + Vector2i(x, y)] = building.entity_id
 				_mark_active_region(building.origin + Vector2i(x, y), active_regions)
 	var unit_buckets: Dictionary = {}
 	var enemy_buckets: Dictionary = {}
@@ -136,8 +145,9 @@ func advance(registry: MechEntityRegistry, grid: MechGridState, navigation: Mech
 		if enemy.fog_coarse and not coarse:
 			enemy.repath_ticks = 0
 		enemy.fog_coarse = coarse
-		_advance_one(enemy, registry, grid, navigation, buildings_by_id,
-			building_cells, unit_buckets, enemy_buckets, noises, tick, dt, hz, result, coarse)
+		var passes_walls: bool = enemy.enemy_definition.passes_walls
+		_advance_one(enemy, registry, grid, _proto_navigation if passes_walls else navigation, buildings_by_id,
+			non_wall_cells if passes_walls else building_cells, unit_buckets, enemy_buckets, noises, tick, dt, hz, result, coarse)
 	return result
 
 
@@ -249,7 +259,7 @@ func _walk_wanderer(enemy: MechEntityState, grid: MechGridState, enemy_buckets: 
 		return
 	var cell: Vector2i = Vector2i(enemy.position.floor())
 	var speed: float = enemy.enemy_definition.move_speed / grid.movement_weight(cell)
-	var velocity: Vector2 = enemy.preferred_velocity(speed, dt, grid.mobile_segment_clear)
+	var velocity: Vector2 = enemy.preferred_velocity(speed, dt, grid.mobile_segment_clear.bind(_wall_ids if enemy.enemy_definition.passes_walls else {}))
 	if velocity == Vector2.ZERO:
 		enemy.finish_path_if_arrived()
 		return
@@ -347,7 +357,7 @@ func _chase(enemy: MechEntityState, grid: MechGridState, navigation: MechGridNav
 		elif target_unit != null:
 			chase_cell = Vector2i(target_unit.position.floor())
 		enemy.repath_ticks = _repath_interval(dt)
-		if chase_cell.x < 0 or not grid.is_walkable(chase_cell):
+		if chase_cell.x < 0 or not grid.is_walkable(chase_cell, true, _wall_ids if enemy.enemy_definition.passes_walls else {}):
 			_disengage(enemy)
 			return
 		var path: PackedVector2Array = navigation.find_path(enemy.position, chase_cell)
@@ -361,7 +371,7 @@ func _chase(enemy: MechEntityState, grid: MechGridState, navigation: MechGridNav
 		return
 	var cell: Vector2i = Vector2i(enemy.position.floor())
 	var speed: float = enemy.enemy_definition.move_speed / grid.movement_weight(cell)
-	var velocity: Vector2 = enemy.preferred_velocity(speed, dt, grid.mobile_segment_clear)
+	var velocity: Vector2 = enemy.preferred_velocity(speed, dt, navigation.segment_clear)
 	if velocity == Vector2.ZERO:
 		# A finished route frees the enemy to re-path toward a moving target.
 		enemy.finish_path_if_arrived()
@@ -545,7 +555,7 @@ func _building_chase_cell(enemy: MechEntityState, building: MechBuildingState, g
 	for y: int in range(area.position.y - 1, area.end.y + 1):
 		for x: int in range(area.position.x - 1, area.end.x + 1):
 			var cell := Vector2i(x, y)
-			if area.has_point(cell) or not grid.is_walkable(cell):
+			if area.has_point(cell) or not grid.is_walkable(cell, true, _wall_ids if enemy.enemy_definition.passes_walls else {}):
 				continue
 			var distance: float = Vector2(cell).distance_squared_to(enemy.position)
 			if distance < best_distance:

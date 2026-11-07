@@ -23,6 +23,7 @@ var _outline := PackedVector2Array()
 var _bounds := Rect2()
 var _terrain_texture: ImageTexture
 var _terrain_cache := PackedByteArray()
+var _playable_cache := PackedByteArray()
 var _fog_texture: ImageTexture
 var _fog_revision: int = -1
 var _fog_generation: int = -1
@@ -77,6 +78,9 @@ func _gui_input(event: InputEvent) -> void:
 			_emit_focus(event.position)
 		accept_event()
 	elif _dragging and event is InputEventMouseMotion:
+		_dragging = (event.button_mask & MOUSE_BUTTON_MASK_LEFT) != 0
+		if not _dragging:
+			return
 		_emit_focus(event.position)
 		accept_event()
 
@@ -95,7 +99,7 @@ func _draw() -> void:
 	# drawn here, above the fog and below the entity dots.
 	for entity: Dictionary in _state.get("entities", []):
 		if entity.get("is_building", false):
-			var fill: Color = Color(OWN_BUILDING, 0.4) if entity.get("phase", 1) == MechBuildingState.Phase.RUINED else OWN_BUILDING
+			var fill: Color = Color(OWN_BUILDING, 0.4) if entity.get("hp", 1) <= 0 else OWN_BUILDING
 			draw_colored_polygon(_footprint_local(entity["origin"], entity["footprint"]), fill)
 			continue
 		var point: Vector2 = _w2l(MechIsoGeometry.project(entity["position"]))
@@ -129,10 +133,11 @@ func _recompute_fit() -> void:
 func _rebuild_terrain_texture(map_state: Dictionary) -> void:
 	var dimensions: Vector2i = map_state["dimensions"]
 	var terrain: PackedByteArray = map_state["terrain"]
-	if dimensions == _dimensions and terrain == _terrain_cache:
+	var playable: PackedByteArray = map_state["playable"]
+	if _terrain_texture != null and _terrain_texture.get_size() == Vector2(dimensions) and terrain == _terrain_cache and playable == _playable_cache:
 		return
 	_terrain_cache = terrain.duplicate()
-	var playable: PackedByteArray = map_state["playable"]
+	_playable_cache = playable.duplicate()
 	var pixels := PackedByteArray()
 	pixels.resize(terrain.size() * 4)
 	for index: int in range(terrain.size()):
@@ -144,10 +149,10 @@ func _rebuild_terrain_texture(map_state: Dictionary) -> void:
 			elif terrain[index] == MechGridState.Terrain.OBSTACLE:
 				fill = TERRAIN_OBSTACLE
 		var rgba: int = fill.to_rgba32()
-		pixels[index * 4] = rgba & 0xFF
-		pixels[index * 4 + 1] = (rgba >> 8) & 0xFF
-		pixels[index * 4 + 2] = (rgba >> 16) & 0xFF
-		pixels[index * 4 + 3] = (rgba >> 24) & 0xFF
+		pixels[index * 4] = (rgba >> 24) & 0xFF
+		pixels[index * 4 + 1] = (rgba >> 16) & 0xFF
+		pixels[index * 4 + 2] = (rgba >> 8) & 0xFF
+		pixels[index * 4 + 3] = rgba & 0xFF
 	var image: Image = Image.create_from_data(dimensions.x, dimensions.y, false, Image.FORMAT_RGBA8, pixels)
 	if _terrain_texture == null or _terrain_texture.get_size() != Vector2(dimensions):
 		_terrain_texture = ImageTexture.create_from_image(image)
@@ -164,7 +169,7 @@ func _rebuild_fog_texture(vision: Dictionary) -> void:
 		pixels[index * 4] = 3
 		pixels[index * 4 + 1] = 6
 		pixels[index * 4 + 2] = 9
-		pixels[index * 4 + 3] = 0 if cells[index] == MechVisionSystem.State.VISIBLE else (120 if cells[index] == MechVisionSystem.State.EXPLORED else 245)
+		pixels[index * 4 + 3] = 0 if cells[index] == MechVisionSystem.State.VISIBLE else (120 if cells[index] == MechVisionSystem.State.EXPLORED else 255)
 	var image: Image = Image.create_from_data(dimensions.x, dimensions.y, false, Image.FORMAT_RGBA8, pixels)
 	if _fog_texture == null or _fog_texture.get_size() != Vector2(dimensions):
 		_fog_texture = ImageTexture.create_from_image(image)

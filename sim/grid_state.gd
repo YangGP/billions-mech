@@ -9,6 +9,7 @@ const MOBILE_RADIUS: float = 0.22
 var _dimensions: Vector2i = Vector2i.ZERO
 var _terrain := PackedByteArray()
 var _occupancy := PackedInt32Array()
+var _pass_through: Dictionary[int, bool] = {}
 var _coverage := PackedByteArray()
 var _rough_weight: float = 2.0
 var _revision: int = 0
@@ -27,6 +28,7 @@ func configure(definition: MechMapDefinition) -> void:
 	_cache_boundary()
 	_occupancy.resize(_terrain.size())
 	_occupancy.fill(0)
+	_pass_through.clear()
 	_coverage.resize(_terrain.size())
 	_coverage.fill(0)
 	_revision += 1
@@ -135,9 +137,9 @@ func set_pass_through(entity_id: int, enabled: bool) -> void:
 	_revision += 1
 
 
-func is_walkable(cell: Vector2i, include_buildings: bool = true) -> bool:
+func is_walkable(cell: Vector2i, include_buildings: bool = true, ignored_occupants: Dictionary = {}) -> bool:
 	return contains(cell) and terrain_at(cell) != Terrain.OBSTACLE \
-		and (not include_buildings or not _blocks_path(occupant_at(cell)))
+		and (not include_buildings or ignored_occupants.has(occupant_at(cell)) or not _blocks_path(occupant_at(cell)))
 
 
 func _blocks_path(occupant: int) -> bool:
@@ -150,7 +152,7 @@ func is_pass_through(cell: Vector2i) -> bool:
 	return occupant != 0 and _pass_through.has(occupant)
 
 
-func mobile_position_clear(point: Vector2) -> bool:
+func mobile_position_clear(point: Vector2, ignored_occupants: Dictionary = {}) -> bool:
 	if not point_inside(point):
 		return false
 	# Match the native RVO circle, including at building corners.
@@ -159,7 +161,7 @@ func mobile_position_clear(point: Vector2) -> bool:
 	for y: int in range(low.y, high.y + 1):
 		for x: int in range(low.x, high.x + 1):
 			var cell := Vector2i(x, y)
-			if is_walkable(cell):
+			if is_walkable(cell, true, ignored_occupants):
 				continue
 			var closest: Vector2 = point.clamp(Vector2(cell), Vector2(cell + Vector2i.ONE))
 			if point.distance_squared_to(closest) < MOBILE_RADIUS * MOBILE_RADIUS:
@@ -167,10 +169,10 @@ func mobile_position_clear(point: Vector2) -> bool:
 	return true
 
 
-func mobile_segment_clear(from: Vector2, to: Vector2) -> bool:
+func mobile_segment_clear(from: Vector2, to: Vector2, ignored_occupants: Dictionary = {}) -> bool:
 	var steps: int = maxi(1, ceili(from.distance_to(to) / 0.1))
 	for index: int in range(1, steps + 1):
-		if not mobile_position_clear(from.lerp(to, float(index) / steps)):
+		if not mobile_position_clear(from.lerp(to, float(index) / steps), ignored_occupants):
 			return false
 	return true
 

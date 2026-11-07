@@ -5,10 +5,12 @@ extends RefCounted
 
 var _navigation := AStarGrid2D.new()
 var _grid: MechGridState
+var _ignored_occupants: Dictionary = {}
 
 
-func rebuild(grid: MechGridState) -> void:
+func rebuild(grid: MechGridState, ignored_occupants: Dictionary = {}) -> void:
 	_grid = grid
+	_ignored_occupants = ignored_occupants.duplicate()
 	_navigation.region = Rect2i(Vector2i.ZERO, grid.dimensions())
 	_navigation.cell_size = Vector2.ONE
 	_navigation.diagonal_mode = AStarGrid2D.DIAGONAL_MODE_ONLY_IF_NO_OBSTACLES
@@ -19,7 +21,7 @@ func rebuild(grid: MechGridState) -> void:
 	for y: int in range(grid.dimensions().y):
 		for x: int in range(grid.dimensions().x):
 			var cell := Vector2i(x, y)
-			_navigation.set_point_solid(cell, not grid.is_walkable(cell))
+			_navigation.set_point_solid(cell, not grid.is_walkable(cell, true, _ignored_occupants))
 			_navigation.set_point_weight_scale(cell, grid.movement_weight(cell))
 
 
@@ -28,7 +30,7 @@ func find_path(from: Vector2, target_cell: Vector2i) -> PackedVector2Array:
 
 
 func find_path_to_point(from: Vector2, target: Vector2) -> PackedVector2Array:
-	if not from.is_finite() or not target.is_finite() or not _grid.mobile_position_clear(target):
+	if not from.is_finite() or not target.is_finite() or not _grid.mobile_position_clear(target, _ignored_occupants):
 		return PackedVector2Array()
 	var target_cell := Vector2i(target.floor())
 	var cells: Array[Vector2i] = _navigation.get_id_path(Vector2i(from.floor()), target_cell)
@@ -41,15 +43,19 @@ func find_path_to_point(from: Vector2, target: Vector2) -> PackedVector2Array:
 			points.append(point)
 	# The final point is the actual command destination, not an implicit snap.
 	if not points[-1].is_equal_approx(target):
-		if not _grid.mobile_segment_clear(points[-1], target):
+		if not segment_clear(points[-1], target):
 			return PackedVector2Array()
 		points.append(target)
-	if points.size() > 2 and _grid.mobile_segment_clear(from, points[2]):
+	if points.size() > 2 and segment_clear(from, points[2]):
 		points.remove_at(1)
 	points = _straighten_path(points)
 	if points.size() > 1:
 		points.remove_at(0)
 	return points
+
+
+func segment_clear(from: Vector2, to: Vector2) -> bool:
+	return _grid.mobile_segment_clear(from, to, _ignored_occupants)
 
 
 func _straighten_path(points: PackedVector2Array) -> PackedVector2Array:
@@ -73,7 +79,7 @@ func _straighten_path(points: PackedVector2Array) -> PackedVector2Array:
 
 
 func _shortcut_allowed(from: Vector2, to: Vector2, budget: float) -> bool:
-	return _grid.mobile_segment_clear(from, to) and _segment_cost(from, to) <= budget + 0.01
+	return segment_clear(from, to) and _segment_cost(from, to) <= budget + 0.01
 
 
 func _segment_cost(from: Vector2, to: Vector2) -> float:

@@ -25,7 +25,7 @@ var _tick_counter: int = 0
 const MOVEMENT_NOISE_SECONDS: float = 2.0
 ## Combat-state rescan interval: attacked buildings leave combat once no
 ## enemy remains within MechBuildingState.THREAT_RADIUS (twice per second).
-const COMBAT_SCAN_TICKS: int = 15
+const COMBAT_SCAN_SECONDS: float = 0.5
 var _settings: MechFoundationSettings
 var _unit_definition: MechUnitDefinition
 var _map_definition: MechMapDefinition
@@ -298,7 +298,7 @@ func advance_one_tick() -> void:
 		_remove_building(entity_id, building.refund(), true)
 	if not changes["completed"].is_empty():
 		_recompute_economy()
-	if _tick_counter % COMBAT_SCAN_TICKS == 0:
+	if _tick_counter % maxi(1, ceili(COMBAT_SCAN_SECONDS * _tick_rate)) == 0:
 		_scan_combat_threat()
 	_economy.advance_repairs(_construction.all(), _tick_rate)
 	_sync_navigation()
@@ -398,7 +398,7 @@ func snapshot() -> Dictionary:
 			mineral["visible"] = _vision.state_at(mineral["cell"]) == MechVisionSystem.State.VISIBLE
 			minerals.append(mineral)
 	return {"clock": _clock.snapshot(), "entities": entities, "economy": economy, "minerals": minerals,
-		"vision": _vision.snapshot(),
+		"vision": _vision.snapshot(), "repair_all": _repair_all_status(),
 		"scenario": _settings.scenario_name, "unit_catalog": _unit_definition.snapshot(),
 		"catalog": _construction.catalog(_economy), "probe_id": _probe_id,
 		"mainbrain_id": _mainbrain_id, "generation": _generation,
@@ -614,7 +614,7 @@ func damage_building(entity_id: int, amount: int) -> Dictionary:
 	var building: MechBuildingState = _construction.get_building(entity_id)
 	if building == null or amount <= 0:
 		return _reject("伤害目标或数值无效")
-	if building.phase == MechBuildingState.Phase.RUINED:
+	if building.hp <= 0:
 		return _reject("基座无法被攻击")
 	building.hp = maxi(0, building.hp - amount)
 	# Any hit puts the building into combat: repairs stay suspended while

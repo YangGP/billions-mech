@@ -76,7 +76,7 @@ func pick_building(screen_point: Vector2) -> int:
 			var height: float = metrics.x
 			if entity["phase"] == MechBuildingState.Phase.CONSTRUCTING:
 				height *= 0.25 + float(entity["build_progress"]) * 0.75
-			elif entity["phase"] == MechBuildingState.Phase.RUINED:
+			elif entity["hp"] <= 0:
 				height = 10.0
 			hull = PackedVector2Array([Vector2(0, -height - metrics.z), Vector2(metrics.y, -height), Vector2(metrics.y, 0), Vector2(0, metrics.z), Vector2(-metrics.y, 0), Vector2(-metrics.y, -height)])
 		for index: int in range(hull.size()):
@@ -290,7 +290,7 @@ func _draw_building(building: Dictionary, point: Vector2, opacity: float = 1.0) 
 	var height: float = metrics.x
 	var half_width: float = metrics.y
 	var depth: float = metrics.z
-	if building.get("phase", MechBuildingState.Phase.OPERATING) == MechBuildingState.Phase.RUINED:
+	if building.get("hp", 1) <= 0:
 		_draw_ruin(building, footprint)
 		return
 	if id == &"armored_wall":

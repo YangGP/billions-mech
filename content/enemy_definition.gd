@@ -40,7 +40,7 @@ func validation_error() -> String:
 		return "敌种威胁单价无效"
 	if shelter_radius < 0.0 or not is_finite(shelter_radius):
 		return "敌种庇护半径无效"
-	if shelter_radius > 0.0 and (shelter_reduction <= 0.0 or shelter_reduction > 1.0):
+	if shelter_radius > 0.0 and (not is_finite(shelter_reduction) or shelter_reduction <= 0.0 or shelter_reduction > 1.0):
 		return "敌种庇护减伤比例无效"
 	return ""
 

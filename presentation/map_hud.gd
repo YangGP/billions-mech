@@ -14,6 +14,7 @@ signal production_cancelled(factory_id: int, ticket: int)
 signal scenario_requested
 signal settings_requested
 signal minimap_focus_requested(world_position: Vector2)
+signal repair_all_requested
 
 const INK := Color("d5e6eb")
 const MUTED := Color("819ca9")
@@ -34,6 +35,7 @@ var _space_label: Label
 var _feedback_label: Label
 var _zoom_label: Label
 var _pause_button: Button
+var _repair_all_button: Button
 var _build_buttons: Dictionary[StringName, Button] = {}
 var _selection_title: Label
 var _status_label: Label

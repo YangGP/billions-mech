@@ -67,6 +67,7 @@ func _ready() -> void:
 	_hud.scenario_requested.connect(_toggle_scenario)
 	_hud.settings_requested.connect(_open_settings)
 	_hud.minimap_focus_requested.connect(_focus_minimap)
+	_hud.repair_all_requested.connect(_repair_all)
 	_settings.close_requested.connect(_close_settings)
 	_settings.settings_applied.connect(_apply_camera_settings)
 	_apply_camera_settings(_settings.preferences())
@@ -641,7 +642,8 @@ func _refresh_selection() -> void:
 		errors = {"cancel": _sim.building_action_error(MechCommand.Type.CANCEL_CONSTRUCTION, entity_id),
 			"demolish": _sim.building_action_error(MechCommand.Type.DEMOLISH, entity_id),
 			"cancel_demolish": _sim.building_action_error(MechCommand.Type.CANCEL_DEMOLISH, entity_id),
-			"repair": _sim.building_action_error(MechCommand.Type.TOGGLE_REPAIR, entity_id)}
+			"repair": _sim.building_action_error(MechCommand.Type.TOGGLE_REPAIR, entity_id),
+			"rebuild": _sim.building_action_error(MechCommand.Type.REBUILD, entity_id)}
 	_hud.present_selection(building, errors)
 	if building.is_empty() and not units.is_empty():
 		_hud.present_units(units)
