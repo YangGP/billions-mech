@@ -13,6 +13,7 @@ signal production_requested(factory_id: int)
 signal production_cancelled(factory_id: int, ticket: int)
 signal scenario_requested
 signal settings_requested
+signal minimap_focus_requested(world_position: Vector2)
 
 const INK := Color("d5e6eb")
 const MUTED := Color("819ca9")
@@ -52,6 +53,11 @@ var _building_widgets: Array[Control] = []
 var _unit_catalog: Dictionary = {}
 var _production_widgets: Array[Control] = []
 var _session_ended: bool = false
+var _minimap_panel: Panel
+var _minimap_view: MechMinimapView
+var _expand_button: Button
+var _minimap_fullscreen: bool = false
+var _minimap_layout: Dictionary = {}
 
 
 func _ready() -> void:
@@ -77,7 +83,18 @@ func _ready() -> void:
 	_primary = $Root/Inspector/Primary
 	_demolish = $Root/Inspector/Demolish
 	_dialog = $DemolitionDialog
-	_panels = [$Root/Header, $Root/Inspector, $Root/Toolbar, $Root/SessionResult]
+	_panels = [$Root/Header, $Root/Inspector, $Root/Toolbar, $Root/SessionResult, $Root/Minimap]
+	_minimap_panel = $Root/Minimap
+	_minimap_view = $Root/Minimap/View
+	_expand_button = $Root/Minimap/Expand
+	_repair_all_button = $Root/Toolbar/RepairAll
+	_minimap_view.focus_requested.connect(minimap_focus_requested.emit)
+	_expand_button.pressed.connect(toggle_minimap_fullscreen)
+	_repair_all_button.pressed.connect(func(): repair_all_requested.emit())
+	_minimap_layout = {"anchor_left": _minimap_panel.anchor_left, "anchor_top": _minimap_panel.anchor_top,
+		"anchor_right": _minimap_panel.anchor_right, "anchor_bottom": _minimap_panel.anchor_bottom,
+		"offset_left": _minimap_panel.offset_left, "offset_top": _minimap_panel.offset_top,
+		"offset_right": _minimap_panel.offset_right, "offset_bottom": _minimap_panel.offset_bottom}
 	_build_buttons = {&"compute_node": $Root/Toolbar/ComputeNode, &"armored_wall": $Root/Toolbar/ArmoredWall,
 		&"sentry_tower": $Root/Toolbar/SentryTower, &"mining_station": $Root/Toolbar/MiningStation,
 		&"assembly_plant": $Root/Toolbar/AssemblyPlant}
@@ -120,6 +137,7 @@ func present_map(map_state: Dictionary) -> void:
 	var dimensions: Vector2i = map_state["dimensions"]
 	var bounds: Rect2 = MechIsoGeometry.map_bounds(dimensions, map_state["outline"])
 	_map_label.text = "%s   /   正方形地图" % map_state["name"] if is_equal_approx(bounds.size.x, bounds.size.y) else "%s   /   %d × %d" % [map_state["name"], dimensions.x, dimensions.y]
+	_minimap_view.present_map(map_state)
 
 
 func present_state(state: Dictionary) -> void:
@@ -164,6 +182,52 @@ func present_state(state: Dictionary) -> void:
 		button.text = "%s %s\n%s" % [SHORTCUTS[index], entry["name"], MechResources.text(entry["cost"])]
 		button.disabled = _session_ended or not entry["unavailable_reason"].is_empty()
 		button.tooltip_text = "本局已结束" if _session_ended else (entry["unavailable_reason"] if button.disabled else "占地 %d×%d；施工 %.1f 秒；预留电力 %d、容量 %d" % [entry["footprint"].x, entry["footprint"].y, entry["construction_seconds"], entry["power_cost"], entry["capacity_cost"]])
+	var repair_all: Dictionary = state.get("repair_all", {})
+	_repair_all_button.disabled = _session_ended or not repair_all.get("ok", false)
+	_repair_all_button.tooltip_text = repair_all.get("reason", "") if _repair_all_button.disabled \
+		else "对全部受损完工建筑开启维修（每座 2 HP/秒 · 1 币/秒）；被攻击后进入交战状态，周边 6 格内有敌军期间自动暂停，脱离后恢复"
+	_minimap_view.present_state(state)
+
+
+func present_camera(rect: Rect2) -> void:
+	_minimap_view.present_camera(rect)
+
+
+func is_minimap_fullscreen() -> bool:
+	return _minimap_fullscreen
+
+
+func toggle_minimap_fullscreen() -> void:
+	set_minimap_fullscreen(not _minimap_fullscreen)
+
+
+func set_minimap_fullscreen(active: bool) -> void:
+	if _minimap_fullscreen == active:
+		return
+	_minimap_fullscreen = active
+	if active:
+		var base: Vector2 = $Root.size
+		var side: float = minf(floor(base.x * 0.6), base.y - 330.0)
+		_minimap_panel.anchor_left = 0.5
+		_minimap_panel.anchor_right = 0.5
+		_minimap_panel.anchor_top = 0.0
+		_minimap_panel.anchor_bottom = 1.0
+		_minimap_panel.offset_left = -side * 0.5
+		_minimap_panel.offset_right = side * 0.5
+		_minimap_panel.offset_top = 150.0
+		_minimap_panel.offset_bottom = -180.0
+		feedback("小地图全屏：左键点击/拖动跳转镜头；M 或 Esc 返回。")
+	else:
+		_minimap_panel.anchor_left = _minimap_layout["anchor_left"]
+		_minimap_panel.anchor_top = _minimap_layout["anchor_top"]
+		_minimap_panel.anchor_right = _minimap_layout["anchor_right"]
+		_minimap_panel.anchor_bottom = _minimap_layout["anchor_bottom"]
+		_minimap_panel.offset_left = _minimap_layout["offset_left"]
+		_minimap_panel.offset_top = _minimap_layout["offset_top"]
+		_minimap_panel.offset_right = _minimap_layout["offset_right"]
+		_minimap_panel.offset_bottom = _minimap_layout["offset_bottom"]
+		feedback("小地图已还原。")
+	_expand_button.text = "还原 [M]" if active else "全屏 [M]"
 
 
 func present_zoom(factor: float) -> void:
@@ -214,29 +278,39 @@ func present_selection(building: Dictionary, errors: Dictionary) -> void:
 	var footprint: Vector2i = building["footprint"]
 	_selection_title.text = "%s · %d×%d" % [building["name"], footprint.x, footprint.y]
 	_status_label.text = building["status"]
-	_status_label.modulate = ACCENT if building["phase"] == MechBuildingState.Phase.OPERATING else Color("f0bc79")
+	_status_label.modulate = Color("f27c78") if building["phase"] == MechBuildingState.Phase.RUINED else (ACCENT if building["phase"] == MechBuildingState.Phase.OPERATING else Color("f0bc79"))
 	_build_bar.value = 100.0 * float(building["demolition_progress"] if building["phase"] == MechBuildingState.Phase.DEMOLISHING else building["build_progress"])
-	_build_label.text = "%s  %d%%" % ["拆除进度" if building["phase"] == MechBuildingState.Phase.DEMOLISHING else "施工进度", roundi(_build_bar.value)]
+	_build_label.text = "%s  %d%%" % ["清除基座进度" if building["phase"] == MechBuildingState.Phase.DEMOLISHING and building["hp"] <= 0 else ("拆除进度" if building["phase"] == MechBuildingState.Phase.DEMOLISHING else "施工进度"), roundi(_build_bar.value)]
 	_hp_bar.value = 100.0 * float(building["hp"]) / float(building["max_hp"])
 	_hp_label.text = "血量  %d / %d" % [building["hp"], building["max_hp"]]
 	_details.text = "预留  电力 %d · 容量 %d\n供给  电力 +%d · 容量 +%d\n运行收入  +%d 币/分钟" % [building["power_cost"], building["capacity_cost"], building["power_provided"], building["capacity_provided"], building["income_per_minute"]]
 	var mineral: Dictionary = building.get("mineral", {})
-	if not mineral.is_empty():
+	if building["phase"] == MechBuildingState.Phase.RUINED:
+		_build_label.hide()
+		_build_bar.hide()
+		_details.text = "已摧毁 · 保留占位与矿点绑定，不阻挡通行\n重建支付全额 50%%，施工 %.1f 秒，血量随进度爬升\n清除基座不退款，完成时释放占地与矿点绑定" % building["construction_seconds"]
+		if not mineral.is_empty():
+			_details.text += "\n矿点绑定保留 · 剩余 %d / %d" % [mineral["remaining"], mineral["initial_amount"]]
+	elif not mineral.is_empty():
 		_details.text = "预留  电力 %d · 容量 %d\n采集产率  %d 矿石/分钟\n剩余储量  %d / %d\n%s" % [building["power_cost"], building["capacity_cost"], building["extraction_per_minute"], mineral["remaining"], mineral["initial_amount"], "矿点耗竭，可拆除" if mineral["remaining"] == 0 else "完工且供电后采集"]
 	if building["phase"] == MechBuildingState.Phase.CONSTRUCTING:
 		_primary_action = MechCommand.Type.CANCEL_CONSTRUCTION
 		_primary.text = "取消施工 · 全退 %s" % MechResources.text(building["paid_cost"])
 		_primary.tooltip_text = errors.get("cancel", "")
+	elif building["phase"] == MechBuildingState.Phase.RUINED:
+		_primary_action = MechCommand.Type.REBUILD
+		_primary.text = "重建 · %s" % MechResources.text(building["rebuild_cost"])
+		_primary.tooltip_text = errors.get("rebuild", "")
 	elif building["phase"] == MechBuildingState.Phase.DEMOLISHING:
 		_primary_action = MechCommand.Type.CANCEL_DEMOLISH
-		_primary.text = "取消拆除 · 恢复运行"
+		_primary.text = "取消清除 · 保留基座" if building["hp"] <= 0 else "取消拆除 · 恢复运行"
 		_primary.tooltip_text = errors.get("cancel_demolish", "")
 	else:
 		_primary_action = MechCommand.Type.TOGGLE_REPAIR
 		_primary.text = "停止维修" if building["repairing"] else "维修 · 2 HP/秒，1 币/秒"
 		_primary.tooltip_text = errors.get("repair", "")
 	_primary.disabled = not _primary.tooltip_text.is_empty()
-	_demolish.text = "拆除 [X] · 返还 %s" % MechResources.text(building["refund"])
+	_demolish.text = "清除基座 [X] · 无退款" if building["phase"] == MechBuildingState.Phase.RUINED else "拆除 [X] · 返还 %s" % MechResources.text(building["refund"])
 	_demolish.tooltip_text = errors.get("demolish", "")
 	_demolish.disabled = not _demolish.tooltip_text.is_empty()
 	var production: Dictionary = building.get("production", {})
@@ -306,10 +380,13 @@ func feedback(message: String, failed: bool = false) -> void:
 
 func request_demolition() -> void:
 	if _selection.is_empty() or _demolish.disabled:
-		feedback("请先选择可拆除的已完工建筑。", true)
+		feedback("请先选择可拆除的完工建筑或基座。", true)
 		return
 	_pending_demolish = _selection["entity_id"]
-	_dialog.dialog_text = "拆除「%s」需要 %.1f 游戏秒，完成后返还 %s。\n期间建筑停机，占用与矿点绑定在拆除完成时释放。" % [_selection["name"], _selection["demolition_seconds"], MechResources.text(_selection["refund"])]
+	if _selection.get("phase", MechBuildingState.Phase.OPERATING) == MechBuildingState.Phase.RUINED:
+		_dialog.dialog_text = "清除「%s」基座需要 %.1f 游戏秒，完成时不退款。\n占地与矿点绑定在清除完成时释放；可取消清除保留基座。" % [_selection["name"], _selection["demolition_seconds"]]
+	else:
+		_dialog.dialog_text = "拆除「%s」需要 %.1f 游戏秒，完成后返还 %s。\n期间建筑停机，占用与矿点绑定在拆除完成时释放。" % [_selection["name"], _selection["demolition_seconds"], MechResources.text(_selection["refund"])]
 	_dialog.popup_centered(Vector2i(540, 210))
 
 

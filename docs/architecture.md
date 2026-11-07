@@ -44,7 +44,7 @@ M4 玩家单位的局部避让直接使用 Godot NavigationServer2D / RVO，适�
   - **入队前 UI 快检**（廉价，驱动按钮灰显/放置预览着色）；
   - **执行时权威校验**（真实，拒绝则回执 UI 报错）。
 - 两个校验调用**同一个纯函数**（`validate_placement`，见 §5 建造）——UI 与模拟永不各写一套规则。
-- 首切片命令集：PlaceBuilding / CancelConstruction / Demolish / CancelDemolish / ToggleRepair / SetRally / QueueUnit / CancelProduction / IssueMove / IssueAttackMove / IssueAttack / TogglePause（元命令）。
+- 首切片命令集：PlaceBuilding / CancelConstruction / Demolish / CancelDemolish / ToggleRepair / Rebuild（基座重建）/ RepairAll（一键修复）/ SetRally / QueueUnit / CancelProduction / IssueMove / IssueAttackMove / IssueAttack / TogglePause（元命令）。
 - 单位类命令（IssueMove/Attack/AttackMove）入队后由 **sim 移动/战斗系统执行**，序号用于串行处理与回执；阵型/避让的外部适配待选型，不引入命令录制。
 
 ## 5. Grid 与规则系统
@@ -99,7 +99,7 @@ M4 玩家单位的局部避让直接使用 Godot NavigationServer2D / RVO，适�
 
 ## 8. 首切片事件清单
 
-目标事件：BuildingPlaced / ConstructionCompleted / BuildingDestroyed / ConstructionCancelled / Demolished / PowerLost / PowerRestored / CoverageChanged / CapacityOverloaded / CapacityRecovered / ResourceDepleted / WaveIncoming（定性强度 + 方向，不含精确数量/构成）/ WaveSpawned / WaveCleared / NoiseEmitted / InfectionTriggered / VisionChanged / UnitProduced / UnitDied / MainbrainDestroyed（= 失败）/ SliceVictory（切片终点）。名称为接口草案，不代表已全部实现。
+目标事件：BuildingPlaced / ConstructionCompleted / BuildingDestroyed（转基座）/ BuildingRuined / ConstructionCancelled / Demolished（含清除基座）/ PowerLost / PowerRestored / CoverageChanged / CapacityOverloaded / CapacityRecovered / ResourceDepleted / WaveIncoming（定性强度 + 方向，不含精确数量/构成）/ WaveSpawned / WaveCleared / NoiseEmitted / InfectionTriggered / VisionChanged / UnitProduced / UnitDied / MainbrainDestroyed（= 失败）/ SliceVictory（切片终点）。名称为接口草案，不代表已全部实现。
 
 ## 9. 设计规模（非功能需求）
 

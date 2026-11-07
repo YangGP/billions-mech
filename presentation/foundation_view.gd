@@ -76,6 +76,8 @@ func pick_building(screen_point: Vector2) -> int:
 			var height: float = metrics.x
 			if entity["phase"] == MechBuildingState.Phase.CONSTRUCTING:
 				height *= 0.25 + float(entity["build_progress"]) * 0.75
+			elif entity["phase"] == MechBuildingState.Phase.RUINED:
+				height = 10.0
 			hull = PackedVector2Array([Vector2(0, -height - metrics.z), Vector2(metrics.y, -height), Vector2(metrics.y, 0), Vector2(0, metrics.z), Vector2(-metrics.y, 0), Vector2(-metrics.y, -height)])
 		for index: int in range(hull.size()):
 			hull[index] = get_global_transform_with_canvas() * (point + hull[index])
@@ -238,6 +240,16 @@ func _draw_cursor() -> void:
 			_draw_building(draft, _project(center), 0.35)
 
 
+func _draw_ruin(building: Dictionary, footprint: Vector2i) -> void:
+	# Destroyed base: a flat slab with cross marks; keeps the site clickable and
+	# clearly distinct from a live building. Skips body, bars and wall lines.
+	var polygon: PackedVector2Array = MechIsoGeometry.footprint_polygon(building["origin"], footprint)
+	draw_colored_polygon(polygon, Color("3c4a53"))
+	draw_polyline(PackedVector2Array([polygon[0], polygon[2]]), Color("f27c78"), 2.0, true)
+	draw_polyline(PackedVector2Array([polygon[1], polygon[3]]), Color("f27c78"), 2.0, true)
+	_outline_cell(building["origin"], footprint, Color("6a7a84"), 1.5)
+
+
 func _draw_building(building: Dictionary, point: Vector2, opacity: float = 1.0) -> void:
 	var id: StringName = building["building_id"]
 	var footprint: Vector2i = building["footprint"]
@@ -249,6 +261,9 @@ func _draw_building(building: Dictionary, point: Vector2, opacity: float = 1.0) 
 	var height: float = metrics.x
 	var half_width: float = metrics.y
 	var depth: float = metrics.z
+	if building.get("phase", MechBuildingState.Phase.OPERATING) == MechBuildingState.Phase.RUINED:
+		_draw_ruin(building, footprint)
+		return
 	if id == &"armored_wall":
 		color = Color("84939c")
 	elif id == &"sentry_tower":

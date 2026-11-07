@@ -190,3 +190,22 @@ Agent-Reach 不可用，使用网页检索。先核对高星候选 [Mindustry](h
 按用户规则调整已有战斗行为：普通移动途中优先赶路，到达后转待命，只对实际射程内、玩家可见且地形视线畅通的目标开火；敌人离开射程/视线立即放弃，不生成追击路径。A 移执行期间保留较大的索敌半径与追击，指定攻击继续按显式命令追击；两者结束进入待命后采用同一原地开火规则。
 
 先核对持续维护的 [OpenRA AutoTarget](https://github.com/OpenRA/OpenRA/blob/bleed/OpenRA.Mods.Common/Traits/AutoTarget.cs) 的扫描半径、`allowMove` 与武器射程区分，源码下载到 `reference/openra/AutoTarget.cs` 并检查既有 COPYING。该模块依赖 C# Actor/Trait、AttackBase 和活动系统，GPL-3.0-or-later，不能直接作为本项目 GDScript 战斗模块接入，未复制或移植。项目已有空间桶、射程/LOS、目标保持、攻击冷却和 A*，只在这些既有接口处限定待命状态的候选范围、缓存目标有效性与追击许可，不新增搜索/战斗算法，也不引入姿态按钮。Agent-Reach 不可用，使用网页和本地源码核对。
+
+## 19. 小地图选型（2026-11-07，实施前核查）
+
+按 §2 既定候选核对 [Razoric480/godot-minimap-demo](https://github.com/Razoric480/godot-minimap-demo)（MIT，2020，演示项目）。已 `git clone --depth 1` 到本地 `reference/godot-minimap-demo/` 并逐文件通读 `project/src/Minimap/`（MinimapManager/Proxy/SpriteProxy/CameraProxy）、README 与 LICENSE。
+
+| 候选 | 实现与依赖 | 采用结论 |
+|---|---|---|
+| Razoric480/godot-minimap-demo | Godot 3 API（`Sprite`、`camera.current`、Light2D 圆形遮罩）；**每实体一个 Proxy Node**（`_process` 内 `global_position = mirror_master.global_position`）克隆进独立 Viewport 子世界，相机亦克隆 | 不 vendor、不复制源码 |
+| 引擎内置能力 | `Control._draw`、`Image.create_from_data`/`ImageTexture`、`draw_polygon(polygon, colors, uvs, texture)`、Camera2D 视口矩形数学 | **直接复用**；与项目既有 `fog_view.gd` 贴图模式同构 |
+
+不兼容原因：代理克隆要求每个实体（含敌人）持有常驻场景节点并逐帧同步位置，与本项目无头 sim、快照读模型（实体仅是 `snapshot()` 字典、非节点）及千级机潮性能目标冲突；其独立 Viewport 子世界会把世界重渲染一遍，抵消静态地形 UPDATE_ONCE 缓存的收益；圆形 Light2D 遮罩与 Unity 风格素材亦非本项目形态。演示素材来自 Unity CodeMonkey 教程，本来也不导入。
+
+实际实现：复用项目既有 `fog_view.gd` 读模型贴图模式——地形（playable/terrain 三色）与三态迷雾各一张逻辑格 `ImageTexture`，经投影轮廓多边形 + UV 贴到小地图 `Control._draw`；实体/矿点/主脑图标/镜头视野框按快照数据以点阵绘制。项目自写部分仅为坐标拟合（letterbox 居中、控件本地↔投影世界互逆换算）与全屏切换布局，不新增算法或 vendor 依赖；将来区域范围叠加层预留绘制位。检查记录见 [小地图检查](../validation/minimap.md)。
+
+## 20. 基座与维修规则（2026-11-07）
+
+纯 sim 规则变更：维修暂停（被攻击后交战状态判定，周边无敌军即恢复）、被毁留基座、重建/清除、一键修复。先核对 [Mindustry](https://github.com/Anuken/Mindustry)（GPL-3.0，Java）与 [OpenRA](https://github.com/OpenRA/OpenRA)（GPL）的废墟/重建处理：两者均把废墟作为引擎内地图实体或 Actor 特性，绑定其各自世界/规则运行时，不能作为本项目无头纯数据 GDScript 模块接入，未复制源码；仅确认"废墟保留占位、付费重建"是成熟 RTS 常见形态。
+
+实际全部复用项目与引擎既有能力：基座复用 `MechBuildingState` 的 Phase 枚举扩展与 CONSTRUCTING 进度/血量爬升机制、`MechResources.scaled` 比例计价、`remove_factory` 队列清理、`_wall_connections` 邻接查询与 ConfirmationDialog 确认框；一键修复复用命令队列与 `building_action_error` 同源校验模式；交战状态复用注册表位置与矩形距离判定。无新增 vendor、无新算法；基座通行豁免（grid 占用保留、寻路放行）是项目自有规则接线。检查记录见 [基座与维修检查](../validation/ruins-repair.md)。

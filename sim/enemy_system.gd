@@ -492,7 +492,7 @@ func _blocker_at(point: Vector2, grid: MechGridState, building_ids: Dictionary) 
 			var cell := Vector2i(x, y)
 			var occupant: int = grid.occupant_at(cell)
 			var solid_terrain: bool = occupant == 0 and grid.terrain_at(cell) == MechGridState.Terrain.OBSTACLE
-			if occupant == 0 and not solid_terrain:
+			if (occupant == 0 and not solid_terrain) or grid.is_pass_through(cell):
 				continue
 			var closest := point.clamp(Vector2(cell), Vector2(cell + Vector2i.ONE))
 			if point.distance_squared_to(closest) < radius * radius:

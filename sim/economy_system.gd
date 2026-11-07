@@ -108,6 +108,11 @@ func advance_repairs(buildings: Array[MechBuildingState], hz: int) -> void:
 			building.repairing = false
 			building.repair_remainder = 0
 			continue
+		# In combat (building-economy.md §4.2): healing halts without spending
+		# or accumulating remainders until the site is clear of enemies.
+		if building.threatened:
+			building.repair_waiting_for_funds = false
+			continue
 		# One coin/sec, two HP/coin. Keep at most one unpaid step.
 		building.repair_remainder += 1
 		building.repair_waiting_for_funds = coins() == 0

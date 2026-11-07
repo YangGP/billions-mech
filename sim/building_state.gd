@@ -2,7 +2,13 @@ class_name MechBuildingState
 extends RefCounted
 ## Independent construction, health and demolition state.
 
-enum Phase { CONSTRUCTING, OPERATING, DEMOLISHING }
+enum Phase { CONSTRUCTING, OPERATING, DEMOLISHING, RUINED }
+
+const REBUILD_COST_RATIO: float = 0.5
+## Enemies within this radius of the footprint keep an attacked building in
+## its combat state (building-economy.md §4.2): repairs stay suspended until
+## the site is clear.
+const THREAT_RADIUS: float = 6.0
 
 var entity_id: int
 var definition: MechBuildingDefinition
@@ -27,6 +33,9 @@ var income_remainder: int = 0
 var attack_cooldown_ticks: int = 0
 var shot_ticks: int = 0
 var shot_target: Vector2 = Vector2.ZERO
+## Combat state: set on taking damage, held while enemies stay within
+## THREAT_RADIUS, cleared by the SimCore scan once the site is clear.
+var threatened: bool = false
 
 
 func configure(id: int, rules: MechBuildingDefinition, cell: Vector2i, hz: int, completed: bool = false) -> void:
@@ -60,11 +69,43 @@ func refund() -> Vector4i:
 	return MechResources.scaled(paid_cost, paid_refund_ratio)
 
 
+func rebuild_cost() -> Vector4i:
+	return MechResources.scaled(definition.cost, REBUILD_COST_RATIO)
+
+
+func mark_ruined() -> void:
+	# Occupancy, the mineral binding and the registry entity stay; everything
+	# else resets so a later rebuild starts from a clean construction state.
+	phase = Phase.RUINED
+	hp = 0
+	built_hp = 1
+	elapsed_build_ticks = 0
+	elapsed_demolition_ticks = 0
+	waiting_for_clearance = false
+	reset_repair_state()
+	threatened = false
+	paid_cost = Vector4i.ZERO
+	extraction_remainder = 0
+	income_remainder = 0
+	attack_cooldown_ticks = 0
+	shot_ticks = 0
+
+
+func reset_repair_state() -> void:
+	repairing = false
+	repair_remainder = 0
+	repair_waiting_for_funds = false
+
+
 func status() -> String:
+	if phase == Phase.RUINED:
+		return "已摧毁 · 基座占位"
 	if phase == Phase.CONSTRUCTING:
 		return "等待友军移出" if waiting_for_clearance else "施工中"
 	if phase == Phase.DEMOLISHING:
-		return "拆除中"
+		return "清除基座中" if hp == 0 else "拆除中"
+	if threatened:
+		return "交战中 · 维修暂停" if repairing else "交战中"
 	if not powered:
 		return "未通电"
 	if repairing:
@@ -79,6 +120,7 @@ func snapshot() -> Dictionary:
 		"build_progress": float(elapsed_build_ticks) / build_ticks,
 		"demolition_progress": float(elapsed_demolition_ticks) / demolition_ticks,
 		"demolition_seconds": definition.demolition_seconds, "refund": refund(),
-		"repairing": repairing, "powered": powered, "waiting_for_clearance": waiting_for_clearance,
+		"repairing": repairing, "threatened": threatened, "powered": powered,
+		"waiting_for_clearance": waiting_for_clearance, "rebuild_cost": rebuild_cost(),
 		"shot_ticks": shot_ticks, "shot_target": shot_target}, true)
 	return result

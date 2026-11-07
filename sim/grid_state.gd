@@ -120,11 +120,34 @@ func release(entity_id: int) -> void:
 	for index: int in range(_occupancy.size()):
 		if _occupancy[index] == entity_id:
 			_occupancy[index] = 0
+	_pass_through.erase(entity_id)
+	_revision += 1
+
+
+## Pass-through occupants keep their cells (placement checks and mineral
+## bindings still see them) while pathfinding, RVO obstacles and movement
+## validation treat the cells as open ground — used by destroyed bases.
+func set_pass_through(entity_id: int, enabled: bool) -> void:
+	if enabled:
+		_pass_through[entity_id] = true
+	else:
+		_pass_through.erase(entity_id)
 	_revision += 1
 
 
 func is_walkable(cell: Vector2i, include_buildings: bool = true) -> bool:
-	return contains(cell) and terrain_at(cell) != Terrain.OBSTACLE and (not include_buildings or occupant_at(cell) == 0)
+	return contains(cell) and terrain_at(cell) != Terrain.OBSTACLE \
+		and (not include_buildings or not _blocks_path(occupant_at(cell)))
+
+
+func _blocks_path(occupant: int) -> bool:
+	return occupant != 0 and not _pass_through.has(occupant)
+
+
+## True when the cell is held by a pass-through occupant (destroyed base).
+func is_pass_through(cell: Vector2i) -> bool:
+	var occupant: int = occupant_at(cell)
+	return occupant != 0 and _pass_through.has(occupant)
 
 
 func mobile_position_clear(point: Vector2) -> bool:

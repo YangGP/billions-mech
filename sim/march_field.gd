@@ -70,7 +70,9 @@ func _contains(cell: Vector2i) -> bool:
 
 ## Enter cost per cell: terrain weight; building cells add 1 + min(HP, cap) / divisor.
 ## The building containing the goal (the mainbrain) is exempt — it is the
-## destination, not an obstacle. Non-building occupants keep plain terrain cost.
+## destination, not an obstacle. Destroyed bases (hp == 0) are pass-through
+## rubble on open terrain: marchers stream straight through the gap they made.
+## Non-building occupants keep plain terrain cost.
 func _fill_costs(grid: MechGridState, buildings: Array[MechBuildingState]) -> void:
 	var goal_building_id: int = 0
 	var soft: Dictionary = {}

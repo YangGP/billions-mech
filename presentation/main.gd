@@ -66,6 +66,7 @@ func _ready() -> void:
 	_hud.production_cancelled.connect(_cancel_production)
 	_hud.scenario_requested.connect(_toggle_scenario)
 	_hud.settings_requested.connect(_open_settings)
+	_hud.minimap_focus_requested.connect(_focus_minimap)
 	_settings.close_requested.connect(_close_settings)
 	_settings.settings_applied.connect(_apply_camera_settings)
 	_apply_camera_settings(_settings.preferences())
@@ -99,6 +100,7 @@ func _process(delta: float) -> void:
 	_publish_state()
 	_update_cursor()
 	_hud.present_zoom(_camera.zoom.x)
+	_hud.present_camera(_camera.visible_world_rect())
 	if _perf_enabled:
 		_perf_view_usec += Time.get_ticks_usec() - started
 		_perf_frames += 1
@@ -250,8 +252,12 @@ func _handle_key(key: int) -> bool:
 			_focus_mainbrain()
 		KEY_HOME:
 			_fit_map()
+		KEY_M:
+			_hud.toggle_minimap_fullscreen()
 		KEY_ESCAPE:
-			if _selection_dragging:
+			if _hud.is_minimap_fullscreen():
+				_hud.set_minimap_fullscreen(false)
+			elif _selection_dragging:
 				_cancel_selection_drag()
 			elif _build_id != &"" or _wall_dragging:
 				_cancel_build()
@@ -312,6 +318,12 @@ func _focus_mainbrain() -> void:
 	_camera.focus_mainbrain()
 
 
+func _focus_minimap(world_position: Vector2) -> void:
+	# Jumping the camera from the minimap keeps build placement active
+	# (operations.md §3.2); nothing here cancels or issues commands.
+	_camera.focus_world(world_position)
+
+
 func _fit_map() -> void:
 	_cancel_wall_drag()
 	_camera.fit_map()
@@ -355,6 +367,10 @@ func _cancel_build() -> void:
 
 func _building_action(action: int, entity_id: int) -> void:
 	_commands.submit(MechCommand.new(action as MechCommand.Type, {"entity_id": entity_id}))
+
+
+func _repair_all() -> void:
+	_commands.submit(MechCommand.new(MechCommand.Type.REPAIR_ALL, {}))
 
 
 func _queue_unit(factory_id: int) -> void:
@@ -506,11 +522,15 @@ func _on_command_finished(command_type: int, result: Dictionary) -> void:
 		MechCommand.Type.CANCEL_CONSTRUCTION:
 			_hud.feedback("施工已取消，返还 %s 并释放占用。" % MechResources.text(result["refund"]))
 		MechCommand.Type.DEMOLISH:
-			_hud.feedback("已开始拆除；建筑停机，工程完成后退款并释放占用。")
+			_hud.feedback("已开始清除基座；完成时不退款，释放占地与矿点绑定。" if result.get("clearing", false) else "已开始拆除；建筑停机，工程完成后退款并释放占用。")
 		MechCommand.Type.CANCEL_DEMOLISH:
-			_hud.feedback("拆除已取消，血量保持，建筑恢复工作。")
+			_hud.feedback("清除已取消，基座保留原地。" if result.get("was_clearing", false) else "拆除已取消，血量保持，建筑恢复工作。")
 		MechCommand.Type.TOGGLE_REPAIR:
 			_hud.feedback("维修开关已更新；按模拟时间扣费回血，资金不足时等待。")
+		MechCommand.Type.REBUILD:
+			_hud.feedback("重建已下单，支付 %s；完工后恢复运行。" % MechResources.text(result["cost"]))
+		MechCommand.Type.REPAIR_ALL:
+			_hud.feedback("已对 %d 座受损建筑开启维修。" % result["count"])
 		MechCommand.Type.MOVE_ENTITY:
 			_hud.feedback("移动目标已更新。" if not _sim.is_paused() else "目标已更新，恢复后移动。")
 		MechCommand.Type.RESET_SESSION:

@@ -23,6 +23,9 @@ var _tick_counter: int = 0
 
 ## Marching player units emit weak movement noise every two seconds (staggered).
 const MOVEMENT_NOISE_SECONDS: float = 2.0
+## Combat-state rescan interval: attacked buildings leave combat once no
+## enemy remains within MechBuildingState.THREAT_RADIUS (twice per second).
+const COMBAT_SCAN_TICKS: int = 15
 var _settings: MechFoundationSettings
 var _unit_definition: MechUnitDefinition
 var _map_definition: MechMapDefinition
@@ -162,22 +165,58 @@ func execute_command(command: MechCommand) -> Dictionary:
 			result = {"ok": true, "reason": "", "refund": refund}
 		MechCommand.Type.DEMOLISH:
 			var building: MechBuildingState = _construction.get_building(command.payload["entity_id"])
+			var clearing: bool = building.phase == MechBuildingState.Phase.RUINED
+			if clearing:
+				# Clearing a base never refunds (values.md §7); paid_cost zero makes
+				# the demolition-completion refund path come out empty.
+				building.paid_cost = Vector4i.ZERO
 			building.phase = MechBuildingState.Phase.DEMOLISHING
 			building.elapsed_demolition_ticks = 0
 			building.repairing = false
 			building.repair_remainder = 0
 			_threat.note_construction(Vector2(building.origin) + Vector2(building.definition.footprint) * 0.5)
 			_recompute_economy()
+			result["clearing"] = clearing
+			result["refund"] = building.refund()
 		MechCommand.Type.CANCEL_DEMOLISH:
 			var building: MechBuildingState = _construction.get_building(command.payload["entity_id"])
-			building.phase = MechBuildingState.Phase.OPERATING
+			var was_clearing: bool = building.hp <= 0
+			building.phase = MechBuildingState.Phase.RUINED if was_clearing else MechBuildingState.Phase.OPERATING
 			building.elapsed_demolition_ticks = 0
 			_recompute_economy()
+			result["was_clearing"] = was_clearing
 		MechCommand.Type.TOGGLE_REPAIR:
 			var building: MechBuildingState = _construction.get_building(command.payload["entity_id"])
 			building.repairing = not building.repairing
 			building.repair_remainder = 0
 			building.repair_waiting_for_funds = _economy.coins() == 0
+		MechCommand.Type.REBUILD:
+			var building: MechBuildingState = _construction.get_building(command.payload["entity_id"])
+			var cost: Vector4i = building.rebuild_cost()
+			if not _economy.try_spend(cost):
+				return _reject("资源不足，重建未下单")
+			building.paid_cost = cost
+			building.phase = MechBuildingState.Phase.CONSTRUCTING
+			building.elapsed_build_ticks = 0
+			building.elapsed_demolition_ticks = 0
+			building.hp = 1
+			building.built_hp = 1
+			building.waiting_for_clearance = false
+			building.reset_repair_state()
+			# A rebuild is fresh construction: blocking resumes from the order on.
+			_grid.set_pass_through(building.entity_id, false)
+			_production.register_factory(building)
+			_threat.note_construction(Vector2(building.origin) + Vector2(building.definition.footprint) * 0.5)
+			_recompute_economy()
+			result = {"ok": true, "reason": "", "entity_id": building.entity_id, "cost": cost}
+		MechCommand.Type.REPAIR_ALL:
+			var count: int = 0
+			for target: MechBuildingState in _construction.all():
+				if target.phase == MechBuildingState.Phase.OPERATING and target.hp < target.definition.max_hp:
+					target.repairing = true
+					target.repair_remainder = 0
+					count += 1
+			result = {"ok": true, "reason": "", "count": count}
 	_sync_navigation()
 	_sync_vision()
 	state_changed.emit()
@@ -234,8 +273,12 @@ func validate_command(command: MechCommand) -> Dictionary:
 			var plan: Dictionary = preview_wall_line(cells)
 			plan["origins"] = cells
 			return plan
-		MechCommand.Type.CANCEL_CONSTRUCTION, MechCommand.Type.DEMOLISH, MechCommand.Type.CANCEL_DEMOLISH, MechCommand.Type.TOGGLE_REPAIR:
+		MechCommand.Type.CANCEL_CONSTRUCTION, MechCommand.Type.DEMOLISH, MechCommand.Type.CANCEL_DEMOLISH, MechCommand.Type.TOGGLE_REPAIR, MechCommand.Type.REBUILD:
 			return _validate_building_action(command)
+		MechCommand.Type.REPAIR_ALL:
+			var repair_all: Dictionary = _repair_all_status()
+			if not repair_all["ok"]:
+				return _reject(repair_all["reason"])
 		MechCommand.Type.RESET_SESSION:
 			pass
 		_:
@@ -255,6 +298,8 @@ func advance_one_tick() -> void:
 		_remove_building(entity_id, building.refund(), true)
 	if not changes["completed"].is_empty():
 		_recompute_economy()
+	if _tick_counter % COMBAT_SCAN_TICKS == 0:
+		_scan_combat_threat()
 	_economy.advance_repairs(_construction.all(), _tick_rate)
 	_sync_navigation()
 	if _production.advance(_construction, _spawn_unit):
@@ -517,7 +562,12 @@ func damage_building(entity_id: int, amount: int) -> Dictionary:
 	var building: MechBuildingState = _construction.get_building(entity_id)
 	if building == null or amount <= 0:
 		return _reject("伤害目标或数值无效")
+	if building.phase == MechBuildingState.Phase.RUINED:
+		return _reject("基座无法被攻击")
 	building.hp = maxi(0, building.hp - amount)
+	# Any hit puts the building into combat: repairs stay suspended while
+	# enemies remain within THREAT_RADIUS (building-economy.md §4.2).
+	building.threatened = true
 	if building.hp == 0:
 		# Infection: capacity-bearing assets destroyed by enemies spawn builders at
 		# the wreck plus a combat pulse (values.md §14). Demolish/cancel paths never
@@ -525,11 +575,53 @@ func damage_building(entity_id: int, amount: int) -> Dictionary:
 		var rules: MechBuildingDefinition = building.definition
 		if not rules.is_core and rules.capacity_cost > 0:
 			_infect_asset(rules.cost, Vector2(building.origin) + Vector2(rules.footprint) * 0.5)
-		_remove_building(entity_id, Vector4i.ZERO)
+		if rules.is_core:
+			_remove_building(entity_id, Vector4i.ZERO)
+		elif building.phase == MechBuildingState.Phase.CONSTRUCTING:
+			# Under-construction losses leave no base: nothing has sunk
+			# into the site yet, so it is removed outright.
+			_remove_building(entity_id, Vector4i.ZERO)
+		else:
+			# Finished buildings leave an occupying base (building-economy.md
+			# §4.1): cells and the mineral binding stay held, but the base
+			# itself never blocks movement.
+			_ruin_building(building)
 		_sync_navigation()
 	_sync_vision()
 	state_changed.emit()
 	return {"ok": true, "reason": ""}
+
+
+func _ruin_building(building: MechBuildingState) -> void:
+	building.mark_ruined()
+	# Destroyed factories lose their queue without refunds (building-economy.md §5).
+	_economy.credit(_production.remove_factory(building.entity_id, false))
+	# The base keeps its cells for placement and mineral binding but never
+	# blocks movement (building-economy.md §4.1).
+	_grid.set_pass_through(building.entity_id, true)
+	_recompute_economy()
+
+
+func _scan_combat_threat() -> void:
+	# Attacked buildings leave the combat state only once no enemy remains
+	# within THREAT_RADIUS of their footprint (building-economy.md §4.2).
+	# Enemies passing by later without attacking do not re-enter combat.
+	var radius_sq: float = MechBuildingState.THREAT_RADIUS * MechBuildingState.THREAT_RADIUS
+	for building: MechBuildingState in _construction.all():
+		if not building.threatened or building.hp <= 0:
+			continue
+		var rect := Rect2(Vector2(building.origin), Vector2(building.definition.footprint))
+		var engaged := false
+		for entity: MechEntityState in _registry.all():
+			if entity.enemy_definition == null or entity.hp <= 0:
+				continue
+			var clamped := Vector2(clampf(entity.position.x, rect.position.x, rect.end.x),
+				clampf(entity.position.y, rect.position.y, rect.end.y))
+			if entity.position.distance_squared_to(clamped) <= radius_sq:
+				engaged = true
+				break
+		if not engaged:
+			building.threatened = false
 
 
 func _place(id: StringName, origin: Vector2i) -> Dictionary:
@@ -587,8 +679,8 @@ func _validate_building_action(command: MechCommand) -> Dictionary:
 		MechCommand.Type.DEMOLISH:
 			if building.definition.is_core:
 				return _reject("主脑不可拆除")
-			if building.phase != MechBuildingState.Phase.OPERATING:
-				return _reject("只有已完工建筑可拆除")
+			if building.phase != MechBuildingState.Phase.OPERATING and building.phase != MechBuildingState.Phase.RUINED:
+				return _reject("只有完工建筑或基座可拆除")
 		MechCommand.Type.CANCEL_DEMOLISH:
 			if building.phase != MechBuildingState.Phase.DEMOLISHING:
 				return _reject("建筑未在拆除")
@@ -597,7 +689,30 @@ func _validate_building_action(command: MechCommand) -> Dictionary:
 				return _reject("施工或拆除期间不可维修")
 			if not building.repairing and building.hp >= building.definition.max_hp:
 				return _reject("建筑完好，无需维修")
+		MechCommand.Type.REBUILD:
+			if building.phase != MechBuildingState.Phase.RUINED:
+				return _reject("仅摧毁基座可重建")
+			# Reservations stay held by the base itself; only funds gate a rebuild.
+			var funds_error: String = _economy.spend_error(building.rebuild_cost())
+			if not funds_error.is_empty():
+				return _reject(funds_error)
 	return {"ok": true, "reason": ""}
+
+
+func _repair_all_status() -> Dictionary:
+	if session_ended():
+		return {"ok": false, "reason": "本局已结束", "count": 0}
+	var count: int = 0
+	for building: MechBuildingState in _construction.all():
+		# Any live building still in combat blocks the button; bases (hp == 0)
+		# are never attacked and never block.
+		if building.hp > 0 and building.threatened:
+			return {"ok": false, "reason": "有建筑交战中，周边 6 格内仍有敌军", "count": 0}
+		if building.phase == MechBuildingState.Phase.OPERATING and building.hp < building.definition.max_hp:
+			count += 1
+	if count == 0:
+		return {"ok": false, "reason": "没有受损的完工建筑", "count": 0}
+	return {"ok": true, "reason": "", "count": count}
 
 
 func _validate_move(payload: Dictionary) -> Dictionary:
@@ -689,7 +804,7 @@ func _wall_connections(origin: Vector2i) -> int:
 	var directions: Array[Vector2i] = [Vector2i.LEFT, Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN]
 	for index: int in range(directions.size()):
 		var adjacent: MechBuildingState = _construction.get_building(_grid.occupant_at(origin + directions[index]))
-		if adjacent != null and adjacent.definition.building_id == &"armored_wall":
+		if adjacent != null and adjacent.hp > 0 and adjacent.definition.building_id == &"armored_wall":
 			mask |= 1 << index
 	return mask
 

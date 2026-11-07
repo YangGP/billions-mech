@@ -60,6 +60,17 @@ func fit_map() -> void:
 	_clamp_position()
 
 
+func visible_world_rect() -> Rect2:
+	var half: Vector2 = get_viewport_rect().size / zoom * 0.5
+	return Rect2(position - half, half * 2.0)
+
+
+func focus_world(world_position: Vector2) -> void:
+	_stop_drag()
+	position = world_position
+	_clamp_position()
+
+
 func handle_event(event: InputEvent) -> bool:
 	if input_blocked or _external_gesture:
 		return false
