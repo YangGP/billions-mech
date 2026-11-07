@@ -175,11 +175,12 @@ func _draw_minerals() -> void:
 		if mineral["remaining"] <= 0 or mineral["assigned_to"] != 0:
 			continue
 		var point: Vector2 = MechIsoGeometry.cell_center(mineral["cell"])
-		_outline_cell(mineral["cell"], Vector2i.ONE, Color("b9c5ce"), 2.0)
+		var dim: float = 0.0 if mineral.get("visible", true) else 0.59
+		_outline_cell(mineral["cell"], Vector2i.ONE, Color("b9c5ce").darkened(dim), 2.0)
 		for offset: Vector2 in [Vector2(-12, 0), Vector2(6, -6), Vector2(15, 5)]:
 			var rock := PackedVector2Array([point + offset + Vector2(-10, 2), point + offset + Vector2(-2, -14), point + offset + Vector2(11, 2)])
-			draw_colored_polygon(rock, Color("c4cdd2"))
-			draw_line(point + offset + Vector2(-2, -14), point + offset + Vector2(0, 2), Color("85939c"), 2.0, true)
+			draw_colored_polygon(rock, Color("c4cdd2").darkened(dim))
+			draw_line(point + offset + Vector2(-2, -14), point + offset + Vector2(0, 2), Color("85939c").darkened(dim), 2.0, true)
 
 
 func _visual_sort(a: Dictionary, b: Dictionary) -> bool:

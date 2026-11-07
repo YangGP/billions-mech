@@ -12,6 +12,7 @@ extends Resource
 @export var starting_unit_cells: Array[Vector2i] = []
 @export var practice_target_cells: Array[Vector2i] = []
 @export_range(0.1, 10.0, 0.1) var probe_speed: float = 2.5
+@export_range(0.5, 64.0, 0.5) var probe_sight_radius: float = 7.0
 
 ## Threat side (values.md §2/§12/§13/§15). Training keeps threat_enabled off.
 @export var enemy_definitions: Array[MechEnemyDefinition] = []

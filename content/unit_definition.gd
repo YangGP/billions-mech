@@ -13,6 +13,7 @@ extends Resource
 @export var attack_range: float = 4.0
 @export var acquisition_range: float = 6.0
 @export var move_speed: float = 2.5
+@export_range(0.5, 64.0, 0.5) var sight_radius: float = 7.0
 
 
 func validation_error() -> String:
@@ -25,6 +26,8 @@ func validation_error() -> String:
 			return "单位时间、射程或移速无效"
 	if acquisition_range < attack_range:
 		return "单位索敌范围不可小于射程"
+	if not is_finite(sight_radius) or sight_radius <= 0.0 or sight_radius > 64.0:
+		return "单位视野半径无效"
 	return ""
 
 

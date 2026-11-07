@@ -156,12 +156,36 @@ func movement_weight(cell: Vector2i) -> float:
 	return _rough_weight if terrain_at(cell) == Terrain.ROUGH else 1.0
 
 
-func terrain_line_clear(from: Vector2, to: Vector2) -> bool:
-	# Buildings never block sight (vision-fog.md §2); only obstacle terrain does.
-	for cell: Vector2i in Geometry2D.bresenham_line(Vector2i(from.floor()), Vector2i(to.floor())):
+func terrain_line_clear(from: Vector2, to: Vector2, reveal_blocker: bool = false) -> bool:
+	# Supercover traversal: diagonal cracks between rocks never leak vision.
+	# A visibility ray reveals its first blocking tile; combat rays cannot hit
+	# through it. Buildings and rough terrain do not block either kind of ray.
+	var cell := Vector2i(from.floor())
+	var goal := Vector2i(to.floor())
+	if not contains(cell) or not contains(goal):
+		return false
+	var delta: Vector2 = to - from
+	var step := Vector2i(signi(goal.x - cell.x), signi(goal.y - cell.y))
+	var stride := Vector2(INF if step.x == 0 else absf(1.0 / delta.x), INF if step.y == 0 else absf(1.0 / delta.y))
+	var boundary := Vector2(cell) + Vector2(1 if step.x > 0 else 0, 1 if step.y > 0 else 0)
+	var crossing := Vector2(INF if step.x == 0 else (boundary.x - from.x) / delta.x, INF if step.y == 0 else (boundary.y - from.y) / delta.y)
+	while true:
+		if cell == goal:
+			return reveal_blocker or terrain_at(cell) != Terrain.OBSTACLE
 		if terrain_at(cell) == Terrain.OBSTACLE:
 			return false
-	return true
+		if is_equal_approx(crossing.x, crossing.y):
+			if terrain_at(cell + Vector2i(step.x, 0)) == Terrain.OBSTACLE or terrain_at(cell + Vector2i(0, step.y)) == Terrain.OBSTACLE:
+				return false
+			cell += step
+			crossing += stride
+		elif crossing.x < crossing.y:
+			cell.x += step.x
+			crossing.x += stride.x
+		else:
+			cell.y += step.y
+			crossing.y += stride.y
+	return false
 
 
 func inspect_cell(cell: Vector2i) -> Dictionary:

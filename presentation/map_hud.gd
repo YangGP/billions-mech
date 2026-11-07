@@ -181,7 +181,10 @@ func present_cell(info: Dictionary, preview: Dictionary) -> void:
 	else:
 		var cell: Vector2i = info["cell"]
 		_cell_label.text = "格子  (%d, %d)  ·  %s" % [cell.x, cell.y, info["terrain_name"]]
-		if info["inside"]:
+		if info["inside"] and info.get("vision", MechVisionSystem.State.VISIBLE) == MechVisionSystem.State.UNEXPLORED:
+			_cell_label.text += "\n派遣单位探索；未知区域不显示地形与矿点。"
+		elif info["inside"]:
+			_cell_label.text += " · " + ("实时视野" if info.get("vision", MechVisionSystem.State.VISIBLE) == MechVisionSystem.State.VISIBLE else "已探索 · 无实时视野")
 			_cell_label.text += "\n%s  ·  %s" % ["供电覆盖内" if info["covered"] else "覆盖外", "空地" if info["occupied_by"] == 0 else "建筑占用"]
 			_cell_label.text += "\n%s" % ("可通行 · 速度 %d%%" % roundi(100.0 / float(info["movement_weight"])) if info["walkable"] else "不可通行")
 			var mineral: Dictionary = info.get("mineral", {})

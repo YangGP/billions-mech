@@ -132,11 +132,11 @@ func spawn(building: MechBuildingState, rally: Vector2i, rules: MechUnitDefiniti
 	return true
 
 
-func advance(registry: MechEntityRegistry, grid: MechGridState, navigation: MechGridNavigation, hz: int) -> Array[int]:
+func advance(registry: MechEntityRegistry, grid: MechGridState, navigation: MechGridNavigation, hz: int, vision: MechVisionSystem) -> Array[int]:
 	var dead: Array[int] = []
 	var enemies: Dictionary[Vector2i, Array] = {}
 	for entity: MechEntityState in registry.all():
-		if entity.team == 2 and entity.hp > 0:
+		if entity.team == 2 and entity.hp > 0 and vision.is_visible(entity.position):
 			var cell := Vector2i(entity.position.floor())
 			if not enemies.has(cell):
 				enemies[cell] = []
@@ -155,6 +155,14 @@ func advance(registry: MechEntityRegistry, grid: MechGridState, navigation: Mech
 			_repath_blocked(unit, navigation, hz)
 			continue
 		var target: MechEntityState = registry.get_entity(unit.attack_target_id)
+		if target != null and not vision.is_visible(target.position):
+			# Search the last observed position, never follow a hidden entity ID.
+			unit.set_move_path(PackedVector2Array())
+			unit.repath_ticks = 0
+			unit.attack_target_id = 0
+			if unit.order == &"attack":
+				unit.order = &"attack_move"
+			target = null
 		if target == null or target.hp <= 0 or target.team != 2:
 			if unit.attack_target_id != 0:
 				unit.set_move_path(PackedVector2Array())
@@ -170,6 +178,8 @@ func advance(registry: MechEntityRegistry, grid: MechGridState, navigation: Mech
 				unit.set_move_path(PackedVector2Array())
 				unit.repath_ticks = 0
 		if target != null:
+			if unit.order == &"attack":
+				unit.order_goal = target.position
 			if unit.position.distance_to(target.position) <= unit.unit_definition.attack_range and _line_clear(unit.position, target.position, grid):
 				unit.set_move_path(PackedVector2Array())
 				if unit.cooldown_ticks == 0:
@@ -207,10 +217,7 @@ func _nearest_enemy(unit: MechEntityState, buckets: Dictionary) -> MechEntitySta
 
 
 func _line_clear(from: Vector2, to: Vector2, grid: MechGridState) -> bool:
-	for cell: Vector2i in Geometry2D.bresenham_line(Vector2i(from.floor()), Vector2i(to.floor())):
-		if grid.terrain_at(cell) == MechGridState.Terrain.OBSTACLE:
-			return false
-	return true
+	return grid.terrain_line_clear(from, to)
 
 
 func _attack_path(unit: MechEntityState, target: MechEntityState, registry: MechEntityRegistry, grid: MechGridState, navigation: MechGridNavigation) -> PackedVector2Array:

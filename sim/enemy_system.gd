@@ -14,6 +14,8 @@ const SEPARATION_WEIGHT: float = 0.6
 const SEPARATION_RADIUS: float = 0.6
 const CROWD_SEPARATION_RADIUS: float = 0.3
 const VISION_SCAN_INTERVAL: int = 5
+const FOG_DECISION_STRIDE: int = 4
+const ACTIVITY_BUCKET_SIZE: int = 16
 const FIELD_HP_REFRESH_SECONDS: float = 1.0
 const CONVERGE_REPATH_SECONDS: float = 2.0
 const CONVERGE_ARRIVAL: float = 1.0
@@ -78,12 +80,13 @@ func create(registry: MechEntityRegistry, rules: MechEnemyDefinition, position: 
 
 ## Returns unit deaths and building damage; SimCore applies them through its own
 ## removal/economy paths so refunds and capacity follow the existing rules.
-func advance(registry: MechEntityRegistry, grid: MechGridState, navigation: MechGridNavigation, buildings: Array[MechBuildingState], hz: int, noises: Array[Dictionary]) -> Dictionary:
+func advance(registry: MechEntityRegistry, grid: MechGridState, navigation: MechGridNavigation, buildings: Array[MechBuildingState], hz: int, noises: Array[Dictionary], vision: MechVisionSystem) -> Dictionary:
 	var result: Dictionary = {"dead_units": [], "building_hits": []}
 	_refresh_field(grid, buildings, hz)
 	var building_ids: Dictionary = {}
 	var buildings_by_id: Dictionary = {}
 	var building_cells: Dictionary = {}
+	var active_regions: Dictionary = {}
 	for building: MechBuildingState in buildings:
 		if building.hp <= 0:
 			continue
@@ -92,6 +95,7 @@ func advance(registry: MechEntityRegistry, grid: MechGridState, navigation: Mech
 		for y: int in range(building.definition.footprint.y):
 			for x: int in range(building.definition.footprint.x):
 				building_cells[building.origin + Vector2i(x, y)] = building.entity_id
+				_mark_active_region(building.origin + Vector2i(x, y), active_regions)
 	var unit_buckets: Dictionary = {}
 	var enemy_buckets: Dictionary = {}
 	var enemies: Array[MechEntityState] = []
@@ -103,6 +107,7 @@ func advance(registry: MechEntityRegistry, grid: MechGridState, navigation: Mech
 			if not unit_buckets.has(unit_cell):
 				unit_buckets[unit_cell] = []
 			unit_buckets[unit_cell].append(entity)
+			_mark_active_region(unit_cell, active_regions)
 		elif entity.team == 2 and entity.enemy_definition != null:
 			enemies.append(entity)
 			var enemy_cell := Vector2i(entity.position.floor())
@@ -113,15 +118,35 @@ func advance(registry: MechEntityRegistry, grid: MechGridState, navigation: Mech
 	var tick: int = _tick_counter
 	_tick_counter += 1
 	for enemy: MechEntityState in enemies:
+		var cell := Vector2i(enemy.position.floor())
+		var near_assets: bool = active_regions.has(_activity_bucket(cell))
+		var local_radius: float = maxf(enemy.enemy_definition.vision_radius, enemy.enemy_definition.attack_range)
+		var coarse: bool = not vision.is_visible(enemy.position) and not near_assets and local_radius <= ACTIVITY_BUCKET_SIZE
+		if enemy.fog_coarse and not coarse:
+			enemy.repath_ticks = 0
+		enemy.fog_coarse = coarse
 		_advance_one(enemy, registry, grid, navigation, buildings_by_id, building_ids,
-			building_cells, unit_buckets, enemy_buckets, noises, tick, dt, hz, result)
+			building_cells, unit_buckets, enemy_buckets, noises, tick, dt, hz, result, coarse)
 	return result
+
+
+func _activity_bucket(cell: Vector2i) -> Vector2i:
+	return Vector2i(Vector2(cell) / float(ACTIVITY_BUCKET_SIZE))
+
+
+func _mark_active_region(cell: Vector2i, regions: Dictionary) -> void:
+	var bucket: Vector2i = _activity_bucket(cell)
+	# At least sixteen tiles of margin: combat and nearby enemy perception keep
+	# full cadence even in terrain blind spots. Fog never disables enemy senses.
+	for y: int in range(-1, 2):
+		for x: int in range(-1, 2):
+			regions[bucket + Vector2i(x, y)] = true
 
 
 func _advance_one(enemy: MechEntityState, registry: MechEntityRegistry, grid: MechGridState,
 		navigation: MechGridNavigation, buildings_by_id: Dictionary, building_ids: Dictionary,
 		building_cells: Dictionary, unit_buckets: Dictionary, enemy_buckets: Dictionary,
-		noises: Array[Dictionary], tick: int, dt: float, hz: int, result: Dictionary) -> void:
+		noises: Array[Dictionary], tick: int, dt: float, hz: int, result: Dictionary, coarse: bool) -> void:
 	var rules: MechEnemyDefinition = enemy.enemy_definition
 	if rules == null:
 		return
@@ -131,7 +156,8 @@ func _advance_one(enemy: MechEntityState, registry: MechEntityRegistry, grid: Me
 	# Being attacked is an immediate engage condition even between vision scans.
 	var provoked: bool = enemy.hp < enemy.hp_last_tick
 	enemy.hp_last_tick = enemy.hp
-	var scan_due: bool = provoked or (tick + enemy.entity_id) % VISION_SCAN_INTERVAL == 0
+	var stride: int = FOG_DECISION_STRIDE if coarse and not provoked else 1
+	var scan_due: bool = provoked or (tick + enemy.entity_id) % (VISION_SCAN_INTERVAL * stride) == 0
 	if enemy.order == &"engaged":
 		_advance_engaged(enemy, registry, grid, navigation, buildings_by_id, building_ids,
 			building_cells, unit_buckets, enemy_buckets, dt, hz, result)
@@ -146,7 +172,8 @@ func _advance_one(enemy: MechEntityState, registry: MechEntityRegistry, grid: Me
 		return
 	# Wanderers never march to the core: noise convergence or TAB-style shuffling.
 	if not enemy.enemy_definition.marches_to_core:
-		_advance_wandering(enemy, noises, grid, navigation, enemy_buckets, building_ids, buildings_by_id, dt)
+		var decision_due: bool = (tick + enemy.entity_id) % stride == 0
+		_advance_wandering(enemy, noises, grid, navigation, enemy_buckets, building_ids, buildings_by_id, dt, decision_due, stride)
 		return
 	_advance_marching(enemy, grid, enemy_buckets, building_ids, dt)
 
@@ -157,7 +184,10 @@ func _advance_one(enemy: MechEntityState, registry: MechEntityRegistry, grid: Me
 ## them lingering wherever they stopped.
 func _advance_wandering(enemy: MechEntityState, noises: Array[Dictionary], grid: MechGridState,
 		navigation: MechGridNavigation, enemy_buckets: Dictionary, building_ids: Dictionary,
-		buildings_by_id: Dictionary, dt: float) -> void:
+		buildings_by_id: Dictionary, dt: float, decision_due: bool, stride: int) -> void:
+	if not decision_due:
+		_walk_wanderer(enemy, grid, enemy_buckets, building_ids, dt)
+		return
 	var heard: Dictionary = {}
 	var best_radius: float = 0.0
 	var best_distance: float = INF
@@ -174,7 +204,7 @@ func _advance_wandering(enemy: MechEntityState, noises: Array[Dictionary], grid:
 		var goal: Vector2 = heard["position"]
 		if enemy.position.distance_to(goal) <= CONVERGE_ARRIVAL:
 			enemy.set_move_path(PackedVector2Array())
-			enemy.repath_ticks = maxi(1, ceili(CONVERGE_REPATH_SECONDS / dt))
+			enemy.repath_ticks = maxi(1, ceili(CONVERGE_REPATH_SECONDS * stride / dt))
 			return
 		if enemy.repath_ticks == 0 and (not enemy.has_move_order or enemy.order_goal.distance_to(goal) > 1.0):
 			var goal_cell := Vector2i(goal.floor())
@@ -186,7 +216,7 @@ func _advance_wandering(enemy: MechEntityState, noises: Array[Dictionary], grid:
 			var path := PackedVector2Array()
 			if grid.is_walkable(goal_cell):
 				path = navigation.find_path(enemy.position, goal_cell)
-			enemy.repath_ticks = maxi(1, ceili(CONVERGE_REPATH_SECONDS / dt))
+			enemy.repath_ticks = maxi(1, ceili(CONVERGE_REPATH_SECONDS * stride / dt))
 			if not path.is_empty():
 				enemy.order_goal = goal
 				enemy.set_move_path(path)
@@ -199,6 +229,11 @@ func _advance_wandering(enemy: MechEntityState, noises: Array[Dictionary], grid:
 			if not path.is_empty():
 				enemy.order_goal = Vector2(shuffle_target) + Vector2(0.5, 0.5)
 				enemy.set_move_path(path)
+	_walk_wanderer(enemy, grid, enemy_buckets, building_ids, dt)
+
+
+func _walk_wanderer(enemy: MechEntityState, grid: MechGridState, enemy_buckets: Dictionary, building_ids: Dictionary, dt: float) -> void:
+	# Movement, collision, cooldowns and damage retain the normal tick duration.
 	if not enemy.has_move_order:
 		return
 	var cell: Vector2i = Vector2i(enemy.position.floor())

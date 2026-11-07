@@ -17,6 +17,7 @@ var _enemies := MechEnemySystem.new()
 var _towers := MechTowerSystem.new()
 var _waves := MechWaveDirector.new()
 var _threat := MechThreatSystem.new()
+var _vision := MechVisionSystem.new()
 var _enemy_defs: Dictionary = {}
 var _tick_counter: int = 0
 
@@ -33,6 +34,8 @@ var _tick_rate: int = 30
 var _starting_resources := Vector4i.ZERO
 var _navigation_revision: int = -1
 var _outcome: StringName = &"ongoing"
+var _alert: Dictionary = {}
+var _alert_sequence: int = 0
 
 
 func _init() -> void:
@@ -44,6 +47,7 @@ func shutdown() -> void:
 
 
 func _on_movement_finished() -> void:
+	_sync_vision()
 	state_changed.emit()
 
 
@@ -169,6 +173,7 @@ func execute_command(command: MechCommand) -> Dictionary:
 			building.repair_remainder = 0
 			building.repair_waiting_for_funds = _economy.coins() == 0
 	_sync_navigation()
+	_sync_vision()
 	state_changed.emit()
 	# Internal pathfinding data never needs to leave the command executor.
 	result.erase("path")
@@ -195,6 +200,10 @@ func validate_command(command: MechCommand) -> Dictionary:
 				return _reject("单位指令类型无效")
 			if typeof(command.payload.get("target_id", 0)) != TYPE_INT:
 				return _reject("攻击目标编号无效")
+			if command.payload["kind"] == &"attack":
+				var target: MechEntityState = _registry.get_entity(command.payload.get("target_id", 0))
+				if target == null or not _vision.is_visible(target.position):
+					return _reject("攻击目标不在当前视野内")
 			return _units.plan_order(command.payload["ids"], command.payload["kind"], command.payload["goal"], command.payload.get("target_id", 0), _registry, _grid, _navigation)
 		MechCommand.Type.SET_PAUSED:
 			if typeof(command.payload.get("paused")) != TYPE_BOOL:
@@ -245,21 +254,22 @@ func advance_one_tick() -> void:
 	if _production.advance(_construction, _spawn_unit):
 		_recompute_economy()
 	_release_enemies()
+	_sync_vision()
 	# Noise emitted last tick reaches wanderers this tick (combat during the
 	# units/enemies passes below lands next tick).
 	var noises: Array[Dictionary] = _threat.noises()
-	var dead: Array[int] = _units.advance(_registry, _grid, _navigation, _tick_rate)
+	var dead: Array[int] = _units.advance(_registry, _grid, _navigation, _tick_rate, _vision)
 	for id: int in dead:
 		_remove_entity(id)
 	if not dead.is_empty():
 		_recompute_economy()
 		_sync_navigation()
-	var enemy_result: Dictionary = _enemies.advance(_registry, _grid, _navigation, _construction.all(), _tick_rate, noises)
+	var enemy_result: Dictionary = _enemies.advance(_registry, _grid, _navigation, _construction.all(), _tick_rate, noises, _vision)
 	for hit: Dictionary in enemy_result["building_hits"]:
 		damage_building(hit["id"], hit["damage"])
 	for id: int in enemy_result["dead_units"]:
 		# Units destroyed by enemies feed infection at the wreck (values.md §14).
-		_release_spawns(_threat.infect(_unit_definition.cost, _registry.position_of(id)))
+		_infect_asset(_unit_definition.cost, _registry.position_of(id))
 		_remove_entity(id)
 	if not enemy_result["dead_units"].is_empty():
 		_recompute_economy()
@@ -267,11 +277,13 @@ func advance_one_tick() -> void:
 	# Finish removal bookkeeping for this combat pass, but never fire towers or
 	# submit a new native movement batch after the core has fallen.
 	if session_ended():
+		_sync_vision()
 		state_changed.emit()
 		return
 	# Towers fire after enemy movement; hits return as results and share the
 	# unit-kill removal bookkeeping (grid release, economy, navigation).
-	var tower_hits: Array[Dictionary] = _towers.advance(_registry, _construction.all(), _tick_rate)
+	_sync_vision()
+	var tower_hits: Array[Dictionary] = _towers.advance(_registry, _construction.all(), _tick_rate, _grid, _vision)
 	var tower_dead: Array[int] = []
 	for hit: Dictionary in tower_hits:
 		var target: MechEntityState = _registry.get_entity(hit["id"])
@@ -295,26 +307,39 @@ func advance_one_tick() -> void:
 
 
 func snapshot() -> Dictionary:
-	var entities: Array[Dictionary] = _registry.snapshots()
+	var entities: Array[Dictionary] = []
+	for current: MechEntityState in _registry.all():
+		if current.team == 2 and not _vision.is_visible(current.position):
+			continue
+		entities.append(current.snapshot())
 	for entity: Dictionary in entities:
 		var building: MechBuildingState = _construction.get_building(entity["id"])
 		if building != null:
 			entity.merge(_building_snapshot(building), true)
 			if building.definition.building_id == &"armored_wall":
 				entity["connections"] = _wall_connections(building.origin)
+		if entity.get("shot_ticks", 0) > 0 and not _vision.is_visible(entity["shot_target"]):
+			entity["shot_ticks"] = 0
 	var economy: Dictionary = _economy.snapshot()
 	var production: Vector4i = _minerals.production_rate(_construction.all())
 	production.x = economy["income_rate"]
 	economy["production_per_minute"] = production
 	economy["unit_capacity"] = _units.capacity_used(_registry)
 	economy["queued_capacity"] = _production.reserved_capacity()
-	return {"clock": _clock.snapshot(), "entities": entities, "economy": economy, "minerals": _minerals.snapshots(),
+	var minerals: Array[Dictionary] = []
+	for mineral: Dictionary in _minerals.snapshots():
+		if _vision.state_at(mineral["cell"]) != MechVisionSystem.State.UNEXPLORED:
+			mineral["visible"] = _vision.state_at(mineral["cell"]) == MechVisionSystem.State.VISIBLE
+			minerals.append(mineral)
+	return {"clock": _clock.snapshot(), "entities": entities, "economy": economy, "minerals": minerals,
+		"vision": _vision.snapshot(),
 		"scenario": _settings.scenario_name, "unit_catalog": _unit_definition.snapshot(),
 		"catalog": _construction.catalog(_economy), "probe_id": _probe_id,
 		"mainbrain_id": _mainbrain_id, "generation": _generation,
 		"session": {"outcome": _outcome, "ended": session_ended(),
 			"reason": "主脑已被摧毁" if _outcome == &"defeat" else ""},
 		"threat": _waves.state(),
+		"alert": _alert.duplicate(),
 		"map_revision": _grid.revision(), "map_name": _map_definition.display_name}
 
 
@@ -329,12 +354,18 @@ func map_snapshot() -> Dictionary:
 
 
 func inspect_cell(cell: Vector2i) -> Dictionary:
+	var vision: MechVisionSystem.State = _vision.state_at(cell)
+	if _grid.contains(cell) and vision == MechVisionSystem.State.UNEXPLORED:
+		return {"cell": cell, "inside": true, "terrain_name": "未探索", "vision": vision, "reason": "派遣单位探索该区域"}
 	var info: Dictionary = _grid.inspect_cell(cell)
+	info["vision"] = vision
 	info["mineral"] = _minerals.at(cell)
 	return info
 
 
 func building_at(cell: Vector2i) -> Dictionary:
+	if _vision.state_at(cell) == MechVisionSystem.State.UNEXPLORED:
+		return {}
 	var building: MechBuildingState = _construction.get_building(_grid.occupant_at(cell))
 	return _building_snapshot(building) if building != null else {}
 
@@ -378,6 +409,29 @@ func _release_spawns(requests: Array[Dictionary]) -> void:
 			_enemies.create(_registry, rules, request["position"])
 
 
+func _infect_asset(cost: Vector4i, position: Vector2) -> void:
+	var requests: Array[Dictionary] = _threat.infect(cost, position)
+	if requests.is_empty():
+		return
+	_release_spawns(requests)
+	# Terrain blind spots must not silently hide an infection event. Report a
+	# qualitative direction without exposing enemy counts or hidden positions.
+	var center: Vector2 = Vector2(_map_definition.mainbrain_origin) + Vector2(_map_definition.mainbrain_footprint) * 0.5
+	var offset: Vector2 = position - center
+	var delta := Vector2(offset.x - offset.y, (offset.x + offset.y) * 0.5)
+	var direction: String
+	if delta.length_squared() < 1.0:
+		direction = "基地附近"
+	elif absf(delta.x) > absf(delta.y) * 2.0:
+		direction = "基地东侧" if delta.x > 0.0 else "基地西侧"
+	elif absf(delta.y) > absf(delta.x) * 2.0:
+		direction = "基地南侧" if delta.y > 0.0 else "基地北侧"
+	else:
+		direction = "基地" + ("东" if delta.x > 0.0 else "西") + ("南侧" if delta.y > 0.0 else "北侧")
+	_alert_sequence += 1
+	_alert = {"sequence": _alert_sequence, "text": "%s发生感疫脉冲，注意来袭威胁。" % direction}
+
+
 func _validate_production_command(command: MechCommand) -> Dictionary:
 	if typeof(command.payload.get("factory_id")) != TYPE_INT:
 		return _reject("工厂编号无效")
@@ -412,11 +466,14 @@ func _remove_entity(id: int) -> void:
 
 
 func preview_footprint(origin: Vector2i, footprint: Vector2i) -> Dictionary:
-	return _grid.preview_footprint(origin, footprint)
+	var result: Dictionary = _grid.preview_footprint(origin, footprint)
+	_mask_unknown_preview(result)
+	return result
 
 
 func preview_build(id: StringName, origin: Vector2i) -> Dictionary:
 	var result: Dictionary = _construction.preview_placement(id, origin, _grid, _economy, _minerals)
+	_mask_unknown_preview(result)
 	if session_ended():
 		result["ok"] = false
 		result["reason"] = "本局已结束"
@@ -425,10 +482,22 @@ func preview_build(id: StringName, origin: Vector2i) -> Dictionary:
 
 func preview_wall_line(cells: Array[Vector2i]) -> Dictionary:
 	var result: Dictionary = _construction.preview_wall_line(cells, _grid, _economy, _minerals)
+	_mask_unknown_preview(result)
 	if session_ended():
 		result["ok"] = false
 		result["reason"] = "本局已结束"
 	return result
+
+
+func _mask_unknown_preview(preview: Dictionary) -> void:
+	for info: Dictionary in preview["cells"]:
+		if _grid.contains(info["cell"]) and _vision.state_at(info["cell"]) == MechVisionSystem.State.UNEXPLORED:
+			info["ok"] = false
+			info["reason"] = "该区域尚未探索"
+			if not preview.get("line", false):
+				preview["ok"] = false
+				preview["reason"] = "该区域尚未探索"
+				preview["mineral_id"] = &""
 
 
 func building_action_error(type: MechCommand.Type, entity_id: int) -> String:
@@ -449,9 +518,10 @@ func damage_building(entity_id: int, amount: int) -> Dictionary:
 		# pass through here, so controlled teardown stays infection-free.
 		var rules: MechBuildingDefinition = building.definition
 		if not rules.is_core and rules.capacity_cost > 0:
-			_release_spawns(_threat.infect(rules.cost, Vector2(building.origin) + Vector2(rules.footprint) * 0.5))
+			_infect_asset(rules.cost, Vector2(building.origin) + Vector2(rules.footprint) * 0.5)
 		_remove_building(entity_id, Vector4i.ZERO)
 		_sync_navigation()
+	_sync_vision()
 	state_changed.emit()
 	return {"ok": true, "reason": ""}
 
@@ -557,6 +627,10 @@ func _sync_navigation() -> void:
 			_registry.set_move_path(entity_id, _navigation.find_path(unit["position"], Vector2i(unit["target"].floor())))
 
 
+func _sync_vision() -> void:
+	_vision.update(_grid, _registry, _construction.all(), _settings.probe_sight_radius)
+
+
 func _clear_building_footprint(building: MechBuildingState) -> bool:
 	var area := Rect2i(building.origin, building.definition.footprint)
 	var assignments: Dictionary[int, Vector2] = {}
@@ -615,6 +689,8 @@ func _wall_connections(origin: Vector2i) -> int:
 func _reset() -> void:
 	_generation += 1
 	_outcome = &"ongoing"
+	_alert.clear()
+	_alert_sequence = 0
 	_tick_counter = 0
 	_clock.reset()
 	_registry.clear()
@@ -653,6 +729,8 @@ func _reset() -> void:
 	_enemies.reset(_grid, _map_definition.mainbrain_origin + (brain.footprint - Vector2i.ONE) / 2, _construction.all())
 	_waves.reset(_grid, _map_definition, _settings.threat_enabled, _tick_rate)
 	_threat.reset(_grid, _map_definition, _settings.threat_enabled, _tick_rate)
+	_vision.reset(_grid)
+	_sync_vision()
 	print("[Billions Mech] playable cells=", _grid.playable_cell_count())
 
 
@@ -669,6 +747,8 @@ func _settings_error(settings: MechFoundationSettings) -> String:
 		return "开局资源无效"
 	if settings.simulation_hz < 10 or settings.simulation_hz > 120 or not is_finite(settings.probe_speed) or settings.probe_speed <= 0.0:
 		return "模拟频率或验证实体速度无效"
+	if not is_finite(settings.probe_sight_radius) or settings.probe_sight_radius <= 0.0 or settings.probe_sight_radius > 64.0:
+		return "验证实体视野半径无效"
 	var construction := MechConstructionSystem.new()
 	error = construction.configure(settings.building_definitions)
 	if not error.is_empty():

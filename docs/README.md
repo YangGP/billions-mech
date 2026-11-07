@@ -22,4 +22,6 @@
 
 [M5 实施与检查](../validation/m5-threat-defense.md) 汇总当前实现及有效检查结果，[bundle 审查记录](../validation/m5-bundle-review.md) 保留逐提交结论；待验收清单与后续顺序统一看[开发计划](development-plan.md)。
 
+[视野迷雾实施与检查](../validation/m6-vision-fog.md) 记录 2026-11-07 接入的三态迷雾、视野与信息过滤、49 项行为检查及原生画面验证。
+
 旧设计稿和 M1–M4 实施流水已清理，仍有效的检查结果与待验项已汇总；旧版本从 Git 历史追溯。[旧原型资源](../archive/README.md) 仅保留非运行依赖的场景和素材。

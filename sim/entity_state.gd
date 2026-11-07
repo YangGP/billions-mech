@@ -30,6 +30,7 @@ var repath_ticks: int = 0
 var blocked_ticks: int = 0
 var shot_ticks: int = 0
 var shot_target: Vector2 = Vector2.ZERO
+var fog_coarse: bool = false
 var _waypoints := PackedVector2Array()
 var _waypoint_index: int = 0
 

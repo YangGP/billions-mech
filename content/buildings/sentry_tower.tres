@@ -2,6 +2,7 @@
 [ext_resource type="Script" path="res://content/building_definition.gd" id="1"]
 [resource]
 script = ExtResource("1")
+sight_radius = 10.0
 building_id = &"sentry_tower"
 display_name = "哨戒炮塔"
 footprint = Vector2i(2, 2)

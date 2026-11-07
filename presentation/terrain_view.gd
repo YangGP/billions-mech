@@ -9,6 +9,8 @@ var _font := SystemFont.new()
 var _cache_viewport: SubViewport
 var _cache_sprite: Sprite2D
 var _painter: Node2D
+var _labels: Node2D
+var _known_markers: Dictionary = {}
 const CACHE_MARGIN: float = 160.0
 const MAX_CACHE_SIDE: float = 4096.0
 
@@ -40,6 +42,7 @@ func _init() -> void:
 
 func present_map(map_state: Dictionary) -> void:
 	_map = map_state.duplicate(true)
+	_known_markers.clear()
 	if not is_inside_tree():
 		return
 	if _cache_viewport == null:
@@ -57,6 +60,9 @@ func present_map(map_state: Dictionary) -> void:
 		_cache_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 		_cache_sprite.texture = _cache_viewport.get_texture()
 		add_child(_cache_sprite)
+		_labels = Node2D.new()
+		add_child(_labels)
+		_labels.draw.connect(_draw_markers)
 	var bounds: Rect2 = MechIsoGeometry.map_bounds(_map["dimensions"], _map["outline"]).grow(CACHE_MARGIN)
 	var resolution: float = minf(1.0, MAX_CACHE_SIDE / maxf(bounds.size.x, bounds.size.y))
 	_cache_viewport.size = Vector2i((bounds.size * resolution).ceil())
@@ -67,6 +73,19 @@ func present_map(map_state: Dictionary) -> void:
 	_cache_sprite.show()
 	_painter.queue_redraw()
 	_cache_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
+	_labels.queue_redraw()
+
+
+func present_vision(vision: Dictionary) -> void:
+	var cells: PackedByteArray = vision["cells"]
+	var dimensions: Vector2i = vision["dimensions"]
+	var changed: bool = false
+	for cell: Vector2i in [_map["main_gate"], _map["flank"], _map["mainbrain_origin"] + Vector2i(1, 5)]:
+		if Rect2i(Vector2i.ZERO, dimensions).has_point(cell) and cells[cell.y * dimensions.x + cell.x] != MechVisionSystem.State.UNEXPLORED and not _known_markers.has(cell):
+			_known_markers[cell] = true
+			changed = true
+	if changed:
+		_labels.queue_redraw()
 
 
 func _paint_map() -> void:
@@ -116,9 +135,18 @@ func _paint_map() -> void:
 	var border: PackedVector2Array = boundary.duplicate()
 	border.append(border[0])
 	_painter.draw_polyline(border, Color("587b8c"), 2.0, true)
-	_draw_marker(_map["main_gate"], "主口", Color("f0bc79"))
-	_draw_marker(_map["flank"], "侧翼", Color("f0bc79"))
-	_draw_marker(_map["mainbrain_origin"] + Vector2i(1, 5), "初始腹地", Color("72e9d0"))
+
+
+func _draw_markers() -> void:
+	if _map.is_empty():
+		return
+	if Engine.is_editor_hint() or _known_markers.has(_map["main_gate"]):
+		_draw_marker(_map["main_gate"], "主口", Color("f0bc79"))
+	if Engine.is_editor_hint() or _known_markers.has(_map["flank"]):
+		_draw_marker(_map["flank"], "侧翼", Color("f0bc79"))
+	var belly: Vector2i = _map["mainbrain_origin"] + Vector2i(1, 5)
+	if Engine.is_editor_hint() or _known_markers.has(belly):
+		_draw_marker(belly, "初始腹地", Color("72e9d0"))
 
 
 func _draw_rock(center: Vector2, variation: int, boundary: PackedVector2Array) -> void:
@@ -138,5 +166,5 @@ func _draw_rock(center: Vector2, variation: int, boundary: PackedVector2Array) -
 
 func _draw_marker(cell: Vector2i, text: String, color: Color) -> void:
 	var point: Vector2 = MechIsoGeometry.cell_center(cell)
-	_painter.draw_arc(point, 22.0, 0.0, TAU, 32, color, 2.0, true)
-	_painter.draw_string(_font, point + Vector2(30, 5), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 21, color)
+	_labels.draw_arc(point, 22.0, 0.0, TAU, 32, color, 2.0, true)
+	_labels.draw_string(_font, point + Vector2(30, 5), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 21, color)

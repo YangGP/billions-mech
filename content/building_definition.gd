@@ -16,6 +16,7 @@ extends Resource
 @export var mined_resource: StringName = &""
 @export var extraction_per_minute: int = 0
 @export var coverage_radius: int = 0
+@export_range(0.0, 64.0, 0.5) var sight_radius: float = 0.0
 @export var demolition_seconds: float = 3.0
 @export_range(0.0, 1.0) var refund_ratio: float = 0.5
 @export var is_core: bool = false
@@ -37,6 +38,8 @@ func validation_error() -> String:
 		return "建筑生命或造价无效"
 	if mini(mini(capacity_provided, power_provided), income_per_minute) < 0 or coverage_radius < 0:
 		return "建筑供给无效"
+	if not is_finite(sight_radius) or sight_radius < 0.0 or sight_radius > 64.0:
+		return "建筑视野半径无效"
 	if extraction_per_minute < 0 or (mined_resource != &"" and MechResources.KEYS.find(mined_resource) < 1):
 		return "采集类型或产率无效"
 	if (mined_resource == &"") != (extraction_per_minute == 0):
@@ -60,4 +63,5 @@ func snapshot() -> Dictionary:
 		"income_per_minute": income_per_minute, "mined_resource": mined_resource,
 		"extraction_per_minute": extraction_per_minute, "is_core": is_core, "buildable": buildable,
 		"produced_unit": produced_unit, "queue_limit": queue_limit,
-		"attack_damage": attack_damage, "attack_seconds": attack_seconds, "attack_range": attack_range}
+		"attack_damage": attack_damage, "attack_seconds": attack_seconds, "attack_range": attack_range,
+		"sight_radius": sight_radius}

@@ -9,6 +9,7 @@ var _commands := MechCommandQueue.new()
 @onready var _terrain: MechTerrainView = $Terrain
 @onready var _coverage: MechCoverageView = $Coverage
 @onready var _world: MechFoundationView = $Entities
+@onready var _fog: MechFogView = $Fog
 @onready var _camera: MechMapCamera = $MapCamera
 @onready var _hud: MechMapHud = $HUD
 @onready var _settings: MechSettingsMenu = $Settings
@@ -21,6 +22,7 @@ var _wall_dragging: bool = false
 var _wall_start := Vector2i.ZERO
 var _wall_end := Vector2i.ZERO
 var _dimensions := Vector2i.ZERO
+var _map_outline := PackedVector2Array()
 var _selection := MechSelectionState.new()
 var _selection_dragging: bool = false
 var _selection_start := Vector2.ZERO
@@ -31,6 +33,7 @@ var _attack_move_mode: bool = false
 var _last_group: int = -1
 var _last_group_time: int = 0
 var _last_threat_key: String = ""
+var _last_alert_key: String = ""
 var _state: Dictionary = {}
 var _state_dirty: bool = true
 var _last_session_ended: bool = false
@@ -76,7 +79,7 @@ func _ready() -> void:
 		_fit_map()
 	if OS.get_cmdline_user_args().has("--settings"):
 		_open_settings()
-	print("[Billions Mech] M5 threat and defense ready; 1920x1080; whitebox; ", initial_settings.scenario_name)
+	print("[Billions Mech] vision fog ready; 1920x1080; whitebox; ", initial_settings.scenario_name)
 
 
 func _physics_process(_delta: float) -> void:
@@ -541,6 +544,12 @@ func _publish_state() -> void:
 	var generation_changed: bool = _last_generation != state["generation"]
 	var ended: bool = state["session"]["ended"]
 	_present_threat(state)
+	var alert: Dictionary = state.get("alert", {})
+	if not alert.is_empty():
+		var key: String = "%d_%d" % [state["generation"], alert["sequence"]]
+		if key != _last_alert_key:
+			_last_alert_key = key
+			_hud.feedback(alert["text"], true)
 	if _last_generation != state["generation"]:
 		_selection.reset()
 		_attack_move_mode = false
@@ -555,12 +564,15 @@ func _publish_state() -> void:
 		_coverage.present_map(map_state)
 		_hud.present_map(map_state)
 		_dimensions = map_state["dimensions"]
+		_map_outline = map_state["outline"]
 		if _last_generation != state["generation"]:
 			_selected = Vector2i(-1, -1)
 			var focus: Vector2 = MechIsoGeometry.project(Vector2(map_state["mainbrain_origin"]) + Vector2(map_state["mainbrain_footprint"]) * 0.5)
 			_camera.configure(MechIsoGeometry.map_bounds(_dimensions, map_state["outline"]), focus)
 		_last_generation = state["generation"]
 		_last_map_revision = state["map_revision"]
+	_fog.present(state["vision"], state["generation"], _map_outline)
+	_terrain.present_vision(state["vision"])
 	if generation_changed:
 		_select_starting_units()
 	else:
