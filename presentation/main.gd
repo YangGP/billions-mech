@@ -18,6 +18,7 @@ var _last_map_revision: int = -1
 var _stress_mode: bool = false
 var _stress_timer: float = 0.0
 var _stress_step: int = 0
+var _session_logged: bool = false
 var _last_coverage_revision: int = -1
 var _selected := Vector2i(-1, -1)
 var _build_id: StringName = &""
@@ -796,7 +797,23 @@ func _publish_state() -> void:
 	_state = _sim.snapshot()
 	var state: Dictionary = _state
 	var generation_changed: bool = _last_generation != state["generation"]
+	if generation_changed:
+		_session_logged = false
 	var ended: bool = state["session"]["ended"]
+	if ended and not _session_logged:
+		_session_logged = true
+		var record: Dictionary = {
+			"outcome": String(state["session"]["outcome"]),
+			"reason": String(state["session"]["reason"]),
+			"duration_seconds": float(state["session"].get("duration_seconds", 0.0)),
+			"wave_number": int(state["session"].get("wave_number", 0)),
+			"final_phase": String(state["session"].get("final_phase", "none")),
+			"scenario": String(state["scenario"]),
+		}
+		var file: FileAccess = FileAccess.open("user://session-record.json", FileAccess.WRITE)
+		if file != null:
+			file.store_string(JSON.stringify(record, "  "))
+			file.close()
 	_present_threat(state)
 	var alert: Dictionary = state.get("alert", {})
 	if not alert.is_empty():

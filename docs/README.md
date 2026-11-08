@@ -90,6 +90,8 @@
 
 [0.5.61 最终交接状态](../validation/0.5.61-final-status.md) 汇总已推进项、证据与未完成清单。
 
+[0.5.86 交接状态](../validation/0.5.86-handoff-status.md) 记录当前功能、停止测试边界与剩余缺口。
+
 [P8 批量建拆压力](../validation/p8-stress-0.5.79.md) 记录 `--stress` 模式与阶段耗时。
 
 [M6 bundle 本地审查](../validation/m6-bundle-review.md) 记录本次合入的两个提交、原生导入发现的编译/接线问题、穿墙寻路修复，以及本地 43 个脚本、49 项既有回归、启动和原生画面的复验结果与限制。

@@ -705,6 +705,7 @@ func snapshot() -> Dictionary:
 		if _vision.state_at(mineral["cell"]) != MechVisionSystem.State.UNEXPLORED:
 			mineral["visible"] = _vision.state_at(mineral["cell"]) == MechVisionSystem.State.VISIBLE
 			minerals.append(mineral)
+	var wave_state: Dictionary = _waves.state()
 	return {"clock": _clock.snapshot(), "entities": entities, "economy": economy, "minerals": minerals,
 		"vision": _vision.snapshot(), "repair_all": _repair_all_status(),
 		"scenario": _settings.scenario_name, "unit_catalog": _unit_catalog(),
@@ -714,7 +715,10 @@ func snapshot() -> Dictionary:
 		"dispatch": _dispatch.snapshot(),
 		"mainbrain_id": _mainbrain_id, "generation": _generation,
 		"session": {"outcome": _outcome, "ended": session_ended(),
-			"reason": {"defeat": "主脑已被摧毁", "victory": "威胁已清除"}.get(String(_outcome), "")},
+			"reason": {"defeat": "主脑已被摧毁", "victory": "威胁已清除"}.get(String(_outcome), ""),
+			"duration_seconds": float(_clock.snapshot()["tick"]) / float(_tick_rate),
+			"wave_number": int(wave_state.get("wave_number", 0)),
+			"final_phase": String(wave_state.get("final_phase", "none"))},
 		"threat": _threat_snapshot(),
 		"alert": _alert.duplicate(),
 		"map_revision": _grid.revision(), "coverage_revision": _grid.coverage_revision(),
