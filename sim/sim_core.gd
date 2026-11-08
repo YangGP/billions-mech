@@ -669,6 +669,13 @@ func _check_victory() -> void:
 	state_changed.emit()
 
 
+func spawn_diagnostic_enemy(enemy_id: StringName, position: Vector2) -> int:
+	# Performance-diagnostic entry point; normal gameplay only spawns via waves.
+	if not _enemy_defs.has(enemy_id):
+		return 0
+	return _enemies.create(_registry, _enemy_defs[enemy_id], position)
+
+
 func snapshot() -> Dictionary:
 	var entities: Array[Dictionary] = []
 	var shelters: Array[MechEntityState] = _collect_shelter_sources()

@@ -173,6 +173,10 @@ func _stress_advance(delta: float) -> void:
 		return
 	_stress_timer = 0.0
 	_stress_step += 1
+	if _stress_step % 4 == 0:
+		var center: Vector2 = Vector2(SETTINGS.map_definition.mainbrain_origin) + Vector2(24, 0)
+		_sim.spawn_diagnostic_enemy(&"builder", center + Vector2(0, -6))
+		_sim.spawn_diagnostic_enemy(&"builder", center + Vector2(0, 6))
 	if _stress_step % 8 == 0:
 		var index: int = 0
 		for entity: Dictionary in _state["entities"]:
