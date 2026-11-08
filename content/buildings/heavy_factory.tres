@@ -1,5 +1,6 @@
-[gd_resource type="Resource" script_class="MechBuildingDefinition" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="MechBuildingDefinition" load_steps=3 format=3]
 [ext_resource type="Script" path="res://content/building_definition.gd" id="1"]
+[ext_resource type="Resource" path="res://content/buildings/advanced_heavy_factory.tres" id="2"]
 [resource]
 script = ExtResource("1")
 building_id = &"heavy_factory"
@@ -12,4 +13,8 @@ capacity_cost = 4
 power_cost = 8
 produced_units = Array[StringName]([&"heavy_mech"])
 queue_limit = 3
+level = 2
+upgrade_to = ExtResource("2")
+upgrade_cost = Dictionary[StringName, int]({&"coins": 400, &"metal_ore": 10, &"alloy": 16, &"crystals": 20})
+upgrade_seconds = 90.0
 infectable = true

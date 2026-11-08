@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="MechBuildingDefinition" load_steps=2 format=3]
+[ext_resource type="Script" path="res://content/building_definition.gd" id="1"]
+[resource]
+script = ExtResource("1")
+building_id = &"advanced_heavy_factory"
+display_name = "高级重装工厂"
+footprint = Vector2i(3, 3)
+cost = Dictionary[StringName, int]({&"coins": 800, &"metal_ore": 30, &"alloy": 40, &"crystals": 20})
+construction_seconds = 90.0
+max_hp = 1500
+capacity_cost = 6
+power_cost = 12
+produced_units = Array[StringName]([&"rail_mech"])
+queue_limit = 3
+level = 3
+buildable = false
+infectable = true

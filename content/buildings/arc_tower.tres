@@ -1,5 +1,6 @@
-[gd_resource type="Resource" script_class="MechBuildingDefinition" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="MechBuildingDefinition" load_steps=3 format=3]
 [ext_resource type="Script" path="res://content/building_definition.gd" id="1"]
+[ext_resource type="Resource" path="res://content/buildings/emp_tower.tres" id="2"]
 [resource]
 script = ExtResource("1")
 sight_radius = 7.0
@@ -15,4 +16,8 @@ attack_damage = 30
 attack_seconds = 3.0
 attack_range = 5.0
 splash_radius = 3.0
+level = 2
+upgrade_to = ExtResource("2")
+upgrade_cost = Dictionary[StringName, int]({&"coins": 130, &"metal_ore": 2, &"alloy": 2, &"crystals": 8})
+upgrade_seconds = 60.0
 infectable = true

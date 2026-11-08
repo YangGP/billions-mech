@@ -500,6 +500,11 @@ func advance_one_tick() -> void:
 	var tower_hits: Array[Dictionary] = _towers.advance(_registry, _construction.all(), _tick_rate, _grid, _vision)
 	for hit: Dictionary in tower_hits:
 		_damage_enemy(hit["id"], hit["damage"], shelters)
+		if float(hit.get("slow_multiplier", 1.0)) < 1.0:
+			var target: MechEntityState = _registry.get_entity(hit["id"])
+			if target != null and target.hp > 0:
+				target.slow_ticks = maxi(target.slow_ticks, maxi(1, ceili(float(hit.get("slow_seconds", 0.0)) * _tick_rate)))
+				target.slow_multiplier = minf(target.slow_multiplier, float(hit.get("slow_multiplier", 1.0)))
 	_profile_mark(&"towers")
 	_registry.step(_clock.step_seconds(), _grid)
 	_profile_mark(&"step")
@@ -642,10 +647,11 @@ func _threat_snapshot() -> Dictionary:
 
 func _catalog_snapshot() -> Array[Dictionary]:
 	var result: Array[Dictionary] = _construction.catalog(_economy)
-	if not _alloy_processing.ever_produced_alloy:
-		for entry: Dictionary in result:
-			if entry["building_id"] == &"tech_center":
-				entry["unavailable_reason"] = "需先产出第一份合金"
+	for entry: Dictionary in result:
+		if entry["building_id"] == &"tech_center" and not _alloy_processing.ever_produced_alloy:
+			entry["unavailable_reason"] = "需先产出第一份合金"
+		elif entry["building_id"] == &"crystal_extractor" and _mainbrain_level() < 3:
+			entry["unavailable_reason"] = "晶体采掘需要主脑 III"
 	return result
 
 
@@ -895,6 +901,12 @@ func preview_build(id: StringName, origin: Vector2i) -> Dictionary:
 	if id == &"tech_center" and not _alloy_processing.ever_produced_alloy:
 		result["ok"] = false
 		result["reason"] = "需先产出第一份合金"
+		for cell_info: Dictionary in result["cells"]:
+			cell_info["ok"] = false
+			cell_info["reason"] = result["reason"]
+	elif id == &"crystal_extractor" and _mainbrain_level() < 3:
+		result["ok"] = false
+		result["reason"] = "晶体采掘需要主脑 III"
 		for cell_info: Dictionary in result["cells"]:
 			cell_info["ok"] = false
 			cell_info["reason"] = result["reason"]
@@ -1246,11 +1258,20 @@ func _validate_upgrade_command(command: MechCommand) -> Dictionary:
 	if target.requires_water and not _has_water_edge(target, building.origin):
 		return _reject("水冷站需与水域正交相邻")
 	if building.definition.is_core:
-		if _tech_level() < 1:
+		if building.definition.level == 1 and _tech_level() < 1:
 			return _reject("主脑升级需要运行中的科技中心 I")
+		if building.definition.level == 2 and _tech_level() < 2:
+			return _reject("主脑 III 需要科技中心 II")
 	elif building.definition.tech_level == 1:
 		if _mainbrain_level() < 2:
 			return _reject("科技中心 II 需要主脑 II")
+	elif building.definition.tech_level == 2:
+		if _mainbrain_level() < 3:
+			return _reject("科技中心 III 需要主脑 III")
+		if not _minerals.has_produced(&"crystals"):
+			return _reject("科技中心 III 需要先产出晶体")
+	elif target.level >= 3 and _tech_level() < 3:
+		return _reject("三级升级需要科技中心 III")
 	var error: String = _economy.upgrade_error(
 		building.definition, target, building.definition.upgrade_cost
 	)

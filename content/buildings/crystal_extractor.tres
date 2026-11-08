@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="MechBuildingDefinition" load_steps=3 format=3]
+[ext_resource type="Script" path="res://content/building_definition.gd" id="1"]
+[ext_resource type="Resource" path="res://content/buildings/crystal_extractor_deep.tres" id="2"]
+[resource]
+script = ExtResource("1")
+building_id = &"crystal_extractor"
+display_name = "晶体采掘站"
+footprint = Vector2i(2, 2)
+cost = Dictionary[StringName, int]({&"coins": 120, &"metal_ore": 10, &"alloy": 8})
+construction_seconds = 45.0
+max_hp = 350
+capacity_cost = 2
+power_cost = 4
+mined_resource = &"crystals"
+extraction_per_minute = 3
+level = 1
+upgrade_to = ExtResource("2")
+upgrade_cost = Dictionary[StringName, int]({&"coins": 180, &"metal_ore": 6, &"alloy": 12, &"crystals": 8})
+upgrade_seconds = 60.0
+infectable = true

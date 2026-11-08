@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="MechUnitDefinition" load_steps=2 format=3]
+[ext_resource type="Script" path="res://content/unit_definition.gd" id="1"]
+[resource]
+script = ExtResource("1")
+unit_id = &"rail_mech"
+display_name = "磁轨机甲"
+cost = Dictionary[StringName, int]({&"coins": 320, &"metal_ore": 8, &"alloy": 18, &"crystals": 12})
+production_seconds = 90.0
+capacity_cost = 6
+max_hp = 600
+damage = 180
+attack_seconds = 3.0
+attack_range = 9.0
+acquisition_range = 11.0
+move_speed = 1.8
+sight_radius = 9.0

@@ -30,7 +30,9 @@ func advance(registry: MechEntityRegistry, buildings: Array[MechBuildingState], 
 		building.shot_target = target.position
 		var impacted: Dictionary[int, bool] = {}
 		impacted[target.entity_id] = true
-		hits.append({"id": target.entity_id, "damage": building.definition.attack_damage})
+		hits.append({"id": target.entity_id, "damage": building.definition.attack_damage,
+			"slow_multiplier": building.definition.slow_multiplier,
+			"slow_seconds": building.definition.slow_seconds})
 		if building.definition.splash_radius > 0.0:
 			for entity: MechEntityState in registry.all():
 				if entity.team != 2 or entity.hp <= 0 or impacted.has(entity.entity_id):
@@ -42,7 +44,9 @@ func advance(registry: MechEntityRegistry, buildings: Array[MechBuildingState], 
 				if not grid.terrain_line_clear(target.position, entity.position):
 					continue
 				impacted[entity.entity_id] = true
-				hits.append({"id": entity.entity_id, "damage": building.definition.attack_damage})
+				hits.append({"id": entity.entity_id, "damage": building.definition.attack_damage,
+					"slow_multiplier": building.definition.slow_multiplier,
+					"slow_seconds": building.definition.slow_seconds})
 		if combat_noise.is_valid():
 			combat_noise.call(target.position)
 	return hits

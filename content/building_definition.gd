@@ -80,7 +80,7 @@ func validation_error() -> String:
 		return "建筑系统预留或冷却无效"
 	if alloy_recipe != null and not alloy_recipe.validation_error().is_empty():
 		return "建筑合金配方无效"
-	if level < 1 or tech_level < 0 or tech_level > 2:
+	if level < 1 or tech_level < 0 or tech_level > 3:
 		return "建筑等级或科技等级无效"
 	if environment_output_multiplier < 1 or environment_output_cap < 0:
 		return "环境电源倍率或上限无效"

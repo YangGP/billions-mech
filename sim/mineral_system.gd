@@ -4,10 +4,12 @@ extends RefCounted
 
 var _deposits: Dictionary[StringName, Dictionary] = {}
 var _cells: Dictionary[Vector2i, StringName] = {}
+var _produced: Dictionary[StringName, int] = {}
 
 
 func reset(definitions: Array[MechMineralDefinition]) -> void:
 	_deposits.clear()
+	_produced.clear()
 	_cells.clear()
 	for definition: MechMineralDefinition in definitions:
 		_deposits[definition.mineral_id] = definition.snapshot()
@@ -79,9 +81,16 @@ func advance(buildings: Array[MechBuildingState], economy: MechEconomySystem, hz
 		var extracted: int = mini(available, mineral["remaining"])
 		var income := MechResources.empty()
 		income[building.definition.mined_resource] = extracted
+		_produced[building.definition.mined_resource] = int(
+			_produced.get(building.definition.mined_resource, 0)
+		) + extracted
 		economy.credit(income)
 		mineral["remaining"] -= extracted
 		building.extraction_remainder %= extraction_denominator
+
+
+func has_produced(resource: StringName) -> bool:
+	return int(_produced.get(resource, 0)) > 0
 
 
 func production_rate(buildings: Array[MechBuildingState]) -> Dictionary:

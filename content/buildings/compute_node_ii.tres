@@ -1,5 +1,6 @@
-[gd_resource type="Resource" script_class="MechBuildingDefinition" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="MechBuildingDefinition" load_steps=3 format=3]
 [ext_resource type="Script" path="res://content/building_definition.gd" id="1"]
+[ext_resource type="Resource" path="res://content/buildings/compute_node_iii.tres" id="2"]
 [resource]
 script = ExtResource("1")
 building_id = &"compute_node_ii"
@@ -14,5 +15,8 @@ capacity_provided = 8
 capacity_system_reserved = 2
 income_per_minute = 14
 level = 2
+upgrade_to = ExtResource("2")
+upgrade_cost = Dictionary[StringName, int]({&"coins": 120, &"metal_ore": 4, &"alloy": 6, &"crystals": 4})
+upgrade_seconds = 60.0
 buildable = false
 infectable = true

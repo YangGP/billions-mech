@@ -1,5 +1,6 @@
-[gd_resource type="Resource" script_class="MechBuildingDefinition" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="MechBuildingDefinition" load_steps=3 format=3]
 [ext_resource type="Script" path="res://content/building_definition.gd" id="1"]
+[ext_resource type="Resource" path="res://content/buildings/mainbrain_iii.tres" id="2"]
 [resource]
 script = ExtResource("1")
 sight_radius = 12.0
@@ -14,5 +15,8 @@ cooling_provided = 4
 coverage_radius = 6
 income_per_minute = 6
 level = 2
+upgrade_to = ExtResource("2")
+upgrade_cost = Dictionary[StringName, int]({&"coins": 1600, &"metal_ore": 80, &"alloy": 60})
+upgrade_seconds = 240.0
 is_core = true
 buildable = false

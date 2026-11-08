@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="MechBuildingDefinition" load_steps=2 format=3]
+[ext_resource type="Script" path="res://content/building_definition.gd" id="1"]
+[resource]
+script = ExtResource("1")
+sight_radius = 9.0
+building_id = &"emp_tower"
+display_name = "电磁塔"
+footprint = Vector2i(2, 2)
+cost = Dictionary[StringName, int]({&"coins": 350, &"metal_ore": 12, &"alloy": 20, &"crystals": 8})
+construction_seconds = 60.0
+max_hp = 900
+capacity_cost = 3
+power_cost = 8
+attack_damage = 40
+attack_seconds = 3.0
+attack_range = 6.0
+splash_radius = 3.0
+slow_multiplier = 0.7
+slow_seconds = 3.0
+level = 3
+buildable = false
+infectable = true

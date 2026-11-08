@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="MechBuildingDefinition" load_steps=2 format=3]
+[ext_resource type="Script" path="res://content/building_definition.gd" id="1"]
+[resource]
+script = ExtResource("1")
+sight_radius = 12.0
+building_id = &"mainbrain_iii"
+display_name = "主脑 III"
+footprint = Vector2i(5, 5)
+max_hp = 6000
+capacity_provided = 16
+capacity_system_reserved = 4
+power_provided = 10
+cooling_provided = 4
+coverage_radius = 6
+income_per_minute = 8
+level = 3
+is_core = true
+buildable = false

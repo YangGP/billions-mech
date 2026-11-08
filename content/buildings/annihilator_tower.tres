@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="MechBuildingDefinition" load_steps=2 format=3]
+[ext_resource type="Script" path="res://content/building_definition.gd" id="1"]
+[resource]
+script = ExtResource("1")
+sight_radius = 10.0
+building_id = &"annihilator_tower"
+display_name = "歼灭炮塔"
+footprint = Vector2i(2, 2)
+cost = Dictionary[StringName, int]({&"coins": 400, &"metal_ore": 16, &"alloy": 30, &"crystals": 12})
+construction_seconds = 75.0
+max_hp = 1400
+capacity_cost = 4
+power_cost = 10
+attack_damage = 40
+attack_seconds = 0.75
+attack_range = 9.0
+splash_radius = 1.5
+level = 3
+buildable = false
+infectable = true
