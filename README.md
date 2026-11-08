@@ -155,11 +155,6 @@ archive/legacy-prototype/ # 旧非代码资源，.gdignore 排除
 - [P7a 区域授权](validation/p7a-dispatch-regions.md)：调度中心、区域纯数据模型与自动化缺口。
 - [P7b 有限自动化](validation/p7b-limited-automation.md)：区域配置命令、自动维修入口与闭环缺口。
 - [P8 最终对账](validation/p8-final-audit.md)：31目录类/53建筑/4单位盘点、检查记录与未验收清单。
-- [0.5.48 交接状态](validation/0.5.48-handoff-status.md)：提交链、硬缺口与建议验收顺序。
-- [0.5.49 审查修复](validation/review-fixes-0.5.49.md)：F01–F08/F12/F14/F15优先项修复记录。
-- [0.5.58 原生启动观察](validation/native-smoke-0.5.58.md)：非 headless 启动与基础渲染截图。
-- [0.5.61 最终交接状态](validation/0.5.61-final-status.md)：已推进项、证据与未完成清单。
-- [0.5.86 交接状态](validation/0.5.86-handoff-status.md)：当前功能、停止测试边界与剩余缺口。
-- [P8 批量建拆压力](validation/p8-stress-0.5.79.md)：`--stress` 模式与阶段耗时记录。
+- [0.5.88 开发交付总结](validation/0.5.88-delivery-summary.md)：阶段成果、验证证据、审查问题状态与未完成清单。
 
 菜单批次检查见[二级菜单记录](validation/build-menu.md)。当前代码通过Godot 4.7.2原生导入、全部44个GDScript语法检查、既有49项视野回归和开发图600帧无头启动；已导出并查看1920×1080原生画面。6项既有非零配方的材料数量迁移核对一致，活动资源引用无缺失。computer-use原生连接不可用，建造/取消/队列/重建的鼠标键盘验收、经济长期对账及完整战斗仍待复验；详见[本批检查记录](validation/p1-ledger-single-map.md)。历史M6检查保留原版本结论。
