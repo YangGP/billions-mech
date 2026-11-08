@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="MechBuildingDefinition" load_steps=2 format=3]
+[ext_resource type="Script" path="res://content/building_definition.gd" id="1"]
+[resource]
+script = ExtResource("1")
+building_id = &"cooling_tower_ii"
+display_name = "强化冷却塔"
+footprint = Vector2i(2, 2)
+cost = Dictionary[StringName, int]({&"coins": 150, &"metal_ore": 10, &"alloy": 8})
+construction_seconds = 50.0
+max_hp = 500
+power_cost = 3
+cooling_provided = 32
+level = 2
+buildable = false
+infectable = true

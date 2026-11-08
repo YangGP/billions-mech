@@ -461,6 +461,9 @@ func advance(registry: MechEntityRegistry, grid: MechGridState, navigation: Mech
 	var tick: int = _tick_counter
 	_tick_counter += 1
 	for enemy: MechEntityState in enemies:
+		if enemy.slow_ticks > 0:
+			enemy.slow_ticks -= 1
+		enemy.slow_multiplier = 0.4 if enemy.slow_ticks > 0 else 1.0
 		var cell := Vector2i(enemy.position.floor())
 		var near_assets: bool = active_regions.has(_activity_bucket(cell))
 		var local_radius: float = maxf(enemy.enemy_definition.vision_radius, enemy.enemy_definition.attack_range)
@@ -583,7 +586,7 @@ func _walk_wanderer(enemy: MechEntityState, grid: MechGridState, enemy_buckets: 
 	if not enemy.has_move_order:
 		return
 	var cell: Vector2i = Vector2i(enemy.position.floor())
-	var speed: float = enemy.enemy_definition.move_speed * enemy.enemy_definition.wandering_speed_ratio / grid.movement_weight(cell)
+	var speed: float = enemy.enemy_definition.move_speed * enemy.enemy_definition.wandering_speed_ratio * enemy.slow_multiplier / grid.movement_weight(cell)
 	var velocity: Vector2 = enemy.preferred_velocity(speed, dt, grid.mobile_segment_clear.bind(_wall_ids if enemy.enemy_definition.passes_walls else {}))
 	if velocity == Vector2.ZERO:
 		enemy.finish_path_if_arrived()
@@ -617,7 +620,7 @@ func _advance_marching(enemy: MechEntityState, grid: MechGridState, enemy_bucket
 	var flow_dir: Vector2 = field.flow_at(cell)
 	if flow_dir == Vector2.ZERO:
 		flow_dir = _field.flow_at(cell)
-	var speed: float = enemy.enemy_definition.move_speed / grid.movement_weight(cell)
+	var speed: float = enemy.enemy_definition.move_speed * enemy.slow_multiplier / grid.movement_weight(cell)
 	var desired: Vector2 = Steering.desired_velocity(flow_dir, speed)
 	var separation: Vector2 = Steering.separation(enemy.position, _separation_neighbors(enemy, enemy_buckets), SEPARATION_RADIUS)
 	var velocity: Vector2 = Steering.combine(desired, separation, FLOW_WEIGHT, SEPARATION_WEIGHT, speed)
@@ -692,7 +695,7 @@ func _chase(enemy: MechEntityState, grid: MechGridState, navigation: MechGridNav
 	if not enemy.has_move_order:
 		return
 	var cell: Vector2i = Vector2i(enemy.position.floor())
-	var speed: float = enemy.enemy_definition.move_speed / grid.movement_weight(cell)
+	var speed: float = enemy.enemy_definition.move_speed * enemy.slow_multiplier / grid.movement_weight(cell)
 	var velocity: Vector2 = enemy.preferred_velocity(speed, dt, navigation.segment_clear)
 	if velocity == Vector2.ZERO:
 		# A finished route frees the enemy to re-path toward a moving target.

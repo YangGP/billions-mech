@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="MechBuildingDefinition" load_steps=2 format=3]
+[ext_resource type="Script" path="res://content/building_definition.gd" id="1"]
+[resource]
+script = ExtResource("1")
+building_id = &"compute_node_ii"
+display_name = "算力节点 II"
+footprint = Vector2i(2, 2)
+cost = Dictionary[StringName, int]({&"coins": 90, &"metal_ore": 8, &"alloy": 6})
+construction_seconds = 40.0
+max_hp = 500
+power_cost = 4
+cooling_cost = 4
+capacity_provided = 8
+capacity_system_reserved = 2
+income_per_minute = 14
+level = 2
+buildable = false
+infectable = true

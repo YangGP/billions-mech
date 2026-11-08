@@ -114,6 +114,12 @@ func state() -> Dictionary:
 	var seconds_remaining: float = 0.0
 	var next_event: StringName = &"done"
 	var wave_number: int = _wave_index + 1
+	var next_wave_number: int = _wave_index + 1
+	var next_edge: StringName = _main_edge
+	var next_edge_name: String = {"north": "北", "south": "南", "west": "西", "east": "东"}.get(String(_main_edge), "正面")
+	if next_wave_number % _flank_every == 0 and not _flank_band.is_empty():
+		next_edge = _flank_edge
+		next_edge_name = {"north": "北", "south": "南", "west": "西", "east": "东"}.get(String(_flank_edge), "侧翼")
 	match _phase:
 		&"silence":
 			seconds_remaining = maxf(0.0, float(_silence_ticks - _tick_counter) / float(_tick_rate))
@@ -128,6 +134,8 @@ func state() -> Dictionary:
 	return {"active": _active, "phase": _phase, "wave_index": _wave_index,
 		"wave_number": wave_number, "next_event": next_event,
 		"seconds_remaining": seconds_remaining,
+		"next_wave_number": next_wave_number, "next_edge": next_edge,
+		"next_edge_name": next_edge_name,
 		"edge": _edge, "edge_name": _edge_name, "tier": _tier_label,
 		"total_waves": _total_waves, "exhausted": exhausted()}
 

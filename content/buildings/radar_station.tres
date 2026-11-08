@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="MechBuildingDefinition" load_steps=2 format=3]
+[ext_resource type="Script" path="res://content/building_definition.gd" id="1"]
+[resource]
+script = ExtResource("1")
+sight_radius = 20.0
+building_id = &"radar_station"
+display_name = "雷达站"
+footprint = Vector2i(2, 2)
+cost = Dictionary[StringName, int]({&"coins": 120, &"metal_ore": 8, &"alloy": 4})
+construction_seconds = 45.0
+max_hp = 300
+capacity_cost = 1
+power_cost = 4
+radar_warning_seconds = 20.0
+infectable = true

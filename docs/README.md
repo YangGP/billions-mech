@@ -56,6 +56,14 @@
 
 [P3c 材料维修](../validation/p3c-repair-version-a.md) 记录4HP/s、材料25%、整数余数与版本A边界。
 
+[P4a 强化供给与水冷](../validation/p4a-supply-water.md) 记录节点II、深层矿、强化电源、水冷正交邻水与冶炼周期边界。
+
+[P4b 闸门与陷阱](../validation/p4b-gate-traps.md) 记录闸门/电磁/爆破内容、陷阱触发与团队通行层缺口。
+
+[P4c 中期火力与重装](../validation/p4c-midfire-heavy.md) 记录电弧范围伤害、重装工厂/单位与维修站缺口。
+
+[P4d 瞭望与雷达](../validation/p4d-lookout-radar.md) 记录视野源、雷达预警字段与提前量缺口。
+
 [M6 bundle 本地审查](../validation/m6-bundle-review.md) 记录本次合入的两个提交、原生导入发现的编译/接线问题、穿墙寻路修复，以及本地 43 个脚本、49 项既有回归、启动和原生画面的复验结果与限制。
 
 [卡顿与游荡节奏调整](../validation/performance-wanderers.md) 记录 0.5.18-dev 的后台行军场、局部 A*/RVO 更新、视野记忆复用、开局禁刷与游荡移速调整，以及加速战斗性能证据和待验项。

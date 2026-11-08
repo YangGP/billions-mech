@@ -30,6 +30,9 @@ var repath_ticks: int = 0
 var blocked_ticks: int = 0
 var shot_ticks: int = 0
 var shot_target: Vector2 = Vector2.ZERO
+## Strongest active control only; EMP refreshes duration but never stacks.
+var slow_ticks: int = 0
+var slow_multiplier: float = 1.0
 var fog_coarse: bool = false
 ## Stable local navigation region; z distinguishes normal/wall-pass rules.
 var march_zone := Vector3i(-1, -1, -1)

@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="MechBuildingDefinition" load_steps=2 format=3]
+[ext_resource type="Script" path="res://content/building_definition.gd" id="1"]
+[resource]
+script = ExtResource("1")
+building_id = &"mining_station_deep"
+display_name = "深层金属采矿站"
+footprint = Vector2i(2, 2)
+cost = Dictionary[StringName, int]({&"coins": 140, &"metal_ore": 4, &"alloy": 8})
+construction_seconds = 45.0
+max_hp = 500
+capacity_cost = 2
+power_cost = 4
+mined_resource = &"metal_ore"
+extraction_per_minute = 24
+level = 2
+buildable = false
+infectable = true

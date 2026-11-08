@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="MechBuildingDefinition" load_steps=2 format=3]
+[ext_resource type="Script" path="res://content/building_definition.gd" id="1"]
+[resource]
+script = ExtResource("1")
+building_id = &"alloy_gate"
+display_name = "合金闸门"
+footprint = Vector2i(1, 2)
+cost = Dictionary[StringName, int]({&"coins": 20, &"metal_ore": 4, &"alloy": 4})
+construction_seconds = 10.0
+max_hp = 1600
+is_gate = true
+level = 2
+buildable = false
+infectable = false

@@ -189,6 +189,8 @@ func present_state(state: Dictionary) -> void:
 				_wave_label.text = "首波预告 %s" % clock
 			else:
 				_wave_label.text = "下一波 %s" % clock
+			if threat.get("radar_warning", false):
+				_wave_label.text += " · 雷达方向 %s" % String(threat.get("radar_edge_name", ""))
 			_wave_label.show()
 	$Root/SessionResult.visible = _session_ended
 	$Root/WorldInfo/Subtitle.text = "%s  /  战术视图" % state["scenario"]

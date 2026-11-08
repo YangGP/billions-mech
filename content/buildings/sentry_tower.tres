@@ -1,5 +1,6 @@
-[gd_resource type="Resource" script_class="MechBuildingDefinition" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="MechBuildingDefinition" load_steps=3 format=3]
 [ext_resource type="Script" path="res://content/building_definition.gd" id="1"]
+[ext_resource type="Resource" path="res://content/buildings/heavy_tower.tres" id="2"]
 [resource]
 script = ExtResource("1")
 sight_radius = 10.0
@@ -14,5 +15,9 @@ power_cost = 3
 attack_damage = 30
 attack_seconds = 2.5
 attack_range = 8.0
+level = 1
+upgrade_to = ExtResource("2")
+upgrade_cost = Dictionary[StringName, int]({&"coins": 120, &"metal_ore": 2, &"alloy": 16})
+upgrade_seconds = 60.0
 
 infectable = true

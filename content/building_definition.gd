@@ -17,6 +17,16 @@ extends Resource
 @export var cooling_provided: int = 0
 @export var infectable: bool = false
 @export_enum("none", "wind", "solar") var environment_energy: String = "none"
+@export var environment_output_multiplier: int = 1
+@export var environment_output_cap: int = 0
+@export var requires_water: bool = false
+@export var is_gate: bool = false
+@export_enum("none", "emp", "blast") var trap_kind: String = "none"
+@export_range(0.0, 8.0, 0.5) var trigger_radius: float = 2.0
+@export var trap_damage: int = 0
+@export_range(0.0, 1.0, 0.05) var slow_multiplier: float = 1.0
+@export var slow_seconds: float = 0.0
+@export var one_shot: bool = true
 ## Optional independent process recipe (thermal smelter alloy cycles).
 @export var alloy_recipe: MechAlloyRecipe
 @export var income_per_minute: int = 0
@@ -41,6 +51,11 @@ extends Resource
 @export var attack_damage: int = 0
 @export_range(0.1, 10.0, 0.1) var attack_seconds: float = 1.0
 @export_range(0.0, 24.0, 0.5) var attack_range: float = 0.0
+@export_range(0.0, 8.0, 0.5) var splash_radius: float = 0.0
+@export_range(0.0, 16.0, 0.5) var repair_radius: float = 0.0
+@export var repair_rate: float = 0.0
+## Radar pre-warning lead in seconds; 0 marks a non-radar sight source.
+@export var radar_warning_seconds: float = 0.0
 
 
 func validation_error() -> String:
@@ -58,6 +73,12 @@ func validation_error() -> String:
 		return "建筑合金配方无效"
 	if level < 1 or tech_level < 0 or tech_level > 2:
 		return "建筑等级或科技等级无效"
+	if environment_output_multiplier < 1 or environment_output_cap < 0:
+		return "环境电源倍率或上限无效"
+	if trap_kind == "emp" and (slow_multiplier <= 0.0 or slow_seconds <= 0.0):
+		return "电磁陷阱减速参数无效"
+	if trap_kind == "blast" and trap_damage <= 0:
+		return "爆破地雷伤害无效"
 	if upgrade_to != null:
 		if upgrade_seconds <= 0.0 or not MechResources.valid(upgrade_cost) or upgrade_cost.is_empty():
 			return "建筑升级费用或工期无效"
@@ -65,6 +86,10 @@ func validation_error() -> String:
 			return "建筑升级目标占地或等级无效"
 	if not is_finite(sight_radius) or sight_radius < 0.0 or sight_radius > 64.0:
 		return "建筑视野半径无效"
+	if not is_finite(splash_radius) or splash_radius < 0.0 or not is_finite(repair_radius) or repair_radius < 0.0 or repair_rate < 0.0:
+		return "建筑范围或维修参数无效"
+	if radar_warning_seconds < 0.0:
+		return "雷达预警提前量无效"
 	if extraction_per_minute < 0 or (mined_resource != &"" and not MechResources.mineable(mined_resource)):
 		return "采集类型或产率无效"
 	if (mined_resource == &"") != (extraction_per_minute == 0):
@@ -94,8 +119,15 @@ func snapshot() -> Dictionary:
 		"extraction_per_minute": extraction_per_minute, "is_core": is_core, "buildable": buildable,
 		"produced_units": produced_units.duplicate(), "queue_limit": queue_limit,
 		"attack_damage": attack_damage, "attack_seconds": attack_seconds, "attack_range": attack_range,
-		"sight_radius": sight_radius, "coverage_radius": coverage_radius,
+		"splash_radius": splash_radius, "sight_radius": sight_radius, "coverage_radius": coverage_radius,
+		"repair_radius": repair_radius, "repair_rate": repair_rate,
+		"radar_warning_seconds": radar_warning_seconds,
 		"environment_energy": environment_energy, "infectable": infectable,
+		"environment_output_multiplier": environment_output_multiplier,
+		"environment_output_cap": environment_output_cap, "requires_water": requires_water,
+		"is_gate": is_gate, "trap_kind": trap_kind, "trigger_radius": trigger_radius,
+		"trap_damage": trap_damage, "slow_multiplier": slow_multiplier,
+		"slow_seconds": slow_seconds, "one_shot": one_shot,
 		"level": level, "tech_level": tech_level,
 		"upgrade_target": upgrade_to.building_id if upgrade_to != null else &"",
 		"upgrade_target_name": upgrade_to.display_name if upgrade_to != null else "",

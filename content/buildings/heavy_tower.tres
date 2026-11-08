@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="MechBuildingDefinition" load_steps=2 format=3]
+[ext_resource type="Script" path="res://content/building_definition.gd" id="1"]
+[resource]
+script = ExtResource("1")
+sight_radius = 10.0
+building_id = &"heavy_tower"
+display_name = "重型炮塔"
+footprint = Vector2i(2, 2)
+cost = Dictionary[StringName, int]({&"coins": 200, &"metal_ore": 10, &"alloy": 16})
+construction_seconds = 60.0
+max_hp = 1000
+capacity_cost = 3
+power_cost = 6
+attack_damage = 72
+attack_seconds = 3.0
+attack_range = 9.0
+level = 2
+buildable = false
+infectable = true

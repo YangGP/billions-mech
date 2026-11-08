@@ -1,5 +1,6 @@
-[gd_resource type="Resource" script_class="MechBuildingDefinition" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="MechBuildingDefinition" load_steps=3 format=3]
 [ext_resource type="Script" path="res://content/building_definition.gd" id="1"]
+[ext_resource type="Resource" path="res://content/buildings/wind_station_ii.tres" id="2"]
 [resource]
 script = ExtResource("1")
 building_id = &"wind_station"
@@ -9,4 +10,9 @@ cost = Dictionary[StringName, int]({&"coins": 60, &"metal_ore": 8})
 construction_seconds = 30.0
 max_hp = 250
 environment_energy = "wind"
+environment_output_cap = 18
+level = 1
+upgrade_to = ExtResource("2")
+upgrade_cost = Dictionary[StringName, int]({&"coins": 100, &"metal_ore": 4, &"alloy": 8})
+upgrade_seconds = 45.0
 infectable = true

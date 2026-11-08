@@ -476,6 +476,8 @@ func advance_one_tick() -> void:
 		_remove_entity(id)
 	if not enemy_result["dead_units"].is_empty():
 		_recompute_economy()
+	if _trigger_traps():
+		_recompute_economy()
 	_profile_mark(&"enemies")
 	# Building deaths in this pass changed pass-through/occupancy; settle one
 	# navigation refresh for the whole batch instead of one per hit.
@@ -570,7 +572,7 @@ func snapshot() -> Dictionary:
 		"mainbrain_id": _mainbrain_id, "generation": _generation,
 		"session": {"outcome": _outcome, "ended": session_ended(),
 			"reason": {"defeat": "主脑已被摧毁", "victory": "威胁已清除"}.get(String(_outcome), "")},
-		"threat": _waves.state(),
+		"threat": _threat_snapshot(),
 		"alert": _alert.duplicate(),
 		"map_revision": _grid.revision(), "coverage_revision": _grid.coverage_revision(),
 		"map_name": _map_definition.display_name}
@@ -623,6 +625,20 @@ func _building_snapshot(building: MechBuildingState) -> Dictionary:
 	return result
 
 
+func _threat_snapshot() -> Dictionary:
+	var threat: Dictionary = _waves.state()
+	var radar_lead: float = 0.0
+	for building: MechBuildingState in _construction.all():
+		if building.operating():
+			radar_lead = maxf(radar_lead, building.definition.radar_warning_seconds)
+	if radar_lead > 0.0 and threat.get("phase", &"") in [&"silence", &"announced"]:
+		threat["radar_warning"] = true
+		threat["radar_lead_seconds"] = radar_lead
+		threat["radar_edge_name"] = threat.get("next_edge_name", "")
+		threat["radar_wave_number"] = threat.get("next_wave_number", 1)
+	return threat
+
+
 func _catalog_snapshot() -> Array[Dictionary]:
 	var result: Array[Dictionary] = _construction.catalog(_economy)
 	if not _alloy_processing.ever_produced_alloy:
@@ -645,6 +661,10 @@ func _upgrade_error_for(building: MechBuildingState) -> String:
 	elif building.definition.tech_level == 1:
 		if _mainbrain_level() < 2:
 			return "科技中心 II 需要主脑 II"
+	if building.definition.upgrade_to.requires_water and not _has_water_edge(
+		building.definition.upgrade_to, building.origin
+	):
+		return "水冷站需与水域正交相邻"
 	return _economy.upgrade_error(
 		building.definition, building.definition.upgrade_to, building.definition.upgrade_cost
 	)
@@ -675,7 +695,9 @@ func _refresh_environment_power() -> void:
 			continue
 		var previous_power: int = building.environment_power
 		building.environment_power = _environment.score(
-			energy_type, building.origin, building.definition.footprint, _grid, _vision
+			energy_type, building.origin, building.definition.footprint, _grid, _vision,
+			building.definition.environment_output_multiplier,
+			building.definition.environment_output_cap
 		)
 		if profiling_enabled and building.environment_power != previous_power:
 			print("[environment] id=%d type=%s power=%d" % [
@@ -955,6 +977,8 @@ func _place(id: StringName, origin: Vector2i) -> Dictionary:
 	var building: MechBuildingState = _construction.add(entity_id, id, origin, _tick_rate)
 	building.mineral_id = check["mineral_id"]
 	building.environment_power = int(check.get("environment_power", 0))
+	if rules.trap_kind != "none":
+		_grid.set_pass_through(entity_id, true)
 	var energy_type := StringName(rules.environment_energy)
 	if energy_type != &"none" and not _environment.reserve(
 		entity_id, energy_type, origin, rules.footprint
@@ -1026,6 +1050,8 @@ func _validate_building_action(command: MechCommand) -> Dictionary:
 			# reservations. Rebuilding must reserve them again at its discounted cost.
 			if not _grid.footprint_covered(building.origin, building.definition.footprint):
 				return _reject("超出供电覆盖")
+			if building.definition.requires_water and not _has_water_edge(building.definition, building.origin):
+				return _reject("水冷站需与水域正交相邻")
 			var energy_type := StringName(building.definition.environment_energy)
 			if energy_type != &"none":
 				if not _environment.conflicts(
@@ -1033,7 +1059,9 @@ func _validate_building_action(command: MechCommand) -> Dictionary:
 				).is_empty():
 					return _reject("同类环境电源采集区重叠")
 				if _environment.score(
-					energy_type, building.origin, building.definition.footprint, _grid, _vision
+					energy_type, building.origin, building.definition.footprint, _grid, _vision,
+					building.definition.environment_output_multiplier,
+					building.definition.environment_output_cap
 				) <= 0:
 					return _reject("环境评分不足（需已探索有效地形）")
 			var rebuild_error: String = _economy.reservation_error(building.definition, {}, building.rebuild_cost())
@@ -1050,9 +1078,13 @@ func _advance_upgrades() -> bool:
 		building.upgrade_elapsed = mini(building.upgrade_elapsed + 1, building.upgrade_total)
 		if building.upgrade_elapsed < building.upgrade_total:
 			continue
+		var target: MechBuildingDefinition = building.upgrade_target
+		# Smelter upgrades settle at the current burn-cycle boundary; the old
+		# recipe and power stay active until that cycle finishes.
+		if target.alloy_recipe != null and building.processing_active:
+			continue
 		var old_max_hp: int = building.definition.max_hp
 		var lost_hp: int = maxi(0, old_max_hp - building.hp)
-		var target: MechBuildingDefinition = building.upgrade_target
 		building.paid_cost = MechResources.add(building.paid_cost, building.upgrade_paid)
 		building.definition = target
 		building.convert_repair_denominator(old_max_hp, target.max_hp)
@@ -1063,11 +1095,52 @@ func _advance_upgrades() -> bool:
 		building.upgrade_total = 0
 		building.upgrade_paid = MechResources.empty()
 		_coverage_dirty = true
+		if target.environment_energy != "none":
+			_environment_dirty = true
 		changed = true
 	if changed:
 		_recompute_economy()
 		state_changed.emit()
 	return changed
+
+
+func _has_water_edge(rules: MechBuildingDefinition, origin: Vector2i) -> bool:
+	var body := Rect2i(origin, rules.footprint)
+	for y: int in range(origin.y, origin.y + rules.footprint.y):
+		for x: int in range(origin.x, origin.x + rules.footprint.x):
+			for offset: Vector2i in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
+				var cell: Vector2i = Vector2i(x, y) + offset
+				if not body.has_point(cell) and _grid.is_water(cell):
+					return true
+	return false
+
+
+func _trigger_traps() -> bool:
+	var triggered_traps: Array[MechBuildingState] = []
+	for building: MechBuildingState in _construction.all():
+		if building.definition.trap_kind == "none" or not building.operating():
+			continue
+		var center: Vector2 = Vector2(building.origin) + Vector2(building.definition.footprint) * 0.5
+		var enemies_hit: Array[MechEntityState] = []
+		for entity: MechEntityState in _registry.all():
+			if entity.team != 2 or entity.hp <= 0:
+				continue
+			if entity.position.distance_to(center) <= building.definition.trigger_radius:
+				enemies_hit.append(entity)
+		if enemies_hit.is_empty():
+			continue
+		for enemy: MechEntityState in enemies_hit:
+			if building.definition.trap_kind == "blast":
+				_damage_enemy(enemy.entity_id, building.definition.trap_damage, [])
+			elif building.definition.trap_kind == "emp":
+				var ticks: int = maxi(1, ceili(building.definition.slow_seconds * _tick_rate))
+				enemy.slow_ticks = maxi(enemy.slow_ticks, ticks)
+				enemy.slow_multiplier = minf(enemy.slow_multiplier, building.definition.slow_multiplier)
+		triggered_traps.append(building)
+	for building: MechBuildingState in triggered_traps:
+		if _construction.get_building(building.entity_id) != null:
+			_remove_building(building.entity_id, MechResources.empty())
+	return not triggered_traps.is_empty()
 
 
 func _tech_level() -> int:
@@ -1098,6 +1171,8 @@ func _validate_upgrade_command(command: MechCommand) -> Dictionary:
 		return _reject("该建筑没有可用升级")
 	if target.footprint != building.definition.footprint:
 		return _reject("升级目标占地不一致")
+	if target.requires_water and not _has_water_edge(target, building.origin):
+		return _reject("水冷站需与水域正交相邻")
 	if building.definition.is_core:
 		if _tech_level() < 1:
 			return _reject("主脑升级需要运行中的科技中心 I")

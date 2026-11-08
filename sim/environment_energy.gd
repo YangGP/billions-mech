@@ -59,7 +59,7 @@ func release(entity_id: int) -> void:
 			_reserved[energy_type] = occupied
 
 
-func score(energy_type: StringName, origin: Vector2i, footprint: Vector2i, grid: MechGridState, vision: MechVisionSystem) -> int:
+func score(energy_type: StringName, origin: Vector2i, footprint: Vector2i, grid: MechGridState, vision: MechVisionSystem, multiplier: int = 1, cap: int = 0) -> int:
 	if energy_type == &"" or energy_type == &"none" or grid == null or vision == null:
 		return 0
 	var points: int = 0
@@ -82,8 +82,9 @@ func score(energy_type: StringName, origin: Vector2i, footprint: Vector2i, grid:
 			elif energy_type == &"solar":
 				if terrain == MechGridState.Terrain.OPEN:
 					points += 1
+	points *= maxi(1, multiplier)
 	if energy_type == &"wind":
-		return mini(WIND_CAP, points / 4)
+		return mini(cap if cap > 0 else WIND_CAP, points / 4)
 	if energy_type == &"solar":
-		return mini(SOLAR_CAP, points / 2)
+		return mini(cap if cap > 0 else SOLAR_CAP, points / 2)
 	return 0

@@ -87,6 +87,8 @@ func preview_placement(id: StringName, origin: Vector2i, grid: MechGridState, ec
 		reason = coverage_error
 	if reason.is_empty():
 		reason = overlap_error
+	if reason.is_empty() and rules.requires_water and not _has_water_edge(rules, origin, grid):
+		reason = "水冷站需与水域正交相邻"
 	var mineral_check: Dictionary = minerals.placement(rules, origin)
 	if reason.is_empty() and not mineral_check["ok"]:
 		reason = mineral_check["reason"]
@@ -103,7 +105,10 @@ func preview_placement(id: StringName, origin: Vector2i, grid: MechGridState, ec
 			if not conflict_cells.is_empty():
 				reason = "同类环境电源采集区重叠"
 			else:
-				environment_power = environment.score(energy_type, origin, rules.footprint, grid, vision)
+				environment_power = environment.score(
+					energy_type, origin, rules.footprint, grid, vision,
+					rules.environment_output_multiplier, rules.environment_output_cap
+				)
 				if environment_power <= 0:
 					reason = "环境评分不足（需已探索有效地形）"
 	if reason.is_empty():
@@ -122,6 +127,19 @@ func preview_placement(id: StringName, origin: Vector2i, grid: MechGridState, ec
 	result["collection_bounds"] = collection_bounds
 	result["conflict_cells"] = conflict_cells
 	return result
+
+
+func _has_water_edge(rules: MechBuildingDefinition, origin: Vector2i, grid: MechGridState) -> bool:
+	var body := Rect2i(origin, rules.footprint)
+	for y: int in range(origin.y, origin.y + rules.footprint.y):
+		for x: int in range(origin.x, origin.x + rules.footprint.x):
+			for offset: Vector2i in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
+				var cell: Vector2i = Vector2i(x, y) + offset
+				if body.has_point(cell):
+					continue
+				if grid.is_water(cell):
+					return true
+	return false
 
 
 func preview_wall_line(cells: Array[Vector2i], grid: MechGridState, economy: MechEconomySystem, minerals: MechMineralSystem) -> Dictionary:

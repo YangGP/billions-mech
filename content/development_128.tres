@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="MechFoundationSettings" load_steps=25 format=3]
+[gd_resource type="Resource" script_class="MechFoundationSettings" load_steps=36 format=3]
 
 [ext_resource type="Script" path="res://content/foundation_settings.gd" id="1"]
 [ext_resource type="Resource" path="res://content/maps/development_basin_128.tres" id="2"]
@@ -25,14 +25,25 @@
 [ext_resource type="Resource" path="res://content/buildings/fuel_extractor.tres" id="22"]
 [ext_resource type="Resource" path="res://content/buildings/thermal_smelter.tres" id="23"]
 [ext_resource type="Resource" path="res://content/buildings/tech_center.tres" id="24"]
+[ext_resource type="Resource" path="res://content/buildings/water_cooler.tres" id="25"]
+[ext_resource type="Resource" path="res://content/buildings/gate.tres" id="26"]
+[ext_resource type="Resource" path="res://content/buildings/emp_trap.tres" id="27"]
+[ext_resource type="Resource" path="res://content/buildings/blast_mine.tres" id="28"]
+[ext_resource type="Resource" path="res://content/buildings/rapid_cannon.tres" id="29"]
+[ext_resource type="Resource" path="res://content/buildings/arc_tower.tres" id="30"]
+[ext_resource type="Resource" path="res://content/buildings/repair_station.tres" id="31"]
+[ext_resource type="Resource" path="res://content/buildings/heavy_factory.tres" id="32"]
+[ext_resource type="Resource" path="res://content/units/heavy_mech.tres" id="33"]
+[ext_resource type="Resource" path="res://content/buildings/lookout_post.tres" id="34"]
+[ext_resource type="Resource" path="res://content/buildings/radar_station.tres" id="35"]
 
 [resource]
 script = ExtResource("1")
 simulation_hz = 30
 scenario_name = "128×128开发测试"
 map_definition = ExtResource("2")
-building_definitions = Array[ExtResource("7")]([ExtResource("3"), ExtResource("4"), ExtResource("5"), ExtResource("6"), ExtResource("8"), ExtResource("9"), ExtResource("17"), ExtResource("18"), ExtResource("19"), ExtResource("20"), ExtResource("22"), ExtResource("23"), ExtResource("24")])
-unit_definitions = Array[ExtResource("16")]([ExtResource("10"), ExtResource("21")])
+building_definitions = Array[ExtResource("7")]([ExtResource("3"), ExtResource("4"), ExtResource("5"), ExtResource("6"), ExtResource("8"), ExtResource("9"), ExtResource("17"), ExtResource("18"), ExtResource("19"), ExtResource("20"), ExtResource("22"), ExtResource("23"), ExtResource("24"), ExtResource("25"), ExtResource("26"), ExtResource("27"), ExtResource("28"), ExtResource("29"), ExtResource("30"), ExtResource("31"), ExtResource("32"), ExtResource("34"), ExtResource("35")])
+unit_definitions = Array[ExtResource("16")]([ExtResource("10"), ExtResource("21"), ExtResource("33")])
 starting_resources = Dictionary[StringName, int]({&"coins": 600, &"metal_ore": 80})
 starting_unit_id = &"scout"
 starting_unit_cells = Array[Vector2i]([Vector2i(59, 68), Vector2i(66, 68)])

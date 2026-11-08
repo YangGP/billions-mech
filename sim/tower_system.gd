@@ -28,7 +28,21 @@ func advance(registry: MechEntityRegistry, buildings: Array[MechBuildingState], 
 		building.attack_cooldown_ticks = maxi(1, ceili(building.definition.attack_seconds * hz))
 		building.shot_ticks = maxi(1, ceili(SHOT_FLASH_SECONDS * hz))
 		building.shot_target = target.position
+		var impacted: Dictionary[int, bool] = {}
+		impacted[target.entity_id] = true
 		hits.append({"id": target.entity_id, "damage": building.definition.attack_damage})
+		if building.definition.splash_radius > 0.0:
+			for entity: MechEntityState in registry.all():
+				if entity.team != 2 or entity.hp <= 0 or impacted.has(entity.entity_id):
+					continue
+				if not vision.is_visible(entity.position):
+					continue
+				if target.position.distance_to(entity.position) > building.definition.splash_radius:
+					continue
+				if not grid.terrain_line_clear(target.position, entity.position):
+					continue
+				impacted[entity.entity_id] = true
+				hits.append({"id": entity.entity_id, "damage": building.definition.attack_damage})
 		if combat_noise.is_valid():
 			combat_noise.call(target.position)
 	return hits

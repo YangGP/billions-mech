@@ -1,11 +1,12 @@
-[gd_resource type="Resource" script_class="MechBuildingDefinition" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="MechBuildingDefinition" load_steps=3 format=3]
 [ext_resource type="Script" path="res://content/building_definition.gd" id="1"]
+[ext_resource type="Resource" path="res://content/buildings/compute_node_ii.tres" id="2"]
 [resource]
 script = ExtResource("1")
 building_id = &"compute_node"
 display_name = "算力节点"
 footprint = Vector2i(2, 2)
-cost = Dictionary[StringName, int]({&"coins": 30})
+cost = Dictionary[StringName, int]({&"coins": 30, &"metal_ore": 4})
 construction_seconds = 40.0
 max_hp = 250
 power_cost = 2
@@ -13,5 +14,9 @@ cooling_cost = 2
 capacity_provided = 4
 capacity_system_reserved = 1
 income_per_minute = 6
+level = 1
+upgrade_to = ExtResource("2")
+upgrade_cost = Dictionary[StringName, int]({&"coins": 60, &"metal_ore": 4, &"alloy": 6})
+upgrade_seconds = 40.0
 
 infectable = true
