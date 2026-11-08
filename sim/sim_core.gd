@@ -767,7 +767,13 @@ func _building_snapshot(building: MechBuildingState) -> Dictionary:
 		for unit_id: StringName in building.definition.produced_units:
 			var rules: MechUnitDefinition = _unit_definitions[unit_id]
 			var option: Dictionary = rules.snapshot()
-			option["production_error"] = "本局已结束" if session_ended() else _production.order_error(building, rules, _economy)
+			var factory_error: String = _prerequisite_error_for(building.definition)
+			if session_ended():
+				option["production_error"] = "本局已结束"
+			elif not factory_error.is_empty():
+				option["production_error"] = factory_error
+			else:
+				option["production_error"] = _production.order_error(building, rules, _economy)
 			options.append(option)
 		result["unit_options"] = options
 		result["production_error"] = options[0]["production_error"]

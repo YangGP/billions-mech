@@ -48,9 +48,14 @@ func present_selection(ids: Array[int]) -> void:
 	queue_redraw()
 
 
+func _is_wall_id(id: StringName) -> bool:
+	return id in [&"armored_wall", &"alloy_wall"]
+
+
 func _building_metrics(id: StringName) -> Vector3:
+	if _is_wall_id(id):
+		return Vector3(25, 31, 31 * MechIsoGeometry.GROUND_RATIO)
 	match id:
-		&"armored_wall": return Vector3(25, 31, 31 * MechIsoGeometry.GROUND_RATIO)
 		&"sentry_tower": return Vector3(30, 47, 47 * MechIsoGeometry.GROUND_RATIO)
 		&"mining_station": return Vector3(36, 47, 47 * MechIsoGeometry.GROUND_RATIO)
 		&"assembly_plant": return Vector3(48, 75, 75 * MechIsoGeometry.GROUND_RATIO)
@@ -300,7 +305,7 @@ func _draw_building(building: Dictionary, point: Vector2, opacity: float = 1.0) 
 	if building.get("hp", 1) <= 0:
 		_draw_ruin(building, footprint)
 		return
-	if id == &"armored_wall":
+	if _is_wall_id(id):
 		color = Color("84939c")
 	elif id == &"sentry_tower":
 		color = Color("a9b6bf")
@@ -313,7 +318,7 @@ func _draw_building(building: Dictionary, point: Vector2, opacity: float = 1.0) 
 	color.a = opacity * (0.45 + progress * 0.55 if constructing else 1.0)
 	height *= scale_height
 	_draw_shadow(point, Vector2(footprint.x * 29.0, footprint.y * 14.0))
-	if id == &"armored_wall":
+	if _is_wall_id(id):
 		var half: Vector2 = MechIsoGeometry.HALF_TILE
 		var directions: Array[Vector2] = [Vector2(-half.x, -half.y), Vector2(half.x, -half.y), half, Vector2(-half.x, half.y)]
 		var mask: int = building.get("connections", 0)
