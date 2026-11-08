@@ -19,6 +19,7 @@ var _stress_mode: bool = false
 var _stress_timer: float = 0.0
 var _stress_step: int = 0
 var _session_logged: bool = false
+var _selected_dispatch_region: int = 0
 var _last_coverage_revision: int = -1
 var _selected := Vector2i(-1, -1)
 var _build_id: StringName = &""
@@ -66,7 +67,10 @@ func _ready() -> void:
 	_stress_mode = OS.get_cmdline_user_args().has("--stress")
 	_perf_enabled = OS.get_cmdline_user_args().has("--perf")
 	_sim.profiling_enabled = _perf_enabled
-	var initial_settings: MechFoundationSettings = SETTINGS
+	var initial_settings: MechFoundationSettings = SETTINGS.duplicate(true)
+	if OS.get_cmdline_user_args().has("--campaign"):
+		initial_settings.campaign_mode = true
+		initial_settings.scenario_name += " · 三阶段战役"
 	Engine.physics_ticks_per_second = initial_settings.simulation_hz
 	if not _sim.configure(initial_settings):
 		get_tree().quit(1)
@@ -381,6 +385,8 @@ func _handle_key(key: int) -> bool:
 			_toggle_dispatch_region()
 		KEY_F9:
 			_delete_dispatch_region()
+		KEY_F11:
+			_cycle_dispatch_region()
 		KEY_SPACE:
 			_toggle_pause()
 		KEY_R:
@@ -543,7 +549,7 @@ func _select_starting_units() -> void:
 	_selection.select(ids)
 	_refresh_selection()
 	if has_units:
-		_hud.feedback("训练场：已选择 %d 名卫兵。右键移动/攻击红叉训练靶；选工厂可生产卫兵。" % ids.size())
+		_hud.feedback("已选择 %d 个单位。右键移动或攻击；选工厂可生产部队。" % ids.size())
 
 
 func _garrison_selected() -> void:
@@ -551,7 +557,7 @@ func _garrison_selected() -> void:
 		return
 	var units: Array[int] = _selected_units()
 	if units.is_empty():
-		_hud.feedback("先选择轻型射击单位，再按 G 进驻附近碉堡。", true)
+		_hud.feedback("先选择卫兵，再按 G 前往附近碉堡进驻。", true)
 		return
 	for id: int in units:
 		_commands.submit(MechCommand.new(MechCommand.Type.GARRISON_UNIT, {"unit_id": id}))
@@ -595,7 +601,7 @@ func _toggle_dispatch_region() -> void:
 	if regions.is_empty():
 		_hud.feedback("没有可切换的授权区域；先按 F7 创建。", true)
 		return
-	var region: Dictionary = regions[0]
+	var region: Dictionary = _selected_region(regions)
 	_commands.submit(MechCommand.new(MechCommand.Type.CONFIGURE_DISPATCH_REGION, {
 		"region_id": int(region["id"]), "cells": region["cells"],
 		"enabled": not bool(region.get("enabled", true)), "budget_cap": region["budget_cap"]}))
@@ -608,7 +614,7 @@ func _delete_dispatch_region() -> void:
 		_hud.feedback("没有可删除的授权区域。", true)
 		return
 	_commands.submit(MechCommand.new(MechCommand.Type.DELETE_DISPATCH_REGION,
-		{"region_id": int(regions[0]["id"])}))
+		{"region_id": int(_selected_region(regions)["id"])}))
 	_hud.feedback("已请求删除授权区域。")
 
 
@@ -738,6 +744,13 @@ func _on_command_finished(command_type: int, result: Dictionary) -> void:
 		_hud.feedback(result["reason"], true)
 		return
 	match command_type:
+		MechCommand.Type.CONFIGURE_DISPATCH_REGION:
+			_selected_dispatch_region = int(result["region_id"])
+			_hud.feedback("已选择授权区域 #%d；F11切换，F8启停，F9删除。" % _selected_dispatch_region)
+		MechCommand.Type.GARRISON_UNIT:
+			_hud.feedback("已收到进驻指令；抵达碉堡入口后进驻。")
+		MechCommand.Type.UNGARRISON_UNIT:
+			_hud.feedback("已撤离 %d 名卫兵；出口被占时其余单位留在碉堡。" % int(result["ejected"]))
 		MechCommand.Type.SET_PAUSED:
 			_hud.feedback("已暂停，可继续建造、取消和下令；施工与收入已冻结。" if _sim.is_paused() else "模拟已恢复。")
 		MechCommand.Type.PLACE_BUILDING:
@@ -799,6 +812,9 @@ func _publish_state() -> void:
 	var generation_changed: bool = _last_generation != state["generation"]
 	if generation_changed:
 		_session_logged = false
+		_selected_dispatch_region = 0
+	_selected_region(state.get("dispatch", {}).get("regions", []))
+	state["dispatch"]["selected_region_id"] = _selected_dispatch_region
 	var ended: bool = state["session"]["ended"]
 	if ended and not _session_logged:
 		_session_logged = true
@@ -825,7 +841,7 @@ func _publish_state() -> void:
 		_selection.reset()
 		_attack_move_mode = false
 		_last_group = -1
-	_selection.reconcile(state["entities"])
+	_selection.reconcile(state["entities"], state.get("garrisoned_unit_ids", []))
 	_world.present(state)
 	_hud.present_state(state)
 	if _last_generation != state["generation"] or _last_map_revision != state["map_revision"] \
@@ -929,3 +945,28 @@ func _update_cursor() -> void:
 		preview = _sim.preview_build(_build_id, cell)
 	_world.present_cursor(cell, _selected, preview, cursor_visible or _wall_dragging or (_build_id != &"" and _keyboard_build))
 	_hud.present_cell(info, preview)
+
+
+func _selected_region(regions: Array) -> Dictionary:
+	for region: Dictionary in regions:
+		if int(region["id"]) == _selected_dispatch_region:
+			return region
+	if not regions.is_empty():
+		_selected_dispatch_region = int(regions[0]["id"])
+		return regions[0]
+	_selected_dispatch_region = 0
+	return {}
+
+
+func _cycle_dispatch_region() -> void:
+	var regions: Array = _dispatch_regions()
+	if regions.is_empty():
+		_hud.feedback("没有可选择的授权区域。", true)
+		return
+	_selected_region(regions)
+	for index: int in range(regions.size()):
+		if int(regions[index]["id"]) == _selected_dispatch_region:
+			_selected_dispatch_region = int(regions[(index + 1) % regions.size()]["id"])
+			break
+	_state_dirty = true
+	_hud.feedback("已选择授权区域 #%d；F8启停，F9删除。" % _selected_dispatch_region)

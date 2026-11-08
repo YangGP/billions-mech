@@ -33,10 +33,12 @@ var shot_target: Vector2 = Vector2.ZERO
 ## Strongest active control only; EMP refreshes duration but never stacks.
 var slow_ticks: int = 0
 var slow_multiplier: float = 1.0
-var slow_effect_multiplier: float = 0.4
+var slow_effect_multiplier: float = 1.0
+var _slow_effects: Dictionary = {}
 var fence_slow_multiplier: float = 1.0
 var last_fence_cell: Vector2i = Vector2i(-999, -999)
 var fog_coarse: bool = false
+var garrison_target_id: int = 0
 var garrisoned: bool = false
 var garrison_building_id: int = 0
 var garrison_saved_speed: float = 0.0
@@ -112,3 +114,31 @@ func snapshot() -> Dictionary:
 		"capacity_cost": unit_definition.capacity_cost if unit_definition != null else 0,
 		"damage": unit_definition.damage if unit_definition != null else 0,
 		"attack_range": unit_definition.attack_range if unit_definition != null else 0.0}
+
+
+func apply_slow(multiplier: float, ticks: int) -> void:
+	if multiplier >= 1.0 or multiplier <= 0.0 or ticks <= 0:
+		return
+	_slow_effects[multiplier] = maxi(ticks, int(_slow_effects.get(multiplier, 0)))
+	_refresh_slow()
+
+
+func advance_slow() -> void:
+	if _slow_effects.is_empty():
+		return
+	for multiplier: float in _slow_effects.keys():
+		var remaining: int = int(_slow_effects[multiplier]) - 1
+		if remaining <= 0:
+			_slow_effects.erase(multiplier)
+		else:
+			_slow_effects[multiplier] = remaining
+	_refresh_slow()
+
+
+func _refresh_slow() -> void:
+	slow_ticks = 0
+	slow_effect_multiplier = 1.0
+	for multiplier: float in _slow_effects:
+		slow_ticks = maxi(slow_ticks, int(_slow_effects[multiplier]))
+		slow_effect_multiplier = minf(slow_effect_multiplier, multiplier)
+	slow_multiplier = minf(slow_effect_multiplier, fence_slow_multiplier)

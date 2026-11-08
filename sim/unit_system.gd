@@ -54,7 +54,7 @@ func plan_order(ids: Array, kind: StringName, goal: Vector2, target_id: int, reg
 	else:
 		if not goal.is_finite() or not grid.contains(Vector2i(goal.floor())) or not grid.is_walkable(Vector2i(goal.floor()), true, {}, true):
 			return {"ok": false, "reason": "目标超界或被地形/建筑阻挡"}
-		if not grid.mobile_position_clear(goal):
+		if not grid.mobile_position_clear(goal, {}, true):
 			return {"ok": false, "reason": "目标过于贴近障碍，无法容纳单位"}
 		var members: Array[MechEntityState] = []
 		for id: int in selected:
@@ -72,6 +72,7 @@ func apply_order(plan: Dictionary, registry: MechEntityRegistry) -> void:
 	var formation: Dictionary = plan.get("formation", {})
 	for id: int in plan["ids"]:
 		var unit: MechEntityState = registry.get_entity(id)
+		unit.garrison_target_id = 0
 		unit.order = plan["kind"]
 		unit.attack_target_id = plan["target_id"] if unit.order == &"attack" else 0
 		unit.order_goal = plan["goal"]
@@ -106,13 +107,13 @@ func spawn(building: MechBuildingState, rally: Vector2i, rules: MechUnitDefiniti
 			var outside_y: bool = y < area.position.y or y >= area.end.y
 			if outside_x and outside_y:
 				continue
-			if not area.has_point(cell) and grid.is_walkable(cell) and not occupied.has(cell) and registry.mobile_space_free(Vector2(cell) + Vector2(0.5, 0.5)):
+			if not area.has_point(cell) and grid.is_walkable(cell, true, {}, true) and not occupied.has(cell) and registry.mobile_space_free(Vector2(cell) + Vector2(0.5, 0.5)):
 				candidates.append(cell)
 	if candidates.is_empty():
 		return false
 	candidates.sort_custom(func(a: Vector2i, b: Vector2i) -> bool: return a.distance_squared_to(rally) < b.distance_squared_to(rally))
 	var id: int = create(registry, rules, candidates[0])
-	if grid.is_walkable(rally):
+	if grid.is_walkable(rally, true, {}, true):
 		var plan: Dictionary = plan_order([id], &"move", Vector2(rally) + Vector2(0.5, 0.5), 0, registry, grid, navigation)
 		if plan["ok"]:
 			apply_order(plan, registry)

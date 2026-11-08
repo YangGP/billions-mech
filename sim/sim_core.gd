@@ -47,6 +47,10 @@ var _repair_station_targets: Dictionary[int, int] = {}
 var _environment := MechEnvironmentEnergy.new()
 var _alloy_processing := MechAlloyProcessing.new()
 var _dispatch := MechDispatchModel.new()
+var _dispatch_unit_orders: Dictionary[int, int] = {}
+var _dispatch_buildings: Dictionary[int, Dictionary] = {}
+var _contract_rng := RandomNumberGenerator.new()
+var _garrison_pending: Dictionary[int, bool] = {}
 var _environment_dirty: bool = true
 var _environment_full_refresh: bool = true
 var _environment_pending_cells: Array[Vector2i] = []
@@ -69,6 +73,9 @@ var _profile_counters: Dictionary = {}
 
 func _init() -> void:
 	_registry.movement_finished.connect(_on_movement_finished)
+	_production.order_finished = _on_production_finished
+	_economy.repair_authorized = _repair_authorized
+	_economy.repair_paid = _repair_paid
 
 
 func shutdown() -> void:
@@ -80,6 +87,7 @@ func _on_movement_finished() -> void:
 	# The registry emits once after the complete native batch, not per unit.
 	# Publish sight at the committed positions, including the last frame before
 	# pausing; source caching makes unchanged updates inexpensive.
+	_finish_garrison_arrivals()
 	_sync_vision()
 	state_changed.emit()
 
@@ -213,6 +221,7 @@ func execute_command(command: MechCommand, cancel_motion: bool = true) -> Dictio
 				_registry.suspend_motion()
 		MechCommand.Type.MOVE_ENTITY:
 			var mover: MechEntityState = _registry.get_entity(command.payload["entity_id"])
+			mover.garrison_target_id = 0
 			mover.order_goal = command.payload["target"]
 			mover.arrival_facing = mover.position.direction_to(mover.order_goal)
 			if mover.arrival_facing.is_zero_approx():
@@ -303,6 +312,7 @@ func execute_command(command: MechCommand, cancel_motion: bool = true) -> Dictio
 			result["was_clearing"] = was_clearing
 		MechCommand.Type.TOGGLE_REPAIR:
 			var building: MechBuildingState = _construction.get_building(command.payload["entity_id"])
+			_take_manual_repair(building)
 			building.repairing = not building.repairing
 			building.repair_manual_hold = true
 			building.repair_remainder = 0
@@ -344,6 +354,7 @@ func execute_command(command: MechCommand, cancel_motion: bool = true) -> Dictio
 			var count: int = 0
 			for target: MechBuildingState in _construction.all():
 				if target.phase == MechBuildingState.Phase.OPERATING and target.hp < target.definition.max_hp:
+					_take_manual_repair(target)
 					target.repairing = true
 					target.repair_manual_hold = true
 					target.repair_remainder = 0
@@ -378,9 +389,12 @@ func execute_command(command: MechCommand, cancel_motion: bool = true) -> Dictio
 			result = {"ok": true, "reason": "", "final_wave": true}
 		MechCommand.Type.GARRISON_UNIT:
 			var unit: MechEntityState = _registry.get_entity(command.payload["unit_id"])
-			var bunker: MechBuildingState = _nearest_garrison_bunker(unit)
-			_garrison_unit(unit, bunker)
-			result = {"ok": true, "reason": "", "building_id": bunker.entity_id}
+			_units.apply_order({"ids": [unit.entity_id], "kind": &"move", "goal": result["entry"],
+				"target_id": 0, "paths": {unit.entity_id: result["path"]}}, _registry)
+			unit.garrison_target_id = int(result["building_id"])
+			_garrison_pending[unit.entity_id] = true
+			_finish_garrison_arrivals()
+			result = {"ok": true, "reason": "", "building_id": unit.garrison_building_id if unit.garrisoned else unit.garrison_target_id}
 		MechCommand.Type.UNGARRISON_UNIT:
 			var bunker: MechBuildingState = _construction.get_building(command.payload["building_id"])
 			var count: int = _eject_all_garrison(bunker)
@@ -388,7 +402,8 @@ func execute_command(command: MechCommand, cancel_motion: bool = true) -> Dictio
 		MechCommand.Type.ACCEPT_CONTRACT:
 			var dock: MechBuildingState = _construction.get_building(command.payload["building_id"])
 			var offer: Dictionary = dock.contract_offer.duplicate(true)
-			_economy.try_spend(offer["price"])
+			if not _economy.try_spend(offer["price"]):
+				return _reject("资源不足，合同未接受")
 			dock.contract_unit_id = StringName(offer["unit_id"])
 			dock.contract_paid = MechResources.copy(offer["price"])
 			dock.contract_normal_cost = MechResources.copy(offer["normal_cost"])
@@ -630,9 +645,7 @@ func advance_one_tick() -> void:
 		if float(hit.get("slow_multiplier", 1.0)) < 1.0:
 			var target: MechEntityState = _registry.get_entity(hit["id"])
 			if target != null and target.hp > 0:
-				target.slow_ticks = maxi(target.slow_ticks, maxi(1, ceili(float(hit.get("slow_seconds", 0.0)) * _tick_rate)))
-				target.slow_effect_multiplier = minf(target.slow_effect_multiplier, float(hit.get("slow_multiplier", 1.0)))
-				target.slow_multiplier = target.slow_effect_multiplier
+				target.apply_slow(float(hit.get("slow_multiplier", 1.0)), maxi(1, ceili(float(hit.get("slow_seconds", 0.0)) * _tick_rate)))
 	_advance_garrison_fire(_collect_shelter_sources())
 	_profile_mark(&"towers")
 	_registry.step(_clock.step_seconds(), _grid)
@@ -678,8 +691,12 @@ func spawn_diagnostic_enemy(enemy_id: StringName, position: Vector2) -> int:
 
 func snapshot() -> Dictionary:
 	var entities: Array[Dictionary] = []
+	var garrisoned_unit_ids: Array[int] = []
 	var shelters: Array[MechEntityState] = _collect_shelter_sources()
 	for current: MechEntityState in _registry.all():
+		if current.garrisoned:
+			garrisoned_unit_ids.append(current.entity_id)
+			continue
 		if current.team == 2 and not _vision.is_visible(current.position):
 			continue
 		var entry: Dictionary = current.snapshot()
@@ -707,6 +724,7 @@ func snapshot() -> Dictionary:
 			minerals.append(mineral)
 	var wave_state: Dictionary = _waves.state()
 	return {"clock": _clock.snapshot(), "entities": entities, "economy": economy, "minerals": minerals,
+		"garrisoned_unit_ids": garrisoned_unit_ids,
 		"vision": _vision.snapshot(), "repair_all": _repair_all_status(),
 		"scenario": _settings.scenario_name, "unit_catalog": _unit_catalog(),
 		"catalog": _catalog_snapshot(), "probe_id": _probe_id,
@@ -718,7 +736,7 @@ func snapshot() -> Dictionary:
 			"reason": {"defeat": "主脑已被摧毁", "victory": "威胁已清除"}.get(String(_outcome), ""),
 			"duration_seconds": float(_clock.snapshot()["tick"]) / float(_tick_rate),
 			"wave_number": int(wave_state.get("wave_number", 0)),
-			"final_phase": String(wave_state.get("final_phase", "none"))},
+			"final_phase": _final_phase(wave_state)},
 		"threat": _threat_snapshot(),
 		"alert": _alert.duplicate(),
 		"map_revision": _grid.revision(), "coverage_revision": _grid.coverage_revision(),
@@ -761,7 +779,7 @@ func _building_snapshot(building: MechBuildingState) -> Dictionary:
 	result["garrison_count"] = building.garrison_unit_ids.size()
 	result["contract"] = {"offer": building.contract_offer.duplicate(true),
 		"delivery_seconds": float(building.contract_delivery_ticks) / _tick_rate,
-		"unit_id": building.contract_unit_id}
+		"unit_id": building.contract_unit_id, "accept_error": _contract_offer_error(building)}
 	if not building.definition.produced_units.is_empty():
 		var options: Array[Dictionary] = []
 		for unit_id: StringName in building.definition.produced_units:
@@ -784,6 +802,7 @@ func _building_snapshot(building: MechBuildingState) -> Dictionary:
 
 func _threat_snapshot() -> Dictionary:
 	var threat: Dictionary = _waves.state()
+	threat["final_phase"] = _final_phase(threat)
 	var radar_lead: float = 0.0
 	for building: MechBuildingState in _construction.all():
 		if building.operating():
@@ -859,13 +878,12 @@ func _create_contract_offer(building: MechBuildingState) -> void:
 	for unit_id: StringName in [&"sentinel", &"heavy_mech", &"rail_mech"]:
 		if not _unit_definitions.has(unit_id):
 			continue
-		var required_tech: int = 2 if unit_id == &"heavy_mech" else (3 if unit_id == &"rail_mech" else 0)
-		if _tech_level() < required_tech:
+		if not _contract_unit_error(unit_id).is_empty():
 			continue
 		candidates.append(unit_id)
 	if candidates.is_empty():
 		return
-	var chosen: StringName = candidates[(_tick_counter + building.entity_id) % candidates.size()]
+	var chosen: StringName = candidates[_contract_rng.randi_range(0, candidates.size() - 1)]
 	var rules: MechUnitDefinition = _unit_definitions[chosen]
 	var price: Dictionary = MechResources.copy(rules.cost)
 	price[&"coins"] = ceili(float(price.get(&"coins", 0)) * building.definition.contract_price_multiplier)
@@ -961,6 +979,7 @@ func _advance_garrison_fire(shelters: Array[MechEntityState]) -> void:
 			var unit: MechEntityState = _registry.get_entity(id)
 			if unit == null or unit.hp <= 0:
 				continue
+			unit.shot_ticks = maxi(0, unit.shot_ticks - 1)
 			unit.cooldown_ticks = maxi(0, unit.cooldown_ticks - 1)
 			if unit.cooldown_ticks > 0:
 				continue
@@ -971,21 +990,20 @@ func _advance_garrison_fire(shelters: Array[MechEntityState]) -> void:
 				if enemy.team != 2 or enemy.hp <= 0 or not _vision.is_visible(enemy.position):
 					continue
 				var distance: float = center.distance_squared_to(enemy.position)
-				if distance <= best:
+				if distance <= best and _grid.terrain_line_clear(center, enemy.position):
 					best = distance
 					target = enemy
 			if target == null:
 				continue
 			unit.cooldown_ticks = maxi(1, ceili(unit.unit_definition.attack_seconds * _tick_rate))
 			unit.shot_ticks = 4
+			unit.face_direction(target.position - center)
+			_threat.note_combat(target.position)
 			unit.shot_target = target.position
 			_damage_enemy(target.entity_id, unit.unit_definition.damage, shelters)
 
 
 func _auto_queue_unit(region_id: int, cells: Dictionary) -> void:
-	for task_id: String in _dispatch.task_ids(region_id):
-		if task_id.begins_with("unit:"):
-			return
 	for building: MechBuildingState in _construction.all():
 		if not building.operating() or building.definition.produced_units.is_empty():
 			continue
@@ -1016,8 +1034,9 @@ func _auto_queue_unit(region_id: int, cells: Dictionary) -> void:
 		var queued: Dictionary = execute_command(MechCommand.new(MechCommand.Type.QUEUE_UNIT,
 			{"factory_id": building.entity_id, "unit_id": unit_id}), false)
 		if queued.get("ok", false):
-			_dispatch.rename_task(region_id, pending, "unit:%d:%d" % [
-				building.entity_id, int(queued["ticket"])])
+			var ticket: int = int(queued["ticket"])
+			_dispatch.settle(region_id, pending, ticket, _tick_counter)
+			_dispatch_unit_orders[ticket] = region_id
 			_dispatch.note_success(region_id)
 		else:
 			_dispatch.release(region_id, pending)
@@ -1031,105 +1050,187 @@ func _validate_garrison(command: MechCommand) -> Dictionary:
 			return _reject("单位编号无效")
 		var unit: MechEntityState = _registry.get_entity(command.payload["unit_id"])
 		if unit == null or unit.team != 1 or unit.unit_definition == null or unit.hp <= 0 or unit.garrisoned:
-			return _reject("请选择可进驻的轻型射击单位")
-		if unit.unit_definition.damage <= 0 or unit.unit_definition.capacity_cost > 2:
-			return _reject("只有轻型射击单位可以进驻")
-		var bunker: MechBuildingState = _nearest_garrison_bunker(unit)
-		if bunker == null:
-			return _reject("附近没有可用的驻防碉堡")
-		return {"ok": true, "reason": "", "building_id": bunker.entity_id}
+			return _reject("请选择未驻防的卫兵")
+		if unit.unit_definition.unit_id != &"sentinel":
+			return _reject("只有卫兵可以进驻，侦察和重型单位不可驻防")
+		var plan: Dictionary = _garrison_entry_plan(unit)
+		if plan.is_empty():
+			return _reject("附近没有尚有空位且入口可达的驻防碉堡")
+		plan["ok"] = true
+		plan["reason"] = ""
+		return plan
 	if typeof(command.payload.get("building_id")) != TYPE_INT:
 		return _reject("碉堡编号无效")
 	var bunker: MechBuildingState = _construction.get_building(command.payload["building_id"])
-	if bunker == null or not bunker.operating() or bunker.definition.garrison_capacity <= 0:
-		return _reject("请选择运行中的驻防碉堡")
+	if bunker == null or bunker.definition.garrison_capacity <= 0:
+		return _reject("请选择驻防碉堡")
 	if bunker.garrison_unit_ids.is_empty():
 		return _reject("碉堡内没有驻防单位")
 	return {"ok": true, "reason": ""}
+
+
+func _contract_offer_error(dock: MechBuildingState) -> String:
+	if dock == null or not dock.operating() or dock.definition.contract_interval_seconds <= 0.0:
+		return "请选择运行中的远征接驳站"
+	if dock.contract_offer.is_empty() or dock.contract_unit_id != &"":
+		return "当前没有可接受的合同"
+	var prerequisite: String = _prerequisite_error_for(dock.definition)
+	if not prerequisite.is_empty():
+		return prerequisite
+	var unit_id := StringName(dock.contract_offer["unit_id"])
+	var rules: MechUnitDefinition = _unit_definitions.get(unit_id)
+	if rules == null:
+		return "合同单位无效"
+	var unit_error: String = _contract_unit_error(unit_id)
+	if not unit_error.is_empty():
+		return unit_error
+	return _economy.contract_error(rules.capacity_cost, dock.contract_offer["price"])
+
+
+func _contract_unit_error(unit_id: StringName) -> String:
+	var required: int = 3 if unit_id == &"rail_mech" else (2 if unit_id == &"heavy_mech" else 0)
+	if _tech_level() < required or _mainbrain_level() < required:
+		return "合同单位需要主脑和科技等级 %d" % required
+	return ""
 
 
 func _validate_contract(command: MechCommand) -> Dictionary:
 	if typeof(command.payload.get("building_id")) != TYPE_INT:
 		return _reject("接驳站编号无效")
 	var dock: MechBuildingState = _construction.get_building(command.payload["building_id"])
-	if dock == null or not dock.operating() or dock.definition.contract_interval_seconds <= 0.0:
-		return _reject("请选择运行中的远征接驳站")
 	if command.type == MechCommand.Type.ACCEPT_CONTRACT:
-		if dock.contract_offer.is_empty() or dock.contract_unit_id != &"":
-			return _reject("当前没有可接受的合同")
-		var rules: MechUnitDefinition = _unit_definitions.get(dock.contract_offer["unit_id"])
-		if rules == null:
-			return _reject("合同单位无效")
-		var error: String = _economy.contract_error(rules.capacity_cost, dock.contract_offer["price"])
-		if not error.is_empty():
-			return _reject(error)
-		return {"ok": true, "reason": ""}
-	if dock.contract_unit_id == &"":
+		var error: String = _contract_offer_error(dock)
+		return {"ok": true, "reason": ""} if error.is_empty() else _reject(error)
+	# Cancelling an existing paid order must remain possible after power or
+	# prerequisites are lost, including while demolition is pending.
+	if dock == null or dock.contract_unit_id == &"":
 		return _reject("没有未交付合同")
 	return {"ok": true, "reason": ""}
 
 
-func _nearest_garrison_bunker(unit: MechEntityState) -> MechBuildingState:
-	var best: MechBuildingState = null
-	var best_distance: float = 12.0
-	for building: MechBuildingState in _construction.all():
-		if not building.operating() or building.definition.garrison_capacity <= 0:
+func _garrison_reservations(bunker: MechBuildingState, ignored_id: int = 0) -> int:
+	var count: int = bunker.garrison_unit_ids.size()
+	for id: int in _garrison_pending:
+		var unit: MechEntityState = _registry.get_entity(id)
+		if unit != null and id != ignored_id and unit.hp > 0 and unit.garrison_target_id == bunker.entity_id:
+			count += 1
+	return count
+
+
+func _garrison_perimeter(bunker: MechBuildingState) -> Array[Vector2i]:
+	var cells: Array[Vector2i] = []
+	var area := Rect2i(bunker.origin, bunker.definition.footprint)
+	for x: int in range(area.position.x, area.end.x):
+		cells.append(Vector2i(x, area.position.y - 1))
+		cells.append(Vector2i(x, area.end.y))
+	for y: int in range(area.position.y, area.end.y):
+		cells.append(Vector2i(area.position.x - 1, y))
+		cells.append(Vector2i(area.end.x, y))
+	return cells
+
+
+func _garrison_entry_plan(unit: MechEntityState) -> Dictionary:
+	var best: Dictionary = {}
+	var best_distance: float = INF
+	for bunker: MechBuildingState in _construction.all():
+		if not bunker.operating() or bunker.definition.garrison_capacity <= 0:
 			continue
-		if building.garrison_unit_ids.size() >= building.definition.garrison_capacity:
+		if _garrison_reservations(bunker, unit.entity_id) >= bunker.definition.garrison_capacity:
 			continue
-		var center: Vector2 = Vector2(building.origin) + Vector2(building.definition.footprint) * 0.5
-		var distance: float = unit.position.distance_to(center)
-		if distance <= best_distance:
-			best_distance = distance
-			best = building
+		var center: Vector2 = Vector2(bunker.origin) + Vector2(bunker.definition.footprint) * 0.5
+		if unit.position.distance_to(center) > 12.0:
+			continue
+		for cell: Vector2i in _garrison_perimeter(bunker):
+			var entry: Vector2 = Vector2(cell) + Vector2(0.5, 0.5)
+			if not _grid.mobile_position_clear(entry, {}, true):
+				continue
+			var path: PackedVector2Array = _navigation.find_path(unit.position, cell)
+			if path.is_empty():
+				continue
+			var length: float = 0.0
+			var previous: Vector2 = unit.position
+			for point: Vector2 in path:
+				length += previous.distance_to(point)
+				previous = point
+			if length < best_distance:
+				best_distance = length
+				best = {"building_id": bunker.entity_id, "entry": entry, "path": path}
 	return best
 
 
+func _finish_garrison_arrivals() -> void:
+	if session_ended():
+		return
+	for id: int in _garrison_pending.keys():
+		var unit: MechEntityState = _registry.get_entity(id)
+		if unit == null or unit.garrison_target_id == 0:
+			_garrison_pending.erase(id)
+			continue
+		var bunker: MechBuildingState = _construction.get_building(unit.garrison_target_id)
+		if unit.hp <= 0 or bunker == null or not bunker.operating() or unit.order not in [&"move", &"idle"]:
+			unit.garrison_target_id = 0
+			_garrison_pending.erase(id)
+			continue
+		if unit.position.distance_to(unit.order_goal) > MechEntityState.ARRIVAL_TOLERANCE:
+			continue
+		var entry_cell := Vector2i(unit.order_goal.floor())
+		if entry_cell not in _garrison_perimeter(bunker) or bunker.garrison_unit_ids.size() >= bunker.definition.garrison_capacity:
+			unit.garrison_target_id = 0
+			_garrison_pending.erase(id)
+			continue
+		_garrison_unit(unit, bunker)
+
+
 func _garrison_unit(unit: MechEntityState, bunker: MechBuildingState) -> void:
+	_garrison_pending.erase(unit.entity_id)
 	unit.garrison_saved_speed = unit.rvo_speed
 	unit.rvo_speed = 0.0
-	unit.has_move_order = false
 	unit.order = &"garrisoned"
+	unit.attack_target_id = 0
+	unit.garrison_target_id = 0
 	unit.garrisoned = true
 	unit.garrison_building_id = bunker.entity_id
-	unit.position = Vector2(bunker.origin) + Vector2(bunker.definition.footprint) * 0.5
+	unit.formation_id = 0
+	unit.has_arrival_facing = false
+	_registry.teleport(unit.entity_id, Vector2(bunker.origin) + Vector2(bunker.definition.footprint) * 0.5)
 	bunker.garrison_unit_ids.append(unit.entity_id)
 
 
-func _eject_all_garrison(bunker: MechBuildingState) -> int:
+func _eject_all_garrison(bunker: MechBuildingState, forced: bool = false, infect_losses: bool = false) -> int:
 	var count: int = 0
 	for id: int in bunker.garrison_unit_ids.duplicate():
 		var unit: MechEntityState = _registry.get_entity(id)
-		if unit != null:
-			var cell: Vector2i = _garrison_eject_cell(bunker)
-			unit.position = Vector2(cell) + Vector2(0.5, 0.5)
-			unit.garrisoned = false
-			unit.garrison_building_id = 0
-			unit.rvo_speed = unit.garrison_saved_speed if unit.garrison_saved_speed > 0.0 else unit.unit_definition.move_speed
-			unit.order = &"idle"
-			unit.has_move_order = false
-			count += 1
+		if unit == null:
+			bunker.garrison_unit_ids.erase(id)
+			continue
+		var cell: Vector2i = _garrison_eject_cell(bunker)
+		if cell.x < 0:
+			# A voluntary exit waits for space; a destroyed/removed bunker cannot
+			# keep units hidden or teleport them across a surrounding wall.
+			if forced:
+				if infect_losses:
+					_infect_asset(unit.unit_definition.cost, unit.position)
+				_remove_entity(id)
+			continue
+		unit.garrisoned = false
+		unit.garrison_building_id = 0
+		unit.garrison_target_id = 0
+		unit.rvo_speed = unit.garrison_saved_speed if unit.garrison_saved_speed > 0.0 else unit.unit_definition.move_speed
+		unit.order = &"idle"
+		unit.attack_target_id = 0
+		_registry.teleport(id, Vector2(cell) + Vector2(0.5, 0.5))
+		unit.order_goal = unit.position
 		bunker.garrison_unit_ids.erase(id)
+		count += 1
 	return count
 
 
 func _garrison_eject_cell(bunker: MechBuildingState) -> Vector2i:
-	var center: Vector2 = Vector2(bunker.origin) + Vector2(bunker.definition.footprint) * 0.5
-	var best: Vector2i = Vector2i(center.floor())
-	var best_distance: float = INF
-	for radius: int in range(1, 5):
-		for y: int in range(-radius, radius + 1):
-			for x: int in range(-radius, radius + 1):
-				var cell: Vector2i = Vector2i(bunker.origin) + Vector2i(x, y) + bunker.definition.footprint / 2
-				if not _grid.is_walkable(cell, true, {}, true) or not _registry.mobile_space_free(Vector2(cell) + Vector2(0.5, 0.5)):
-					continue
-				var distance: float = Vector2(cell).distance_squared_to(center)
-				if distance < best_distance:
-					best_distance = distance
-					best = cell
-		if best_distance < INF:
-			break
-	return best
+	for cell: Vector2i in _garrison_perimeter(bunker):
+		var point: Vector2 = Vector2(cell) + Vector2(0.5, 0.5)
+		if _grid.mobile_position_clear(point, {}, true) and _registry.mobile_space_free(point):
+			return cell
+	return Vector2i(-1, -1)
 
 
 func _clear_dispatch_region(region_id: int) -> void:
@@ -1154,24 +1255,13 @@ func _advance_dispatch_automation() -> void:
 	for region: Dictionary in regions:
 		var region_id: int = int(region["id"])
 		if not region.get("enabled", false):
-			for building: MechBuildingState in _construction.all():
-				if building.repair_auto_source == -region_id:
-					building.repairing = false
-					building.repair_auto_source = 0
-					building.repair_rate_override = 0.0
-			continue
-		if not _dispatch.can_retry(region_id, _tick_counter):
+			_clear_dispatch_region(region_id)
 			continue
 		var cells: Dictionary = {}
 		for cell: Vector2i in region.get("cells", []):
 			cells[cell] = true
 		# Release tasks whose target is full, gone, or manually taken over.
 		for task_id: String in region.get("tasks", {}).keys():
-			if task_id.begins_with("unit:"):
-				var parts: PackedStringArray = task_id.split(":")
-				if parts.size() == 3 and not _production.has_ticket(int(parts[1]), int(parts[2])):
-					_dispatch.settle(region_id, task_id, int(parts[2]), _tick_counter)
-				continue
 			if not task_id.begins_with("repair:"):
 				continue
 			var target_id: int = int(task_id.trim_prefix("repair:"))
@@ -1183,6 +1273,8 @@ func _advance_dispatch_automation() -> void:
 					target.repairing = false
 					target.repair_auto_source = 0
 					target.repair_rate_override = 0.0
+		if not _dispatch.can_retry(region_id, _tick_counter):
+			continue
 		for building: MechBuildingState in _construction.all():
 			if building.phase != MechBuildingState.Phase.OPERATING or building.hp >= building.definition.max_hp:
 				continue
@@ -1199,8 +1291,11 @@ func _advance_dispatch_automation() -> void:
 			if not in_region:
 				continue
 			var estimate := {}
+			var missing_hp: int = building.definition.max_hp - building.hp
+			var denominator: int = 4 * maxi(1, building.definition.max_hp)
 			for key: StringName in MechResources.KEYS:
-				estimate[key] = ceili(float(building.definition.cost.get(key, 0)) * 0.25)
+				estimate[key] = (int(building.repair_material_remainder.get(key, 0))
+					+ missing_hp * int(building.definition.cost.get(key, 0))) / denominator
 			var task_id := "repair:%d" % building.entity_id
 			if not _dispatch.commit(region_id, task_id, estimate, _dispatch.generation()):
 				_dispatch.note_failure(region_id, _tick_counter)
@@ -1215,9 +1310,14 @@ func _advance_dispatch_automation() -> void:
 		if _tick_counter % 30 != 0:
 			continue
 		var has_build_task: bool = false
-		for task_id: String in region.get("tasks", {}).keys():
-			if task_id.begins_with("build:"):
-				has_build_task = true
+		for pending: MechBuildingState in _construction.all():
+			if pending.phase != MechBuildingState.Phase.CONSTRUCTING or pending.definition.building_id not in [&"relay_node", &"compute_node"]:
+				continue
+			for cell: Vector2i in region.get("cells", []):
+				if Rect2i(pending.origin, pending.definition.footprint).has_point(cell):
+					has_build_task = true
+					break
+			if has_build_task:
 				break
 		if has_build_task:
 			continue
@@ -1253,7 +1353,9 @@ func _advance_dispatch_automation() -> void:
 		var placed: Dictionary = execute_command(MechCommand.new(MechCommand.Type.PLACE_BUILDING,
 			{"building_id": build_id, "origin": site}), false)
 		if placed.get("ok", false):
-			_dispatch.settle(region_id, task_id, int(placed.get("entity_id", 0)), _tick_counter)
+			var entity_id: int = int(placed["entity_id"])
+			_dispatch.settle(region_id, task_id, entity_id, _tick_counter)
+			_dispatch_buildings[entity_id] = {"region_id": region_id, "cost": MechResources.copy(placed["cost"])}
 			_dispatch.note_success(region_id)
 		else:
 			_dispatch.release(region_id, task_id)
@@ -1468,18 +1570,23 @@ func _validate_production_command(command: MechCommand) -> Dictionary:
 	else:
 		if building.phase == MechBuildingState.Phase.DEMOLISHING:
 			return _reject("拆除期间不可修改集结点")
-		if typeof(command.payload.get("cell")) != TYPE_VECTOR2I or not _grid.is_walkable(command.payload["cell"]):
+		if typeof(command.payload.get("cell")) != TYPE_VECTOR2I or not _grid.is_walkable(command.payload["cell"], true, {}, true):
 			return _reject("集结点须为地图内可通行格")
 	return {"ok": true, "reason": ""}
 
 
 func _remove_entity(id: int) -> void:
+	_garrison_pending.erase(id)
 	var entity: MechEntityState = _registry.get_entity(id)
 	if entity == null:
 		return
 	if _construction.get_building(id) != null:
 		_remove_building(id, MechResources.empty())
 		return
+	if entity.garrison_building_id != 0:
+		var bunker: MechBuildingState = _construction.get_building(entity.garrison_building_id)
+		if bunker != null:
+			bunker.garrison_unit_ids.erase(id)
 	if _grid.occupant_at(Vector2i(entity.position.floor())) == id:
 		_grid.release(id)
 	_registry.remove(id)
@@ -1665,7 +1772,8 @@ func damage_building(entity_id: int, amount: int) -> Dictionary:
 
 
 func _ruin_building(building: MechBuildingState) -> void:
-	_eject_all_garrison(building)
+	_dispatch_buildings.erase(building.entity_id)
+	_eject_all_garrison(building, true, true)
 	building.contract_offer = {}
 	building.contract_unit_id = &""
 	building.contract_paid = {}
@@ -1762,10 +1870,20 @@ func _remove_building(entity_id: int, refund: Dictionary, refund_orders: bool = 
 	var cycle_refund := MechResources.empty()
 	var building: MechBuildingState = _construction.get_building(entity_id)
 	var removed_rules: MechBuildingDefinition = null
+	if _dispatch_buildings.has(entity_id):
+		var receipt: Dictionary = _dispatch_buildings[entity_id]
+		var ratio: float = 0.0
+		if building != null:
+			ratio = 1.0 if building.phase == MechBuildingState.Phase.CONSTRUCTING else building.paid_refund_ratio
+		var paid_refund: Dictionary = MechResources.scaled(receipt["cost"], ratio)
+		for key: StringName in MechResources.KEYS:
+			paid_refund[key] = mini(int(paid_refund.get(key, 0)), int(refund.get(key, 0)))
+		_dispatch.refund_spent(int(receipt["region_id"]), paid_refund)
+		_dispatch_buildings.erase(entity_id)
 	if building != null:
 		cycle_refund = building.cycle_refund()
 		removed_rules = building.definition
-		_eject_all_garrison(building)
+		_eject_all_garrison(building, true)
 		if not building.contract_paid.is_empty():
 			cycle_refund = MechResources.add(cycle_refund, building.contract_paid)
 			building.contract_paid = {}
@@ -1910,7 +2028,7 @@ func _advance_slow_fences() -> void:
 			continue
 		var cell: Vector2i = enemy.position.floor()
 		var fence: MechBuildingState = fences.get(cell)
-		if fence == null:
+		if fence == null or not fence.operating():
 			enemy.last_fence_cell = Vector2i(-999, -999)
 			enemy.fence_slow_multiplier = 1.0
 			continue
@@ -1919,7 +2037,7 @@ func _advance_slow_fences() -> void:
 			fence.hp = maxi(0, fence.hp - 10)
 			if fence.hp <= 0:
 				_ruin_building(fence)
-		enemy.fence_slow_multiplier = fence.definition.slow_fence_ratio
+		enemy.fence_slow_multiplier = fence.definition.slow_fence_ratio if fence.operating() else 1.0
 
 
 func _trigger_traps() -> bool:
@@ -1942,9 +2060,7 @@ func _trigger_traps() -> bool:
 				_damage_enemy(enemy.entity_id, building.definition.trap_damage, shelters)
 			elif building.definition.trap_kind == "emp":
 				var ticks: int = maxi(1, ceili(building.definition.slow_seconds * _tick_rate))
-				enemy.slow_ticks = maxi(enemy.slow_ticks, ticks)
-				enemy.slow_effect_multiplier = minf(enemy.slow_effect_multiplier, building.definition.slow_multiplier)
-				enemy.slow_multiplier = enemy.slow_effect_multiplier
+				enemy.apply_slow(building.definition.slow_multiplier, ticks)
 		triggered_traps.append(building)
 	for building: MechBuildingState in triggered_traps:
 		if _construction.get_building(building.entity_id) != null:
@@ -2047,12 +2163,12 @@ func _validate_move(payload: Dictionary) -> Dictionary:
 	if not target.is_finite() or not _grid.point_inside(target):
 		return _reject("超出地图边界")
 	var entity_id: int = payload["entity_id"]
-	if not _grid.is_walkable(Vector2i(_registry.position_of(entity_id).floor())):
+	if not _grid.is_walkable(Vector2i(_registry.position_of(entity_id).floor()), true, {}, true):
 		return _reject("实体位于施工占地内，完工时将自动移出")
 	var cell := Vector2i(target.floor())
-	if not _grid.is_walkable(cell):
+	if not _grid.is_walkable(cell, true, {}, true):
 		return _reject("目标被障碍或建筑阻挡")
-	if not _grid.mobile_position_clear(target):
+	if not _grid.mobile_position_clear(target, {}, true):
 		return _reject("目标过于贴近障碍，无法容纳单位")
 	var path: PackedVector2Array = _navigation.find_path_to_point(_registry.position_of(entity_id), target)
 	if path.is_empty():
@@ -2069,7 +2185,7 @@ func _sync_navigation() -> void:
 	for unit: Dictionary in _registry.movable_snapshots():
 		var entity_id: int = unit["id"]
 		var position: Vector2 = unit["position"]
-		if not _grid.is_walkable(Vector2i(position.floor())):
+		if not _grid.is_walkable(Vector2i(position.floor()), true, {}, true):
 			_registry.stop(entity_id)
 			continue
 		if not unit["has_order"]:
@@ -2088,7 +2204,7 @@ func _sync_navigation() -> void:
 func _path_is_blocked(position: Vector2, path: PackedVector2Array) -> bool:
 	var previous: Vector2 = position
 	for point: Vector2 in path:
-		if not _grid.mobile_segment_clear(previous, point):
+		if not _grid.mobile_segment_clear(previous, point, {}, true):
 			return true
 		previous = point
 	return false
@@ -2112,7 +2228,7 @@ func _clear_building_footprint(building: MechBuildingState) -> bool:
 	# Player units and wave enemies are both displaced on completion.
 	var movers: Array[MechEntityState] = []
 	for entity: MechEntityState in _registry.all():
-		if entity.hp > 0 and (entity.unit_definition != null or entity.enemy_definition != null):
+		if entity.hp > 0 and not entity.garrisoned and (entity.unit_definition != null or entity.enemy_definition != null):
 			movers.append(entity)
 	for mover: MechEntityState in movers:
 		var cell := Vector2i(mover.position.floor())
@@ -2183,6 +2299,10 @@ func _reset() -> void:
 	_environment_explored_revision = -1
 	_alloy_processing.reset()
 	_dispatch.reset()
+	_dispatch_unit_orders.clear()
+	_dispatch_buildings.clear()
+	_garrison_pending.clear()
+	_contract_rng.seed = _settings.session_seed
 	_economy.reset(_starting_resources)
 	_minerals.reset(_map_definition.minerals)
 	var brain: MechBuildingDefinition = _construction.definition(&"mainbrain")
@@ -2323,3 +2443,41 @@ func _configuration_error(reason: String) -> bool:
 
 func _reject(reason: String) -> Dictionary:
 	return {"ok": false, "reason": reason}
+
+
+func _on_production_finished(ticket: int, refund: Dictionary) -> void:
+	if not _dispatch_unit_orders.has(ticket):
+		return
+	_dispatch.refund_spent(_dispatch_unit_orders[ticket], refund)
+	_dispatch_unit_orders.erase(ticket)
+	_dispatch_dirty = true
+
+
+func _repair_authorized(building: MechBuildingState, due: Dictionary) -> bool:
+	if building.repair_auto_source >= 0:
+		return true
+	return _dispatch_center_operating() and _dispatch.can_consume(
+		-building.repair_auto_source, "repair:%d" % building.entity_id, due)
+
+
+func _repair_paid(building: MechBuildingState, due: Dictionary) -> void:
+	if building.repair_auto_source < 0:
+		_dispatch.consume(-building.repair_auto_source, "repair:%d" % building.entity_id, due)
+
+
+func _take_manual_repair(building: MechBuildingState) -> void:
+	if building.repair_auto_source < 0:
+		_dispatch.release(-building.repair_auto_source, "repair:%d" % building.entity_id)
+	building.repair_auto_source = 0
+	building.repair_rate_override = 0.0
+	_repair_stations_dirty = true
+
+
+func _final_phase(wave_state: Dictionary) -> String:
+	if not wave_state.get("final_requested", false):
+		return "none"
+	if _outcome == &"victory":
+		return "complete"
+	if _outcome == &"defeat":
+		return "failed"
+	return String(wave_state.get("final_phase", "requested"))

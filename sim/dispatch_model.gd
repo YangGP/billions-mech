@@ -45,11 +45,9 @@ func update_region(id: int, cells: Array[Vector2i], budget_cap: Dictionary, enab
 	_regions[id]["cells"] = cells.duplicate()
 	_regions[id]["budget_cap"] = MechResources.copy(budget_cap)
 	_regions[id]["enabled"] = enabled
-	_regions[id]["committed"] = MechResources.empty()
 	# Re-authorizing does not erase already spent budget, otherwise toggling
 	# F8 would reset the cap and allow unbounded spending.
 	_regions[id]["spent"] = MechResources.copy(spent)
-	_regions[id]["tasks"] = {}
 	_regions[id]["failure_count"] = 0
 	_regions[id]["retry_at_tick"] = 0
 	return true
@@ -61,8 +59,6 @@ func set_enabled(id: int, enabled: bool) -> bool:
 	_regions[id]["enabled"] = enabled
 	if not enabled:
 		_regions[id]["failure_reason"] = "手动接管"
-		_regions[id]["committed"] = MechResources.empty()
-		_regions[id]["tasks"] = {}
 	return true
 
 
@@ -86,7 +82,7 @@ func note_success(id: int) -> void:
 
 
 func commit(id: int, task_id: String, cost: Dictionary, generation: int) -> bool:
-	if not _regions.has(id) or not _regions[id]["enabled"]:
+	if not _regions.has(id) or not _regions[id]["enabled"] or generation != _generation or not MechResources.valid(cost):
 		return false
 	var committed: Dictionary = _regions[id]["committed"]
 	var spent: Dictionary = _regions[id]["spent"]
@@ -189,3 +185,42 @@ func snapshot() -> Dictionary:
 		region["spent"] = MechResources.copy(region["spent"])
 		regions.append(region)
 	return {"generation": _generation, "regions": regions}
+
+
+## Repair reservations are consumed only by a successful wallet transaction.
+## Extra damage may require a top-up; authorize it against the same cap.
+func can_consume(id: int, task_id: String, cost: Dictionary) -> bool:
+	if not _regions.has(id) or not _regions[id]["enabled"] or not MechResources.valid(cost):
+		return false
+	var region: Dictionary = _regions[id]
+	var task: Dictionary = region["tasks"].get(task_id, {})
+	if task.is_empty() or int(task["generation"]) != _generation:
+		return false
+	for key: StringName in MechResources.KEYS:
+		var extra: int = maxi(0, int(cost.get(key, 0)) - int(task["cost"].get(key, 0)))
+		if int(region["spent"].get(key, 0)) + int(region["committed"].get(key, 0)) + extra > int(region["budget_cap"].get(key, 0)):
+			_regions[id]["failure_reason"] = "维修预算已用尽"
+			return false
+	return true
+
+
+func consume(id: int, task_id: String, cost: Dictionary) -> bool:
+	if not can_consume(id, task_id, cost):
+		return false
+	var region: Dictionary = _regions[id]
+	var held: Dictionary = region["tasks"][task_id]["cost"]
+	for key: StringName in MechResources.KEYS:
+		var amount: int = int(cost.get(key, 0))
+		var used: int = mini(amount, int(held.get(key, 0)))
+		held[key] = int(held.get(key, 0)) - used
+		region["committed"][key] = maxi(0, int(region["committed"].get(key, 0)) - used)
+		region["spent"][key] = int(region["spent"].get(key, 0)) + amount
+	return true
+
+
+func refund_spent(id: int, refund: Dictionary) -> void:
+	if not _regions.has(id) or not MechResources.valid(refund):
+		return
+	var spent: Dictionary = _regions[id]["spent"]
+	for key: StringName in MechResources.KEYS:
+		spent[key] = maxi(0, int(spent.get(key, 0)) - int(refund.get(key, 0)))

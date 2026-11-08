@@ -11,6 +11,7 @@ var _entities: Dictionary[int, MechEntityState] = {}
 var _next_id: int = 1
 var _crowd = CROWD_SCRIPT.new()
 var _pending_request: int = 0
+var _friendly_pass: bool = false
 var _motion_grid: MechGridState
 var _motion_seconds: float = 0.0
 var _starting_positions: Dictionary[int, Vector2] = {}
@@ -60,7 +61,7 @@ func all() -> Array[MechEntityState]:
 
 func mobile_space_free(point: Vector2, ignored: Dictionary = {}) -> bool:
 	for entity: MechEntityState in _entities.values():
-		if entity.rvo_speed > 0.0 and not ignored.has(entity.entity_id) and entity.position.distance_squared_to(point) < MOBILE_SPACING * MOBILE_SPACING:
+		if not entity.garrisoned and (entity.rvo_speed > 0.0 or (entity.enemy_definition != null and entity.hp > 0)) and not ignored.has(entity.entity_id) and entity.position.distance_squared_to(point) < MOBILE_SPACING * MOBILE_SPACING:
 			return false
 	return true
 
@@ -100,6 +101,7 @@ func set_move_path(entity_id: int, path: PackedVector2Array) -> void:
 
 
 func set_friendly_pass(enabled: bool) -> void:
+	_friendly_pass = enabled
 	_crowd.set_friendly_pass(enabled)
 
 
@@ -110,10 +112,10 @@ func step(seconds: float, grid: MechGridState) -> void:
 	_starting_waypoints.clear()
 	var preferred: Dictionary[int, Vector2] = {}
 	for entity: MechEntityState in _entities.values():
-		if entity.rvo_speed <= 0.0 or not grid.is_walkable(Vector2i(entity.position.floor())):
+		if entity.rvo_speed <= 0.0 or not grid.is_walkable(Vector2i(entity.position.floor()), true, {}, _friendly_pass):
 			continue
 		var speed: float = entity.rvo_speed / grid.movement_weight(Vector2i(entity.position.floor()))
-		preferred[entity.entity_id] = entity.preferred_velocity(speed, seconds, grid.mobile_segment_clear)
+		preferred[entity.entity_id] = entity.preferred_velocity(speed, seconds, grid.mobile_segment_clear.bind({}, _friendly_pass))
 		_starting_positions[entity.entity_id] = entity.position
 		_starting_waypoints[entity.entity_id] = entity.next_waypoint()
 	_pending_request = _crowd.request(all(), preferred, grid)
@@ -144,7 +146,7 @@ func _apply_velocities(request_id: int, velocities: Dictionary) -> void:
 		var velocity: Vector2 = velocities[id]
 		var desired: Vector2 = entity.position + velocity * _motion_seconds
 		# Final static guard only; all dynamic avoidance is performed by native RVO.
-		if _motion_grid.mobile_segment_clear(entity.position, desired, {}, true):
+		if _motion_grid.mobile_segment_clear(entity.position, desired, {}, _friendly_pass):
 			entity.position = desired
 		entity.face_direction(entity.position - _starting_positions[id])
 		entity.finish_path_if_arrived()

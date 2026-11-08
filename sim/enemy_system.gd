@@ -437,7 +437,7 @@ func advance(registry: MechEntityRegistry, grid: MechGridState, navigation: Mech
 	var need_main: bool = false
 	var need_proto: bool = false
 	for entity: MechEntityState in registry.all():
-		if entity.hp <= 0:
+		if entity.hp <= 0 or entity.garrisoned:
 			continue
 		if entity.team == 1 and entity.unit_definition != null:
 			var unit_cell := Vector2i(entity.position.floor())
@@ -461,12 +461,7 @@ func advance(registry: MechEntityRegistry, grid: MechGridState, navigation: Mech
 	var tick: int = _tick_counter
 	_tick_counter += 1
 	for enemy: MechEntityState in enemies:
-		if enemy.slow_ticks > 0:
-			enemy.slow_ticks -= 1
-		if enemy.slow_ticks <= 0:
-			enemy.slow_effect_multiplier = 1.0
-		enemy.slow_multiplier = enemy.slow_effect_multiplier if enemy.slow_ticks > 0 else 1.0
-		enemy.slow_multiplier = minf(enemy.slow_multiplier, enemy.fence_slow_multiplier)
+		enemy.slow_multiplier = minf(enemy.slow_effect_multiplier, enemy.fence_slow_multiplier)
 		var cell := Vector2i(enemy.position.floor())
 		var near_assets: bool = active_regions.has(_activity_bucket(cell))
 		var local_radius: float = maxf(enemy.enemy_definition.vision_radius, enemy.enemy_definition.attack_range)
@@ -477,6 +472,8 @@ func advance(registry: MechEntityRegistry, grid: MechGridState, navigation: Mech
 		var passes_walls: bool = enemy.enemy_definition.passes_walls
 		_advance_one(enemy, registry, grid, _proto_navigation if passes_walls else navigation, buildings_by_id,
 			non_wall_cells if passes_walls else building_cells, unit_buckets, enemy_buckets, noises, tick, dt, hz, result, coarse)
+		# Effects applied after last tick's movement cover this complete step.
+		enemy.advance_slow()
 	return result
 
 
@@ -639,7 +636,7 @@ func _advance_engaged(enemy: MechEntityState, registry: MechEntityRegistry, grid
 	var target_unit: MechEntityState = null
 	if target_building == null:
 		target_unit = registry.get_entity(target_id)
-		if target_unit == null or target_unit.team != 1 or target_unit.hp <= 0:
+		if target_unit == null or target_unit.team != 1 or target_unit.hp <= 0 or target_unit.garrisoned:
 			target_unit = null
 	if target_building == null and target_unit == null:
 		# A destroyed wall releases its attackers back into marching. Surviving

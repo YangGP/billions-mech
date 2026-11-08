@@ -858,7 +858,7 @@ mouse_filter = 0
 text = "操作 [?]"
 theme_override_font_sizes/font_size = 11
 modulate = Color(0.721569, 0.733333, 0.639216, 1.000000)
-tooltip_text = "左键点选 / 框选；Shift 追加 / Ctrl 切换\n右键移动、攻击或工厂集结点；A＋左键攻击移动\nCtrl＋1–9 编队；1–9 召回\n中键拖图；滚轮缩放；空格暂停\nQ 节点 / W 墙 / E 炮塔；X 拆除；M 地图\nHome 全图；F1 主脑；F10 设置"
+tooltip_text = "左键点选 / 框选；Shift 追加 / Ctrl 切换\n右键移动、攻击或工厂集结点；A＋左键攻击移动\nCtrl＋1–9 编队；1–9 召回\n中键拖图；滚轮缩放；空格暂停\nQ 节点 / W 墙 / E 炮塔；X 拆除；M 地图\nG 卫兵进驻 / U 驻军撤离；C 接受合同 / V 取消\nF6 小地图框选区域 / F7 创建 / F11 切换 / F8 启停 / F9 删除\nHome 全图；F1 主脑；F10 设置"
 
 [node name="StatusStrip" type="Panel" parent="Root"]
 layout_mode = 0
@@ -867,7 +867,7 @@ anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
 offset_left = 280.0
-offset_top = -278.0
+offset_top = -320.0
 offset_right = -16.0
 offset_bottom = -232.0
 theme_override_styles/panel = SubResource("StyleBox_panel")

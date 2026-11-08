@@ -6,6 +6,8 @@ var _queues: Dictionary[int, Array] = {}
 var _rallies: Dictionary[int, Vector2i] = {}
 var _blocked: Dictionary[int, bool] = {}
 var _next_ticket: int = 1
+## Terminal receipt: an empty refund means delivered or lost, never cancelled.
+var order_finished: Callable
 
 
 func clear() -> void:
@@ -68,6 +70,8 @@ func cancel(factory_id: int, ticket: int) -> Dictionary:
 		var item: Dictionary = queue[index]
 		if item["ticket"] == ticket:
 			queue.remove_at(index)
+			if order_finished.is_valid():
+				order_finished.call(ticket, MechResources.copy(item["paid_cost"]))
 			_blocked.erase(factory_id)
 			# Refund is an external result; never hand out the queue item's
 			# mutable dictionary.
@@ -77,9 +81,11 @@ func cancel(factory_id: int, ticket: int) -> Dictionary:
 
 func remove_factory(factory_id: int, refund_orders: bool) -> Dictionary:
 	var refund := MechResources.empty()
-	if refund_orders:
-		for item: Dictionary in _queues.get(factory_id, []):
-			refund = MechResources.add(refund, item["paid_cost"])
+	for item: Dictionary in _queues.get(factory_id, []):
+		var paid_refund: Dictionary = MechResources.copy(item["paid_cost"]) if refund_orders else MechResources.empty()
+		refund = MechResources.add(refund, paid_refund)
+		if order_finished.is_valid():
+			order_finished.call(int(item["ticket"]), paid_refund)
 	_queues.erase(factory_id)
 	_rallies.erase(factory_id)
 	_blocked.erase(factory_id)
@@ -114,6 +120,8 @@ func advance(construction: MechConstructionSystem, spawn: Callable) -> bool:
 			continue
 		if spawn.call(building, _rallies[factory_id], item["unit_id"]):
 			queue.pop_front()
+			if order_finished.is_valid():
+				order_finished.call(int(item["ticket"]), MechResources.empty())
 			_blocked.erase(factory_id)
 			changed = true
 		else:

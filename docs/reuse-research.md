@@ -242,3 +242,7 @@ Agent-Reach 不可用，使用网页检索。先核对高星候选 [Mindustry](h
 ## 25. 二级建造目录（2026-11-08）
 
 先评估[RTS Framework](https://github.com/rluders/rts-framework)（MIT，完整3D Node框架，维护者标注WIP），其选择/命令/建筑生命周期与本项目纯数据模拟和既有HUD不匹配，不为菜单引入完整框架。实际直接复用Godot原生[ButtonGroup](https://docs.godotengine.org/en/stable/classes/class_buttongroup.html)、[GridContainer](https://docs.godotengine.org/en/stable/classes/class_gridcontainer.html)、[ScrollContainer](https://docs.godotengine.org/en/stable/classes/class_scrollcontainer.html)和JSON资源导入。项目只负责目录分类、展示状态及原有建造意图接线；未移植外部代码或自写布局/滚动/互斥按钮算法。
+
+## 26. 0.5.89 生命周期修复（2026-11-09）
+
+核对 [OpenRA](https://github.com/OpenRA/OpenRA)（GPL-3.0，C#/SDL 完整 RTS 引擎）：其 Actor/Trait/World 运行时不适合作为本项目纯 GDScript 模拟的直接依赖。本轮没有移植或重写其算法。直接复用项目现有的 Godot [AStarGrid2D](https://docs.godotengine.org/en/stable/classes/class_astargrid2d.html)、NavigationServer2D 避让、交易与命令模块；仅修正闸门通行参数、驻防命令生命周期、真实付款/退款归属和终波展示状态。没有新增寻路、避让或预算求解算法。

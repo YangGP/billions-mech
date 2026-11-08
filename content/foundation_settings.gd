@@ -1,5 +1,7 @@
 class_name MechFoundationSettings
 extends Resource
+
+@export var session_seed: int = 1
 ## Boot data for the rebuild; no scenes or legacy resources.
 
 @export_range(10, 120, 1) var simulation_hz: int = 30

@@ -49,7 +49,7 @@ func update(grid: MechGridState, registry: MechEntityRegistry, buildings: Array[
 			var center: Vector2 = Vector2(building.origin) + Vector2(building.definition.footprint) * 0.5
 			sources[building.entity_id] = Vector3(center.x, center.y, building.definition.sight_radius)
 	for entity: MechEntityState in registry.all():
-		if entity.team != 1:
+		if entity.team != 1 or entity.garrisoned:
 			continue
 		var radius: float = 0.0
 		if entity.unit_definition != null and entity.hp > 0:

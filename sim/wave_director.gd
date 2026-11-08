@@ -31,6 +31,7 @@ var _release_window_ticks: int = 9000
 var _first_wave_budget: float = 25.0
 var _budget_growth: float = 1.6
 var _total_waves: int = 0
+var _configured_total_waves: int = 0
 var _development_nodes: int = 8
 var _development_score_threshold: int = 24
 var _development_score: int = 0
@@ -66,6 +67,7 @@ func configure(settings: MechFoundationSettings) -> String:
 	_first_wave_budget = maxf(1.0, settings.first_wave_budget)
 	_budget_growth = maxf(1.0, settings.wave_budget_growth)
 	_total_waves = 0 if settings.campaign_mode else maxi(0, settings.total_waves)
+	_configured_total_waves = _total_waves
 	_development_nodes = maxi(1, settings.development_node_threshold)
 	_development_score_threshold = maxi(1, settings.development_score_threshold)
 	_wave_trigger_mode = settings.wave_trigger_mode
@@ -83,6 +85,9 @@ func reset(grid: MechGridState, map_definition: MechMapDefinition, active: bool,
 	_tick_counter = 0
 	_tier_label = ""
 	_final_requested = false
+	_total_waves = _configured_total_waves
+	_campaign_stage = 1
+	_development_score = 0
 	_edge = &""
 	_edge_name = ""
 	_pending.clear()
@@ -129,6 +134,10 @@ func request_final_wave() -> bool:
 		return false
 	_final_requested = true
 	_total_waves = _wave_index + 1
+	if _phase == &"announced":
+		_edge = &"all"
+		_edge_name = "全线"
+		_tier_label = "大量"
 	return true
 
 
@@ -139,13 +148,16 @@ func set_campaign_stage(stage: int) -> void:
 func state() -> Dictionary:
 	var seconds_remaining: float = 0.0
 	var next_event: StringName = &"done"
-	var wave_number: int = _wave_index + 1
+	var wave_number: int = _wave_index if _phase == &"done" else _wave_index + 1
 	var next_wave_number: int = _wave_index + 1
 	var next_edge: StringName = _main_edge
 	var next_edge_name: String = {"north": "北", "south": "南", "west": "西", "east": "东"}.get(String(_main_edge), "正面")
 	if next_wave_number % _flank_every == 0 and not _flank_band.is_empty():
 		next_edge = _flank_edge
 		next_edge_name = {"north": "北", "south": "南", "west": "西", "east": "东"}.get(String(_flank_edge), "侧翼")
+	if _final_requested:
+		next_edge = &"all"
+		next_edge_name = "全线"
 	match _phase:
 		&"silence":
 			seconds_remaining = maxf(0.0, float(_silence_ticks - _tick_counter) / float(_tick_rate))
@@ -163,7 +175,7 @@ func state() -> Dictionary:
 		"next_wave_number": next_wave_number, "next_edge": next_edge,
 		"next_edge_name": next_edge_name,
 		"final_requested": _final_requested,
-		"final_phase": "none" if not _final_requested else ("done" if _phase == &"done" else ("clearing" if _phase == &"active" else "requested")),
+		"final_phase": "none" if not _final_requested else ("requested" if _wave_index < _total_waves else ("releasing" if not _pending.is_empty() else "clearing")),
 		"campaign_mode": _campaign_mode,
 		"campaign_stage": _campaign_stage,
 		"development_score": _development_score,
@@ -185,7 +197,7 @@ func _announce() -> void:
 	_tier_label = "小股" if budget < 40.0 else ("常规" if budget < 80.0 else "大量")
 	if _final_requested and wave_number >= _total_waves:
 		_edge = &"all"
-		_edge_name = "全边"
+		_edge_name = "全线"
 	elif wave_number % _flank_every == 0 and not _flank_band.is_empty():
 		_edge = _flank_edge
 		_edge_name = {"north": "北", "south": "南", "west": "西", "east": "东"}.get(String(_flank_edge), "侧翼")

@@ -13,6 +13,8 @@ var _cooling_supply: int = 0
 var _power_reserved: int = 0
 var _power_supply: int = 0
 var _income_rate: int = 0
+var repair_authorized: Callable
+var repair_paid: Callable
 
 
 func reset(starting_resources: Dictionary) -> void:
@@ -188,11 +190,17 @@ func advance_repairs(buildings: Array[MechBuildingState], hz: int) -> void:
 			if units > 0:
 				due[key] = units
 			next_remainder[key] = total - units * denominator
+		if repair_authorized.is_valid() and not repair_authorized.call(building, due):
+			building.repair_waiting_for_funds = true
+			building.repair_hp_accumulator = 0
+			continue
 		if not due.is_empty() and not try_spend(due):
 			# Do not commit fractions or HP when the material step cannot be paid.
 			building.repair_waiting_for_funds = true
 			building.repair_hp_accumulator = 0
 			continue
+		if repair_paid.is_valid():
+			repair_paid.call(building, due)
 		building.repair_material_remainder = next_remainder
 		building.repair_hp_accumulator -= hz
 		building.hp = mini(building.definition.max_hp, building.hp + 1)

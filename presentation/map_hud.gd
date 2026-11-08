@@ -90,17 +90,29 @@ func _ready() -> void:
 	_zoom_label = $Root/Toolbar/Zoom
 	_pause_button = $Root/Header/Pause
 	_wave_label = Label.new()
-	_wave_label.position = Vector2(12, 132)
+	$Root/StatusStrip.add_child(_wave_label)
+	_wave_label.anchor_right = 1.0
+	_wave_label.offset_left = 12
+	_wave_label.offset_top = 45
+	_wave_label.offset_right = -12
+	_wave_label.offset_bottom = 66
+	_wave_label.clip_text = true
+	_wave_label.mouse_filter = Control.MOUSE_FILTER_PASS
 	_wave_label.add_theme_font_override("font", _state_label.get_theme_font("font"))
 	_wave_label.add_theme_font_size_override("font_size", 15)
 	_wave_label.add_theme_color_override("font_color", Color("f0bc79"))
-	$Root/Header.add_child(_wave_label)
 	_dispatch_label = Label.new()
-	_dispatch_label.position = Vector2(12, 154)
+	$Root/StatusStrip.add_child(_dispatch_label)
+	_dispatch_label.anchor_right = 1.0
+	_dispatch_label.offset_left = 12
+	_dispatch_label.offset_top = 66
+	_dispatch_label.offset_right = -12
+	_dispatch_label.offset_bottom = 86
+	_dispatch_label.clip_text = true
+	_dispatch_label.mouse_filter = Control.MOUSE_FILTER_PASS
 	_dispatch_label.add_theme_font_override("font", _state_label.get_theme_font("font"))
 	_dispatch_label.add_theme_font_size_override("font_size", 13)
 	_dispatch_label.add_theme_color_override("font_color", ACCENT)
-	$Root/Header.add_child(_dispatch_label)
 	_selection_title = $Root/Inspector/Title
 	_status_label = $Root/Inspector/Status
 	_build_label = $Root/Inspector/BuildLabel
@@ -185,14 +197,16 @@ func present_state(state: Dictionary) -> void:
 	_session_ended = state["session"]["ended"]
 	var threat: Dictionary = state.get("threat", {})
 	if _wave_label != null:
-		if _session_ended or threat.is_empty() or not threat.get("active", false) or threat.get("phase", &"") == &"done":
+		if _session_ended or threat.is_empty() or not threat.get("active", false) or (threat.get("phase", &"") == &"done" and threat.get("final_phase", "none") == "none"):
 			_wave_label.hide()
 		else:
 			var seconds: int = ceili(float(threat.get("seconds_remaining", 0.0)))
 			var clock := "%02d:%02d" % [seconds / 60, seconds % 60]
 			var edge_name: String = String(threat.get("edge_name", ""))
 			var phase: StringName = threat.get("phase", &"")
-			if phase == &"announced":
+			if phase == &"done":
+				_wave_label.text = "终波出兵中" if threat.get("final_phase", "none") == "releasing" else "终波清场中"
+			elif phase == &"announced":
 				_wave_label.text = "第%d波 %s · %s" % [int(threat.get("wave_number", 1)), clock, edge_name]
 			elif phase == &"active":
 				_wave_label.text = "第%d波已出兵%s · 下一波 %s" % [int(threat.get("wave_number", 1)), (" · " + edge_name) if not edge_name.is_empty() else "", clock]
@@ -209,11 +223,12 @@ func present_state(state: Dictionary) -> void:
 						_wave_label.text += " · 终波已请求"
 					"clearing":
 						_wave_label.text += " · 终波清场中"
-					"done":
-						_wave_label.text += " · 终波已出完"
+					"releasing":
+						_wave_label.text += " · 全线出兵中"
 					_:
 						_wave_label.text += " · T请求终波"
 			_wave_label.show()
+			_wave_label.tooltip_text = _wave_label.text
 	if _dispatch_label != null:
 		var regions: Array = state.get("dispatch", {}).get("regions", [])
 		if regions.is_empty():
@@ -235,10 +250,12 @@ func present_state(state: Dictionary) -> void:
 					failure = String(region["failure_reason"])
 			_dispatch_label.text = "调度区域 %d · 启用%d · 预授权 %s · 已花 %s" % [
 				regions.size(), enabled, MechResources.text(committed), MechResources.text(spent)]
+			_dispatch_label.text += " · 当前#%d · F11切换/F8启停/F9删除" % int(state["dispatch"].get("selected_region_id", 0))
 			if last_order > 0:
 				_dispatch_label.text += " · 最近订单 #%d" % last_order
 			if not failure.is_empty():
 				_dispatch_label.text += " · " + failure
+		_dispatch_label.tooltip_text = _dispatch_label.text
 	$Root/SessionResult.visible = _session_ended
 	$Root/WorldInfo/Subtitle.text = "%s  /  战术视图" % state["scenario"]
 	if _generation != state["generation"]:
@@ -434,7 +451,7 @@ func present_selection(building: Dictionary, errors: Dictionary) -> void:
 		_details.text += "\n减速栅  格上敌人速度 %.0f%% · 每次进入扣10HP" % (
 			float(building.get("slow_fence_ratio", 1.0)) * 100.0)
 	if int(building.get("garrison_capacity", 0)) > 0:
-		_details.text += "\n驻防  %d/%d名轻型射击单位 · 射程+%.0f · G进驻/U撤离" % [
+		_details.text += "\n驻防  %d/%d名卫兵 · 射程+%.0f · G进驻/U撤离" % [
 			int(building.get("garrison_count", 0)), int(building.get("garrison_capacity", 0)),
 			float(building.get("garrison_range_bonus", 0.0))]
 	if float(building.get("contract_interval_seconds", 0.0)) > 0.0:
@@ -443,6 +460,9 @@ func present_selection(building: Dictionary, errors: Dictionary) -> void:
 		if not offer.is_empty():
 			_details.text += "\n合同  %s · %s · C接受 / V取消" % [
 				offer.get("unit_name", ""), MechResources.text(offer.get("price", {}))]
+			var accept_error: String = String(contract.get("accept_error", ""))
+			if not accept_error.is_empty():
+				_details.text += "\n不可接单：" + accept_error
 		elif float(contract.get("delivery_seconds", 0.0)) > 0.0:
 			_details.text += "\n合同交付倒计时 %.1fs · V取消退款" % float(contract.get("delivery_seconds", 0.0))
 		else:

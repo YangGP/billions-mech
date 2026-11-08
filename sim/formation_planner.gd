@@ -132,7 +132,7 @@ func _ordered_members(members: Array[MechEntityState], forward: Vector2) -> Arra
 
 
 func _slot_clear(point: Vector2, occupied: PackedVector2Array, grid: MechGridState) -> bool:
-	if not grid.mobile_position_clear(point):
+	if not grid.mobile_position_clear(point, {}, true):
 		return false
 	for other: Vector2 in occupied:
 		if point.distance_squared_to(other) < MechEntityRegistry.MOBILE_SPACING * MechEntityRegistry.MOBILE_SPACING:
@@ -146,7 +146,7 @@ func _reserved_for_other(point: Vector2, id: int, desired: Dictionary, assigned:
 		if other_id == id or assigned.has(other_id):
 			continue
 		var other: Vector2 = desired[other_id]
-		if point.distance_squared_to(other) < MechEntityRegistry.MOBILE_SPACING * MechEntityRegistry.MOBILE_SPACING and grid.mobile_position_clear(other):
+		if point.distance_squared_to(other) < MechEntityRegistry.MOBILE_SPACING * MechEntityRegistry.MOBILE_SPACING and grid.mobile_position_clear(other, {}, true):
 			return true
 	return false
 
@@ -161,12 +161,12 @@ func _fallback_slots(goal: Vector2, count: int, grid: MechGridState) -> PackedVe
 				if maxi(absi(x), absi(y)) != radius:
 					continue
 				var cell: Vector2i = origin + Vector2i(x, y)
-				if not grid.is_walkable(cell):
+				if not grid.is_walkable(cell, true, {}, true):
 					continue
 				var point: Vector2 = goal + Vector2(x, y)
-				if not grid.mobile_position_clear(point):
+				if not grid.mobile_position_clear(point, {}, true):
 					point = Vector2(cell) + Vector2(0.5, 0.5)
-				if grid.mobile_position_clear(point):
+				if grid.mobile_position_clear(point, {}, true):
 					result.append(point)
 		if result.size() >= count * 3 + 8:
 			break

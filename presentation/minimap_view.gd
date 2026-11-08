@@ -141,6 +141,8 @@ func _draw() -> void:
 	# entity dots. Disabled regions stay visible but dimmed.
 	for region: Dictionary in _state.get("dispatch", {}).get("regions", []):
 		var fill: Color = REGION_ENABLED if region.get("enabled", false) else REGION_DISABLED
+		if int(region["id"]) == int(_state.get("dispatch", {}).get("selected_region_id", 0)):
+			fill = Color(0.95, 0.76, 0.3, 0.45 if region.get("enabled", false) else 0.23)
 		for cell: Vector2i in region.get("cells", []):
 			draw_colored_polygon(_footprint_local(cell, Vector2i.ONE), fill)
 	for entity: Dictionary in _state.get("entities", []):

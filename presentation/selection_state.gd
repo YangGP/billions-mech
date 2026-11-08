@@ -21,12 +21,16 @@ func select(next: Array[int], additive: bool = false, toggle: bool = false) -> v
 			ids.append(id)
 
 
-func reconcile(entities: Array) -> void:
+func reconcile(entities: Array, garrisoned_unit_ids: Array = []) -> void:
 	var live: Dictionary = {}
 	for entity: Dictionary in entities:
 		if entity.get("team", 1) == 1:
 			live[entity["id"]] = true
 	ids.assign(ids.filter(func(id: int) -> bool: return live.has(id)))
+	# Hidden friendly units cannot receive ground orders, but their stored
+	# control groups must survive entering and leaving the same bunker.
+	for id: int in garrisoned_unit_ids:
+		live[id] = true
 	for key: int in groups:
 		groups[key] = groups[key].filter(func(id: int) -> bool: return live.has(id))
 
