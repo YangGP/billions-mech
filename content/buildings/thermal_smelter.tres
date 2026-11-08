@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="MechBuildingDefinition" load_steps=3 format=3]
+[ext_resource type="Script" path="res://content/building_definition.gd" id="1"]
+[ext_resource type="Resource" path="res://content/recipes/thermal_smelter.tres" id="2"]
+[resource]
+script = ExtResource("1")
+building_id = &"thermal_smelter"
+display_name = "热能冶炼站"
+footprint = Vector2i(3, 3)
+cost = Dictionary[StringName, int]({&"coins": 120, &"metal_ore": 18})
+construction_seconds = 45.0
+max_hp = 500
+alloy_recipe = ExtResource("2")
+infectable = true

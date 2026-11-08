@@ -50,6 +50,12 @@
 
 [P2d 无燃料开局](../validation/p2d-opening.md) 记录新供给/配方、scout/sentinel、固定首波、启动日志与原生未验项。
 
+[P3a 燃料与冶炼](../validation/p3a-fuel-smelter.md) 记录原生燃料矿点、燃料采集站、热能冶炼周期与首次合金实测。
+
+[P3b 科技与升级](../validation/p3b-tech-upgrade.md) 记录科技 I/II、主脑 I→II、原址升级状态与原生未验项。
+
+[P3c 材料维修](../validation/p3c-repair-version-a.md) 记录4HP/s、材料25%、整数余数与版本A边界。
+
 [M6 bundle 本地审查](../validation/m6-bundle-review.md) 记录本次合入的两个提交、原生导入发现的编译/接线问题、穿墙寻路修复，以及本地 43 个脚本、49 项既有回归、启动和原生画面的复验结果与限制。
 
 [卡顿与游荡节奏调整](../validation/performance-wanderers.md) 记录 0.5.18-dev 的后台行军场、局部 A*/RVO 更新、视野记忆复用、开局禁刷与游荡移速调整，以及加速战斗性能证据和待验项。

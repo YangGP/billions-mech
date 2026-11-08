@@ -29,10 +29,26 @@ var waiting_for_clearance: bool = false
 var repairing: bool = false
 var repair_waiting_for_funds: bool = false
 var repair_remainder: int = 0
+## P3c material-repair fraction: per-resource numerator over 4*max_hp per HP.
+## Kept across repair toggles, full HP and ruin/rebuild; converted on upgrade.
+var repair_material_remainder: Dictionary[StringName, int] = {}
+var repair_hp_accumulator: int = 0
 var income_remainder: int = 0
 ## Runtime output of an environment source (wind/solar); definition fields stay
 ## immutable and shared. Recomputed only when the explored map changes.
 var environment_power: int = 0
+## Thermal-smelter cycle runtime. paid fuel/metal are removed from the ledger
+## at cycle start and refunded only if an active demolition completes.
+var processing_active: bool = false
+var processing_elapsed: int = 0
+var processing_total: int = 0
+var processing_paid: Dictionary[StringName, int] = MechResources.empty()
+var processing_power: int = 0
+## In-place upgrade keeps the old definition and service active until complete.
+var upgrade_target: MechBuildingDefinition
+var upgrade_elapsed: int = 0
+var upgrade_total: int = 0
+var upgrade_paid: Dictionary[StringName, int] = MechResources.empty()
 var attack_cooldown_ticks: int = 0
 var shot_ticks: int = 0
 var shot_target: Vector2 = Vector2.ZERO
@@ -91,6 +107,15 @@ func mark_ruined() -> void:
 	extraction_remainder = 0
 	income_remainder = 0
 	environment_power = 0
+	processing_active = false
+	processing_elapsed = 0
+	processing_total = 0
+	processing_paid = MechResources.empty()
+	processing_power = 0
+	upgrade_target = null
+	upgrade_elapsed = 0
+	upgrade_total = 0
+	upgrade_paid = MechResources.empty()
 	attack_cooldown_ticks = 0
 	shot_ticks = 0
 
@@ -98,7 +123,27 @@ func mark_ruined() -> void:
 func reset_repair_state() -> void:
 	repairing = false
 	repair_remainder = 0
+	repair_hp_accumulator = 0
 	repair_waiting_for_funds = false
+
+
+func convert_repair_denominator(old_max_hp: int, new_max_hp: int) -> void:
+	if old_max_hp <= 0 or new_max_hp <= 0 or old_max_hp == new_max_hp:
+		return
+	var old_denominator: int = 4 * old_max_hp
+	var new_denominator: int = 4 * new_max_hp
+	for key: StringName in repair_material_remainder:
+		repair_material_remainder[key] = int(
+			repair_material_remainder[key] * new_denominator / old_denominator
+		)
+
+
+func cycle_refund() -> Dictionary[StringName, int]:
+	return MechResources.copy(processing_paid) if processing_active else MechResources.empty()
+
+
+func upgrade_refund() -> Dictionary[StringName, int]:
+	return MechResources.copy(upgrade_paid) if upgrade_target != null else MechResources.empty()
 
 
 func status() -> String:
@@ -113,7 +158,13 @@ func status() -> String:
 	if not powered:
 		return "断覆盖"
 	if repairing:
-		return "维修等待资金" if repair_waiting_for_funds else "维修中"
+		return "维修等待材料" if repair_waiting_for_funds else "维修中"
+	if upgrade_target != null:
+		return "升级中"
+	if definition.alloy_recipe != null:
+		if processing_active:
+			return "燃烧中 · 缺金属" if int(processing_paid.get(&"metal_ore", 0)) <= 0 else "燃烧中"
+		return "待燃料"
 	return "运转中"
 
 
@@ -125,7 +176,18 @@ func snapshot() -> Dictionary:
 		"demolition_progress": float(elapsed_demolition_ticks) / demolition_ticks,
 		"demolition_seconds": definition.demolition_seconds, "refund": refund(),
 		"repairing": repairing, "threatened": threatened, "powered": powered,
+		"repair_waiting_for_materials": repair_waiting_for_funds,
+		"repair_material_remainder": MechResources.copy(repair_material_remainder),
 		"environment_power": environment_power,
+		"processing": {"active": processing_active, "elapsed": processing_elapsed,
+			"total": processing_total, "paid": MechResources.copy(processing_paid),
+			"power": processing_power,
+			"progress": float(processing_elapsed) / float(maxi(1, processing_total))},
+		"upgrade": {"active": upgrade_target != null, "target": upgrade_target.building_id if upgrade_target != null else &"",
+			"target_name": upgrade_target.display_name if upgrade_target != null else "",
+			"elapsed": upgrade_elapsed, "total": upgrade_total,
+			"paid": MechResources.copy(upgrade_paid),
+			"progress": float(upgrade_elapsed) / float(maxi(1, upgrade_total))},
 		"waiting_for_clearance": waiting_for_clearance, "rebuild_cost": rebuild_cost(),
 		"shot_ticks": shot_ticks, "shot_target": shot_target}, true)
 	return result

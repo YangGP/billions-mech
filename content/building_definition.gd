@@ -17,6 +17,8 @@ extends Resource
 @export var cooling_provided: int = 0
 @export var infectable: bool = false
 @export_enum("none", "wind", "solar") var environment_energy: String = "none"
+## Optional independent process recipe (thermal smelter alloy cycles).
+@export var alloy_recipe: MechAlloyRecipe
 @export var income_per_minute: int = 0
 @export var mined_resource: StringName = &""
 @export var extraction_per_minute: int = 0
@@ -26,6 +28,13 @@ extends Resource
 @export_range(0.0, 1.0) var refund_ratio: float = 0.5
 @export var is_core: bool = false
 @export var buildable: bool = true
+## Level chain and in-place upgrade. Level-2+ definitions stay non-buildable and
+## are reached only through upgrade_to; tech_level is the tech-center rank.
+@export var level: int = 1
+@export var tech_level: int = 0
+@export var upgrade_to: MechBuildingDefinition
+@export var upgrade_cost: Dictionary[StringName, int] = {}
+@export var upgrade_seconds: float = 0.0
 @export var produced_units: Array[StringName] = []
 @export_range(1, 20, 1) var queue_limit: int = 5
 ## Tower-style autofire; attack_damage 0 marks an unarmed building.
@@ -45,6 +54,15 @@ func validation_error() -> String:
 		return "建筑供给无效"
 	if capacity_system_reserved < 0 or capacity_system_reserved > capacity_provided or mini(cooling_cost, cooling_provided) < 0:
 		return "建筑系统预留或冷却无效"
+	if alloy_recipe != null and not alloy_recipe.validation_error().is_empty():
+		return "建筑合金配方无效"
+	if level < 1 or tech_level < 0 or tech_level > 2:
+		return "建筑等级或科技等级无效"
+	if upgrade_to != null:
+		if upgrade_seconds <= 0.0 or not MechResources.valid(upgrade_cost) or upgrade_cost.is_empty():
+			return "建筑升级费用或工期无效"
+		if upgrade_to.footprint != footprint or upgrade_to.level <= level:
+			return "建筑升级目标占地或等级无效"
 	if not is_finite(sight_radius) or sight_radius < 0.0 or sight_radius > 64.0:
 		return "建筑视野半径无效"
 	if extraction_per_minute < 0 or (mined_resource != &"" and not MechResources.mineable(mined_resource)):
@@ -77,4 +95,11 @@ func snapshot() -> Dictionary:
 		"produced_units": produced_units.duplicate(), "queue_limit": queue_limit,
 		"attack_damage": attack_damage, "attack_seconds": attack_seconds, "attack_range": attack_range,
 		"sight_radius": sight_radius, "coverage_radius": coverage_radius,
-		"environment_energy": environment_energy, "infectable": infectable}
+		"environment_energy": environment_energy, "infectable": infectable,
+		"level": level, "tech_level": tech_level,
+		"upgrade_target": upgrade_to.building_id if upgrade_to != null else &"",
+		"upgrade_target_name": upgrade_to.display_name if upgrade_to != null else "",
+		"upgrade_cost": MechResources.copy(upgrade_cost),
+		"upgrade_seconds": upgrade_seconds,
+		"can_upgrade": upgrade_to != null,
+		"alloy_recipe": alloy_recipe.snapshot() if alloy_recipe != null else {}}

@@ -68,6 +68,8 @@ func _ready() -> void:
 	_hud.building_action_requested.connect(_building_action)
 	_hud.production_requested.connect(_queue_unit)
 	_hud.production_cancelled.connect(_cancel_production)
+	_hud.upgrade_requested.connect(_upgrade_building)
+	_hud.upgrade_cancelled.connect(_cancel_upgrade)
 	_hud.settings_requested.connect(_open_settings)
 	_hud.minimap_focus_requested.connect(_focus_minimap)
 	_hud.repair_all_requested.connect(_repair_all)
@@ -412,6 +414,14 @@ func _cancel_production(factory_id: int, ticket: int) -> void:
 	_commands.submit(MechCommand.new(MechCommand.Type.CANCEL_PRODUCTION, {"factory_id": factory_id, "ticket": ticket}))
 
 
+func _upgrade_building(entity_id: int) -> void:
+	_commands.submit(MechCommand.new(MechCommand.Type.UPGRADE_BUILDING, {"entity_id": entity_id}))
+
+
+func _cancel_upgrade(entity_id: int) -> void:
+	_commands.submit(MechCommand.new(MechCommand.Type.CANCEL_UPGRADE, {"entity_id": entity_id}))
+
+
 func _select_starting_units() -> void:
 	var ids: Array[int] = []
 	for entity: Dictionary in _state["entities"]:
@@ -569,6 +579,10 @@ func _on_command_finished(command_type: int, result: Dictionary) -> void:
 			_hud.feedback("已付款并预留容量，卫兵进入工厂队列。")
 		MechCommand.Type.CANCEL_PRODUCTION:
 			_hud.feedback("生产订单已取消，返还 %s 并释放容量。" % MechResources.text(result["refund"]))
+		MechCommand.Type.UPGRADE_BUILDING:
+			_hud.feedback("升级已下单，支付差价 %s；旧级服务保持到完工。" % MechResources.text(result["cost"]))
+		MechCommand.Type.CANCEL_UPGRADE:
+			_hud.feedback("升级已取消，返还本次差价 %s。" % MechResources.text(result["refund"]))
 		MechCommand.Type.SET_RALLY:
 			_hud.feedback("集结点已更新，新出厂部队将自动前往。")
 		MechCommand.Type.ISSUE_UNIT_ORDER:

@@ -11,6 +11,8 @@ signal build_cancelled
 signal building_action_requested(action: int, entity_id: int)
 signal production_requested(factory_id: int, unit_id: StringName)
 signal production_cancelled(factory_id: int, ticket: int)
+signal upgrade_requested(entity_id: int)
+signal upgrade_cancelled(entity_id: int)
 signal settings_requested
 signal minimap_focus_requested(world_position: Vector2)
 signal repair_all_requested
@@ -47,6 +49,8 @@ var _hp_label: Label
 var _hp_bar: ProgressBar
 var _details: Label
 var _primary: Button
+var _upgrade_button: Button
+var _upgrade_mode_cancel: bool = false
 var _demolish: Button
 var _dialog: ConfirmationDialog
 var _selection: Dictionary = {}
@@ -97,6 +101,12 @@ func _ready() -> void:
 	_hp_bar = $Root/Inspector/HpProgress
 	_details = $Root/Inspector/Details
 	_primary = $Root/Inspector/Primary
+	_upgrade_button = Button.new()
+	_upgrade_button.position = Vector2(16, 214)
+	_upgrade_button.size = Vector2(388, 32)
+	_upgrade_button.add_theme_font_size_override("font_size", 14)
+	_upgrade_button.pressed.connect(_upgrade_pressed)
+	$Root/Inspector.add_child(_upgrade_button)
 	_demolish = $Root/Inspector/Demolish
 	_dialog = $DemolitionDialog
 	_panels = [$Root/Header, $Root/Inspector, $Root/Toolbar, $Root/Resources, $Root/System, $Root/WorldInfo, $Root/StatusStrip, $Root/SessionResult, $Root/Minimap]
@@ -128,7 +138,7 @@ func _ready() -> void:
 	_primary.pressed.connect(_primary_pressed)
 	_demolish.pressed.connect(request_demolition)
 	_dialog.confirmed.connect(_confirm_demolition)
-	_building_widgets = [_status_label, _build_label, _build_bar, _hp_label, _hp_bar, _details, _primary, _demolish]
+	_building_widgets = [_status_label, _build_label, _build_bar, _hp_label, _hp_bar, _details, _primary, _upgrade_button, _demolish]
 	$Root/Inspector/Portrait/Viewport.world_2d = World2D.new()
 	$Root.resized.connect(_layout_fullscreen_minimap)
 	_status_label.clip_text = true
@@ -225,7 +235,7 @@ func present_state(state: Dictionary) -> void:
 	var repair_all: Dictionary = state.get("repair_all", {})
 	_repair_all_button.disabled = _session_ended or not repair_all.get("ok", false)
 	_repair_all_button.tooltip_text = repair_all.get("reason", "") if _repair_all_button.disabled \
-		else "对全部受损完工建筑开启维修（每座 2 HP/秒 · 1 币/秒）；被攻击后进入交战状态，周边 6 格内有敌军期间自动暂停，脱离后恢复"
+		else "对全部受损完工建筑开启维修（每座 4 HP/秒；满修材料为新建配方25%，按实际修复HP扣）；被攻击后进入交战状态，周边 6 格内有敌军期间自动暂停，脱离后恢复"
 	_minimap_view.present_state(state)
 
 
@@ -330,6 +340,7 @@ func present_selection(building: Dictionary, errors: Dictionary) -> void:
 		widget.visible = not building.is_empty()
 	if building.is_empty():
 		_selection_title.text = "区域信息"
+		_upgrade_button.hide()
 		return
 	var footprint: Vector2i = building["footprint"]
 	_selection_title.text = "%s · %d×%d" % [building["name"], footprint.x, footprint.y]
@@ -349,10 +360,29 @@ func present_selection(building: Dictionary, errors: Dictionary) -> void:
 		_details.text += "\n冷却预留  %.1f" % (float(building["cooling_cost"]))
 	if int(building.get("cooling_provided", 0)) > 0:
 		_details.text += "\n冷却供给  +%.1f（全基地共享）" % (float(building["cooling_provided"]))
+	_present_upgrade(building)
 	if int(building.get("coverage_radius", 0)) > 0 and not building.get("is_core", false):
 		_details.text += "\n覆盖扩展  +%d 格（需与主脑连通）" % int(building["coverage_radius"])
+	if building["hp"] < building["max_hp"] or building.get("repairing", false):
+		_details.text += "\n维修 4 HP/秒 · 满修材料为新建配方25%（按实际HP扣，余数保留）"
+		if building.get("repair_waiting_for_materials", false):
+			_details.text += "\n维修等待材料"
 	if String(building.get("environment_energy", "none")) != "none":
 		_details.text += "\n环境供电  +%d（已探索选址）" % int(building.get("environment_power", 0))
+	var recipe: Dictionary = building.get("alloy_recipe", {})
+	if not recipe.is_empty():
+		var processing: Dictionary = building.get("processing", {})
+		_details.text += "\n周期 %.0fs · 燃料%d + 金属%d → 合金%d · 燃烧 +%d电" % [
+			float(recipe.get("cycle_seconds", 15.0)), int(recipe.get("fuel_cost", 2)),
+			int(recipe.get("metal_cost", 1)), int(recipe.get("alloy_output", 1)),
+			int(recipe.get("power_output", 30))]
+		if processing.get("active", false):
+			_details.text += "\n燃烧进度 %d%% · 已投入 %s" % [
+				roundi(float(processing.get("progress", 0.0)) * 100.0),
+				MechResources.text(processing.get("paid", {}))]
+		else:
+			_details.text += "\n待燃料；满负荷 %.0f 合金/分钟" % (
+				60.0 * float(recipe.get("alloy_output", 1)) / float(recipe.get("cycle_seconds", 15.0)))
 	var mineral: Dictionary = building.get("mineral", {})
 	if building["phase"] == MechBuildingState.Phase.RUINED:
 		_build_label.hide()
@@ -376,7 +406,7 @@ func present_selection(building: Dictionary, errors: Dictionary) -> void:
 		_primary.tooltip_text = errors.get("cancel_demolish", "")
 	else:
 		_primary_action = MechCommand.Type.TOGGLE_REPAIR
-		_primary.text = "停止维修" if building["repairing"] else "维修 · 2 HP/秒，1 币/秒"
+		_primary.text = "停止维修" if building["repairing"] else "维修 · 4 HP/秒，材料25%"
 		_primary.tooltip_text = errors.get("repair", "")
 	_primary.disabled = not _primary.tooltip_text.is_empty()
 	_demolish.text = "清除基座 [X] · 无退款" if building["phase"] == MechBuildingState.Phase.RUINED else "拆除 [X] · 返还 %s" % MechResources.text(building["refund"])
@@ -425,6 +455,50 @@ func present_selection(building: Dictionary, errors: Dictionary) -> void:
 				_status_label.text = "出口受阻 · 等待空位"
 		var rally: Vector2i = production["rally"]
 		_details.text = "预留 电力 %d · 调度 %d\n集结点 (%d, %d)\n可生产：%s\n取消队首全额退资源并释放调度" % [building["power_cost"], building["capacity_cost"], rally.x, rally.y, " / ".join(names)]
+
+
+func _present_upgrade(building: Dictionary) -> void:
+	var upgrade: Dictionary = building.get("upgrade", {})
+	var active: bool = upgrade.get("active", false)
+	var can_upgrade: bool = building.get("can_upgrade", false)
+	_upgrade_mode_cancel = false
+	if active:
+		var progress: int = roundi(float(upgrade.get("progress", 0.0)) * 100.0)
+		if building.get("is_core", false):
+			_upgrade_button.text = "主脑升级中 %d%% · 不可取消" % progress
+			_upgrade_button.disabled = true
+			_upgrade_button.tooltip_text = "主脑升级沿旧设计不可取消"
+		else:
+			_upgrade_mode_cancel = true
+			_upgrade_button.text = "取消升级 %d%% · 退还 %s" % [progress, MechResources.text(upgrade.get("paid", {}))]
+			_upgrade_button.disabled = _session_ended
+			_upgrade_button.tooltip_text = "取消只退本次未完成升级差价，不退原建筑"
+		_upgrade_button.show()
+		_details.text += "\n升级目标  %s · %d%%" % [upgrade.get("target_name", ""), progress]
+	elif can_upgrade:
+		_upgrade_button.text = "升级至 %s · %s" % [building.get("upgrade_target_name", ""), MechResources.text(building.get("upgrade_cost", {}))]
+		var upgrade_error: String = building.get("upgrade_error", "")
+		_upgrade_button.disabled = _session_ended or not upgrade_error.is_empty()
+		_upgrade_button.tooltip_text = upgrade_error if not upgrade_error.is_empty() else \
+			"工期 %.0fs；保持旧级服务，完成后原子切换" % float(building.get("upgrade_seconds", 0.0))
+		_upgrade_button.show()
+		_details.text += "\n等级 %d · 升级差价 %s · 工期 %.0fs" % [
+			int(building.get("level", 1)), MechResources.text(building.get("upgrade_cost", {})),
+			float(building.get("upgrade_seconds", 0.0))]
+		if not upgrade_error.is_empty():
+			_details.text += "\n升级条件：%s" % upgrade_error
+	else:
+		_upgrade_button.hide()
+
+
+func _upgrade_pressed() -> void:
+	if _selection.is_empty():
+		return
+	var entity_id: int = int(_selection["entity_id"])
+	if _upgrade_mode_cancel:
+		upgrade_cancelled.emit(entity_id)
+	else:
+		upgrade_requested.emit(entity_id)
 
 
 func present_units(units: Array[Dictionary]) -> void:

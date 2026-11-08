@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="MechAlloyRecipe" load_steps=2 format=3]
+[ext_resource type="Script" path="res://sim/alloy_recipe.gd" id="1"]
+[resource]
+script = ExtResource("1")
+recipe_id = &"thermal_smelter_basic"
+cycle_seconds = 15.0
+fuel_cost = 2
+metal_cost = 1
+alloy_output = 1
+power_output = 30

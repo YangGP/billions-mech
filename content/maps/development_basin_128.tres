@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="MechMapDefinition" load_steps=16 format=3]
+[gd_resource type="Resource" script_class="MechMapDefinition" load_steps=22 format=3]
 
 [ext_resource type="Script" path="res://content/map_definition.gd" id="1"]
 [ext_resource type="Script" path="res://content/mineral_definition.gd" id="2"]
@@ -59,6 +59,48 @@ cell = Vector2i(87, 18)
 resource_kind = "metal_ore"
 amount = 720
 
+[sub_resource type="Resource" id="fuel_start_west"]
+script = ExtResource("2")
+mineral_id = &"fuel_start_west"
+cell = Vector2i(52, 60)
+resource_kind = "fuel"
+amount = 480
+
+[sub_resource type="Resource" id="fuel_inner_east"]
+script = ExtResource("2")
+mineral_id = &"fuel_inner_east"
+cell = Vector2i(76, 65)
+resource_kind = "fuel"
+amount = 480
+
+[sub_resource type="Resource" id="fuel_north_west"]
+script = ExtResource("2")
+mineral_id = &"fuel_north_west"
+cell = Vector2i(33, 30)
+resource_kind = "fuel"
+amount = 480
+
+[sub_resource type="Resource" id="fuel_east"]
+script = ExtResource("2")
+mineral_id = &"fuel_east"
+cell = Vector2i(98, 54)
+resource_kind = "fuel"
+amount = 480
+
+[sub_resource type="Resource" id="fuel_south_west"]
+script = ExtResource("2")
+mineral_id = &"fuel_south_west"
+cell = Vector2i(28, 101)
+resource_kind = "fuel"
+amount = 480
+
+[sub_resource type="Resource" id="fuel_south"]
+script = ExtResource("2")
+mineral_id = &"fuel_south"
+cell = Vector2i(88, 102)
+resource_kind = "fuel"
+amount = 480
+
 [sub_resource type="Resource" id="crystal_north_west"]
 script = ExtResource("2")
 mineral_id = &"crystal_north_west"
@@ -110,4 +152,4 @@ mainbrain_footprint = Vector2i(5, 5)
 probe_cell = Vector2i(60, 68)
 main_gate = Vector2i(64, 43)
 flank = Vector2i(89, 64)
-minerals = Array[ExtResource("2")]([SubResource("metal_start_west"), SubResource("metal_start_east"), SubResource("metal_inner_north"), SubResource("metal_inner_south"), SubResource("metal_west"), SubResource("metal_east"), SubResource("metal_south"), SubResource("metal_north"), SubResource("crystal_north_west"), SubResource("crystal_north_east"), SubResource("crystal_south_east"), SubResource("crystal_south_west"), SubResource("crystal_far_south")])
+minerals = Array[ExtResource("2")]([SubResource("metal_start_west"), SubResource("metal_start_east"), SubResource("metal_inner_north"), SubResource("metal_inner_south"), SubResource("metal_west"), SubResource("metal_east"), SubResource("metal_south"), SubResource("metal_north"), SubResource("fuel_start_west"), SubResource("fuel_inner_east"), SubResource("fuel_north_west"), SubResource("fuel_east"), SubResource("fuel_south_west"), SubResource("fuel_south"), SubResource("crystal_north_west"), SubResource("crystal_north_east"), SubResource("crystal_south_east"), SubResource("crystal_south_west"), SubResource("crystal_far_south")])

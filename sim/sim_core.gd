@@ -40,6 +40,7 @@ var _starting_resources := MechResources.empty()
 var _navigation_revision: int = -1
 var _coverage_dirty: bool = true
 var _environment := MechEnvironmentEnergy.new()
+var _alloy_processing := MechAlloyProcessing.new()
 var _environment_dirty: bool = true
 var _environment_explored_revision: int = -1
 var _outcome: StringName = &"ongoing"
@@ -264,6 +265,7 @@ func execute_command(command: MechCommand) -> Dictionary:
 			building.elapsed_demolition_ticks = 0
 			building.repairing = false
 			building.repair_remainder = 0
+			building.repair_hp_accumulator = 0
 			_coverage_dirty = true
 			_threat.note_construction(Vector2(building.origin) + Vector2(building.definition.footprint) * 0.5)
 			_recompute_economy()
@@ -282,7 +284,8 @@ func execute_command(command: MechCommand) -> Dictionary:
 			var building: MechBuildingState = _construction.get_building(command.payload["entity_id"])
 			building.repairing = not building.repairing
 			building.repair_remainder = 0
-			building.repair_waiting_for_funds = _economy.coins() == 0
+			building.repair_hp_accumulator = 0
+			building.repair_waiting_for_funds = false
 		MechCommand.Type.REBUILD:
 			var building: MechBuildingState = _construction.get_building(command.payload["entity_id"])
 			var cost: Dictionary = building.rebuild_cost()
@@ -310,8 +313,31 @@ func execute_command(command: MechCommand) -> Dictionary:
 				if target.phase == MechBuildingState.Phase.OPERATING and target.hp < target.definition.max_hp:
 					target.repairing = true
 					target.repair_remainder = 0
+					target.repair_hp_accumulator = 0
+					target.repair_waiting_for_funds = false
 					count += 1
 			result = {"ok": true, "reason": "", "count": count}
+		MechCommand.Type.UPGRADE_BUILDING:
+			var building: MechBuildingState = _construction.get_building(command.payload["entity_id"])
+			var cost: Dictionary = MechResources.copy(result["cost"])
+			if not _economy.try_spend(cost):
+				return _reject("资源不足，升级未下单")
+			building.upgrade_target = building.definition.upgrade_to
+			building.upgrade_elapsed = 0
+			building.upgrade_total = maxi(1, ceili(building.definition.upgrade_seconds * _tick_rate))
+			building.upgrade_paid = cost
+			_recompute_economy()
+			result = {"ok": true, "reason": "", "entity_id": building.entity_id, "cost": cost}
+		MechCommand.Type.CANCEL_UPGRADE:
+			var building: MechBuildingState = _construction.get_building(command.payload["entity_id"])
+			var refund: Dictionary = building.upgrade_refund()
+			building.upgrade_target = null
+			building.upgrade_elapsed = 0
+			building.upgrade_total = 0
+			building.upgrade_paid = MechResources.empty()
+			_economy.credit(refund)
+			_recompute_economy()
+			result = {"ok": true, "reason": "", "refund": refund}
 	# Only commands that change occupancy, phase or vision sources need the
 	# fog/navigation refresh. Pause, move, production and repair toggles do not.
 	if command.type in [
@@ -377,6 +403,10 @@ func validate_command(command: MechCommand) -> Dictionary:
 			return plan
 		MechCommand.Type.CANCEL_CONSTRUCTION, MechCommand.Type.DEMOLISH, MechCommand.Type.CANCEL_DEMOLISH, MechCommand.Type.TOGGLE_REPAIR, MechCommand.Type.REBUILD:
 			return _validate_building_action(command)
+		MechCommand.Type.UPGRADE_BUILDING:
+			return _validate_upgrade_command(command)
+		MechCommand.Type.CANCEL_UPGRADE:
+			return _validate_cancel_upgrade(command)
 		MechCommand.Type.REPAIR_ALL:
 			var repair_all: Dictionary = _repair_all_status()
 			if not repair_all["ok"]:
@@ -406,6 +436,12 @@ func advance_one_tick() -> void:
 		_coverage_dirty = true
 		_environment_dirty = true
 		_recompute_economy()
+	if _alloy_processing.advance(_construction.all(), _economy, _tick_rate):
+		if profiling_enabled:
+			print("[alloy] ever=%s produced=%d" % [
+				_alloy_processing.ever_produced_alloy, _alloy_processing.produced_alloy])
+		_recompute_economy()
+	_advance_upgrades()
 	_profile_mark(&"construction")
 	if _tick_counter % maxi(1, ceili(COMBAT_SCAN_SECONDS * _tick_rate)) == 0:
 		_scan_combat_threat()
@@ -528,7 +564,9 @@ func snapshot() -> Dictionary:
 	return {"clock": _clock.snapshot(), "entities": entities, "economy": economy, "minerals": minerals,
 		"vision": _vision.snapshot(), "repair_all": _repair_all_status(),
 		"scenario": _settings.scenario_name, "unit_catalog": _unit_catalog(),
-		"catalog": _construction.catalog(_economy), "probe_id": _probe_id,
+		"catalog": _catalog_snapshot(), "probe_id": _probe_id,
+		"alloy_processing": {"ever_produced_alloy": _alloy_processing.ever_produced_alloy,
+			"produced_alloy": _alloy_processing.produced_alloy},
 		"mainbrain_id": _mainbrain_id, "generation": _generation,
 		"session": {"outcome": _outcome, "ended": session_ended(),
 			"reason": {"defeat": "主脑已被摧毁", "victory": "威胁已清除"}.get(String(_outcome), "")},
@@ -569,6 +607,7 @@ func _building_snapshot(building: MechBuildingState) -> Dictionary:
 	var result: Dictionary = building.snapshot()
 	var mineral: Dictionary = _minerals.deposit(building.mineral_id)
 	result["mineral"] = mineral
+	result["upgrade_error"] = _upgrade_error_for(building)
 	result["production"] = _production.snapshot(building.entity_id)
 	if not building.definition.produced_units.is_empty():
 		var options: Array[Dictionary] = []
@@ -582,6 +621,33 @@ func _building_snapshot(building: MechBuildingState) -> Dictionary:
 	if not mineral.is_empty() and mineral["remaining"] == 0 and building.operating():
 		result["status"] = "矿点已耗竭 · 停产"
 	return result
+
+
+func _catalog_snapshot() -> Array[Dictionary]:
+	var result: Array[Dictionary] = _construction.catalog(_economy)
+	if not _alloy_processing.ever_produced_alloy:
+		for entry: Dictionary in result:
+			if entry["building_id"] == &"tech_center":
+				entry["unavailable_reason"] = "需先产出第一份合金"
+	return result
+
+
+func _upgrade_error_for(building: MechBuildingState) -> String:
+	if building.definition.upgrade_to == null:
+		return ""
+	if building.upgrade_target != null:
+		return "该建筑已在升级"
+	if building.phase != MechBuildingState.Phase.OPERATING:
+		return "只有完工建筑可升级"
+	if building.definition.is_core:
+		if _tech_level() < 1:
+			return "主脑升级需要运行中的科技中心 I"
+	elif building.definition.tech_level == 1:
+		if _mainbrain_level() < 2:
+			return "科技中心 II 需要主脑 II"
+	return _economy.upgrade_error(
+		building.definition, building.definition.upgrade_to, building.definition.upgrade_cost
+	)
 
 
 func _recompute_economy() -> void:
@@ -756,6 +822,12 @@ func preview_build(id: StringName, origin: Vector2i) -> Dictionary:
 	var result: Dictionary = _construction.preview_placement(
 		id, origin, _grid, _economy, _minerals, {}, {}, _environment, _vision
 	)
+	if id == &"tech_center" and not _alloy_processing.ever_produced_alloy:
+		result["ok"] = false
+		result["reason"] = "需先产出第一份合金"
+		for cell_info: Dictionary in result["cells"]:
+			cell_info["ok"] = false
+			cell_info["reason"] = result["reason"]
 	_mask_unknown_preview(result)
 	if session_ended():
 		result["ok"] = false
@@ -902,13 +974,17 @@ func _place(id: StringName, origin: Vector2i) -> Dictionary:
 
 
 func _remove_building(entity_id: int, refund: Dictionary, refund_orders: bool = false) -> void:
+	var cycle_refund := MechResources.empty()
+	var building: MechBuildingState = _construction.get_building(entity_id)
+	if building != null:
+		cycle_refund = building.cycle_refund()
 	_grid.release(entity_id)
 	_minerals.release(entity_id)
 	_environment.release(entity_id)
 	_construction.remove(entity_id)
 	_registry.remove(entity_id)
 	_coverage_dirty = true
-	_economy.credit(MechResources.add(refund, _production.remove_factory(entity_id, refund_orders)))
+	_economy.credit(MechResources.add(MechResources.add(refund, cycle_refund), _production.remove_factory(entity_id, refund_orders)))
 	if entity_id == _mainbrain_id:
 		_grid.set_core_coverage(Vector2i.ZERO, Vector2i.ONE, -1)
 		_outcome = &"defeat"
@@ -931,6 +1007,8 @@ func _validate_building_action(command: MechCommand) -> Dictionary:
 		MechCommand.Type.DEMOLISH:
 			if building.definition.is_core:
 				return _reject("主脑不可拆除")
+			if building.upgrade_target != null:
+				return _reject("升级中不可拆除")
 			if building.phase != MechBuildingState.Phase.OPERATING and building.phase != MechBuildingState.Phase.RUINED:
 				return _reject("只有完工建筑或基座可拆除")
 		MechCommand.Type.CANCEL_DEMOLISH:
@@ -961,6 +1039,89 @@ func _validate_building_action(command: MechCommand) -> Dictionary:
 			var rebuild_error: String = _economy.reservation_error(building.definition, {}, building.rebuild_cost())
 			if not rebuild_error.is_empty():
 				return _reject(rebuild_error)
+	return {"ok": true, "reason": ""}
+
+
+func _advance_upgrades() -> bool:
+	var changed: bool = false
+	for building: MechBuildingState in _construction.all():
+		if building.upgrade_target == null or not building.operating():
+			continue
+		building.upgrade_elapsed = mini(building.upgrade_elapsed + 1, building.upgrade_total)
+		if building.upgrade_elapsed < building.upgrade_total:
+			continue
+		var old_max_hp: int = building.definition.max_hp
+		var lost_hp: int = maxi(0, old_max_hp - building.hp)
+		var target: MechBuildingDefinition = building.upgrade_target
+		building.paid_cost = MechResources.add(building.paid_cost, building.upgrade_paid)
+		building.definition = target
+		building.convert_repair_denominator(old_max_hp, target.max_hp)
+		building.hp = clampi(target.max_hp - lost_hp, 1, target.max_hp)
+		building.built_hp = building.hp
+		building.upgrade_target = null
+		building.upgrade_elapsed = 0
+		building.upgrade_total = 0
+		building.upgrade_paid = MechResources.empty()
+		_coverage_dirty = true
+		changed = true
+	if changed:
+		_recompute_economy()
+		state_changed.emit()
+	return changed
+
+
+func _tech_level() -> int:
+	var result: int = 0
+	for building: MechBuildingState in _construction.all():
+		if building.operating():
+			result = maxi(result, building.definition.tech_level)
+	return result
+
+
+func _mainbrain_level() -> int:
+	var core: MechBuildingState = _construction.get_building(_mainbrain_id)
+	return core.definition.level if core != null else 1
+
+
+func _validate_upgrade_command(command: MechCommand) -> Dictionary:
+	if typeof(command.payload.get("entity_id")) != TYPE_INT:
+		return _reject("建筑编号无效")
+	var building: MechBuildingState = _construction.get_building(command.payload["entity_id"])
+	if building == null:
+		return _reject("建筑已不存在")
+	if building.phase != MechBuildingState.Phase.OPERATING:
+		return _reject("只有完工建筑可升级")
+	if building.upgrade_target != null:
+		return _reject("该建筑已在升级")
+	var target: MechBuildingDefinition = building.definition.upgrade_to
+	if target == null:
+		return _reject("该建筑没有可用升级")
+	if target.footprint != building.definition.footprint:
+		return _reject("升级目标占地不一致")
+	if building.definition.is_core:
+		if _tech_level() < 1:
+			return _reject("主脑升级需要运行中的科技中心 I")
+	elif building.definition.tech_level == 1:
+		if _mainbrain_level() < 2:
+			return _reject("科技中心 II 需要主脑 II")
+	var error: String = _economy.upgrade_error(
+		building.definition, target, building.definition.upgrade_cost
+	)
+	if not error.is_empty():
+		return _reject(error)
+	return {"ok": true, "reason": "", "cost": MechResources.copy(building.definition.upgrade_cost)}
+
+
+func _validate_cancel_upgrade(command: MechCommand) -> Dictionary:
+	if typeof(command.payload.get("entity_id")) != TYPE_INT:
+		return _reject("建筑编号无效")
+	var building: MechBuildingState = _construction.get_building(command.payload["entity_id"])
+	if building == null:
+		return _reject("建筑已不存在")
+	if building.upgrade_target == null:
+		return _reject("该建筑没有进行中的升级")
+	if building.definition.is_core:
+		return _reject("主脑升级不可取消")
 	return {"ok": true, "reason": ""}
 
 
@@ -1115,6 +1276,7 @@ func _reset() -> void:
 	_environment.clear()
 	_environment_dirty = true
 	_environment_explored_revision = -1
+	_alloy_processing.reset()
 	_economy.reset(_starting_resources)
 	_minerals.reset(_map_definition.minerals)
 	var brain: MechBuildingDefinition = _construction.definition(&"mainbrain")

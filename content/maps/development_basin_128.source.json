@@ -1180,7 +1180,7 @@
         60
       ],
       "amount": 480,
-      "runtime_kind": null
+      "runtime_kind": "fuel"
     },
     {
       "id": "fuel_inner_east",
@@ -1190,7 +1190,7 @@
         65
       ],
       "amount": 480,
-      "runtime_kind": null
+      "runtime_kind": "fuel"
     },
     {
       "id": "fuel_north_west",
@@ -1200,7 +1200,7 @@
         30
       ],
       "amount": 480,
-      "runtime_kind": null
+      "runtime_kind": "fuel"
     },
     {
       "id": "fuel_east",
@@ -1210,7 +1210,7 @@
         54
       ],
       "amount": 480,
-      "runtime_kind": null
+      "runtime_kind": "fuel"
     },
     {
       "id": "fuel_south_west",
@@ -1220,7 +1220,7 @@
         101
       ],
       "amount": 480,
-      "runtime_kind": null
+      "runtime_kind": "fuel"
     },
     {
       "id": "fuel_south",
@@ -1230,7 +1230,7 @@
         102
       ],
       "amount": 480,
-      "runtime_kind": null
+      "runtime_kind": "fuel"
     },
     {
       "id": "crystal_north_west",
@@ -1302,5 +1302,5 @@
     ]
   },
   "runtime_economy": "Five-resource Dictionary ledger; balance values retained until the new power/cooling launch.",
-  "notes": "Fuel remains reserved for P3a. Water is an environment-only obstacle with no storage. Wind is an explicit environment layer. Metal ore and crystals use their stable resource IDs. Four gates are landmarks, not fixed enemy spawn points."
+  "notes": "Six fuel sites are native 480-unit deposits from P3a. Water is an environment-only obstacle with no storage. Wind is an explicit environment layer. Metal ore and crystals use their stable resource IDs. Four gates are landmarks, not fixed enemy spawn points."
 }

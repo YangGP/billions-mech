@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="MechBuildingDefinition" load_steps=2 format=3]
+[ext_resource type="Script" path="res://content/building_definition.gd" id="1"]
+[resource]
+script = ExtResource("1")
+building_id = &"tech_center_ii"
+display_name = "科技中心 II"
+footprint = Vector2i(2, 2)
+cost = Dictionary[StringName, int]({&"coins": 320, &"metal_ore": 20, &"alloy": 22})
+construction_seconds = 60.0
+max_hp = 600
+capacity_cost = 3
+power_cost = 6
+level = 2
+tech_level = 2
+buildable = false
+infectable = true
