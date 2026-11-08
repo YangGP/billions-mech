@@ -4,6 +4,8 @@
 [resource]
 script = ExtResource("1")
 building_id = &"compute_node_ii"
+required_tech_level = 2
+required_mainbrain_level = 2
 display_name = "算力节点 II"
 footprint = Vector2i(2, 2)
 cost = Dictionary[StringName, int]({&"coins": 90, &"metal_ore": 8, &"alloy": 6})

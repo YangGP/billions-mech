@@ -5,6 +5,8 @@
 script = ExtResource("1")
 sight_radius = 10.0
 building_id = &"heavy_tower"
+required_tech_level = 2
+required_mainbrain_level = 2
 display_name = "重型炮塔"
 footprint = Vector2i(2, 2)
 cost = Dictionary[StringName, int]({&"coins": 200, &"metal_ore": 10, &"alloy": 16})

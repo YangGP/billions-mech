@@ -3,6 +3,8 @@
 [resource]
 script = ExtResource("1")
 building_id = &"load_balancer"
+required_tech_level = 2
+required_mainbrain_level = 2
 display_name = "负载均衡站"
 footprint = Vector2i(3, 3)
 cost = Dictionary[StringName, int]({&"coins": 200, &"metal_ore": 16, &"alloy": 10})

@@ -3,6 +3,8 @@
 [resource]
 script = ExtResource("1")
 building_id = &"alloy_gate"
+required_tech_level = 2
+required_mainbrain_level = 2
 display_name = "合金闸门"
 footprint = Vector2i(1, 2)
 cost = Dictionary[StringName, int]({&"coins": 20, &"metal_ore": 4, &"alloy": 4})

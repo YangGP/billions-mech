@@ -3,6 +3,8 @@
 [resource]
 script = ExtResource("1")
 building_id = &"expedition_dock"
+required_tech_level = 2
+required_mainbrain_level = 2
 display_name = "远征接驳站"
 footprint = Vector2i(3, 3)
 cost = Dictionary[StringName, int]({&"coins": 300, &"metal_ore": 20, &"alloy": 12})
@@ -13,4 +15,5 @@ power_cost = 4
 contract_interval_seconds = 180.0
 contract_delivery_seconds = 60.0
 contract_price_multiplier = 1.5
+buildable = true
 infectable = true

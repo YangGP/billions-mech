@@ -20,6 +20,11 @@ var _row_obstacles: Dictionary[int, Array] = {}
 var _request_id: int = 0
 var _pending: Dictionary[int, bool] = {}
 var _velocities: Dictionary[int, Vector2] = {}
+var _friendly_pass: bool = false
+
+
+func set_friendly_pass(enabled: bool) -> void:
+	_friendly_pass = enabled
 
 
 func request(entities: Array[MechEntityState], preferred: Dictionary[int, Vector2], grid: MechGridState) -> int:
@@ -158,11 +163,11 @@ func _sync_row(y: int, grid: MechGridState) -> void:
 	# Keep the existing row coalescing; only affected rows are regenerated.
 	var x: int = 0
 	while x < grid.dimensions().x:
-		if grid.is_walkable(Vector2i(x, y)):
+		if grid.is_walkable(Vector2i(x, y), true, {}, _friendly_pass):
 			x += 1
 			continue
 		var start: int = x
-		while x < grid.dimensions().x and not grid.is_walkable(Vector2i(x, y)):
+		while x < grid.dimensions().x and not grid.is_walkable(Vector2i(x, y), true, {}, _friendly_pass):
 			x += 1
 		row.append(_add_obstacle(Rect2(Vector2(start, y), Vector2(x - start, 1))))
 	_row_obstacles[y] = row

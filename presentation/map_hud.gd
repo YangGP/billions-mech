@@ -15,6 +15,7 @@ signal upgrade_requested(entity_id: int)
 signal upgrade_cancelled(entity_id: int)
 signal settings_requested
 signal minimap_focus_requested(world_position: Vector2)
+signal dispatch_region_selected(cells: Array[Vector2i])
 signal repair_all_requested
 
 const INK := Color("dedfd0")
@@ -43,6 +44,7 @@ var _build_menu: MechBuildMenu
 var _selection_title: Label
 var _status_label: Label
 var _wave_label: Label
+var _dispatch_label: Label
 var _build_label: Label
 var _build_bar: ProgressBar
 var _hp_label: Label
@@ -93,6 +95,12 @@ func _ready() -> void:
 	_wave_label.add_theme_font_size_override("font_size", 15)
 	_wave_label.add_theme_color_override("font_color", Color("f0bc79"))
 	$Root/Header.add_child(_wave_label)
+	_dispatch_label = Label.new()
+	_dispatch_label.position = Vector2(12, 154)
+	_dispatch_label.add_theme_font_override("font", _state_label.get_theme_font("font"))
+	_dispatch_label.add_theme_font_size_override("font_size", 13)
+	_dispatch_label.add_theme_color_override("font_color", ACCENT)
+	$Root/Header.add_child(_dispatch_label)
 	_selection_title = $Root/Inspector/Title
 	_status_label = $Root/Inspector/Status
 	_build_label = $Root/Inspector/BuildLabel
@@ -115,6 +123,9 @@ func _ready() -> void:
 	_expand_button = $Root/Minimap/Expand
 	_repair_all_button = $Root/Toolbar/RepairAll
 	_minimap_view.focus_requested.connect(minimap_focus_requested.emit)
+	_minimap_view.region_selected.connect(func(cells: Array[Vector2i]) -> void:
+		dispatch_region_selected.emit(cells)
+		feedback("已框选 %d 格授权区域。" % cells.size()))
 	_expand_button.pressed.connect(toggle_minimap_fullscreen)
 	_repair_all_button.pressed.connect(func(): repair_all_requested.emit())
 	_minimap_layout = {"anchor_left": _minimap_panel.anchor_left, "anchor_top": _minimap_panel.anchor_top,
@@ -191,7 +202,43 @@ func present_state(state: Dictionary) -> void:
 				_wave_label.text = "下一波 %s" % clock
 			if threat.get("radar_warning", false):
 				_wave_label.text += " · 雷达方向 %s" % String(threat.get("radar_edge_name", ""))
+			if threat.get("campaign_mode", false):
+				_wave_label.text += " · 阶段%s" % ["I", "II", "III"][clampi(int(threat.get("campaign_stage", 1)), 1, 3) - 1]
+				match String(threat.get("final_phase", "none")):
+					"requested":
+						_wave_label.text += " · 终波已请求"
+					"clearing":
+						_wave_label.text += " · 终波清场中"
+					"done":
+						_wave_label.text += " · 终波已出完"
+					_:
+						_wave_label.text += " · T请求终波"
 			_wave_label.show()
+	if _dispatch_label != null:
+		var regions: Array = state.get("dispatch", {}).get("regions", [])
+		if regions.is_empty():
+			_dispatch_label.text = "调度区域 0 · F7创建 F8启停 F9删除"
+		else:
+			var enabled: int = 0
+			var committed: Dictionary = {}
+			var spent: Dictionary = {}
+			var failure: String = ""
+			var last_order: int = 0
+			for region: Dictionary in regions:
+				last_order = maxi(last_order, int(region.get("last_order_id", 0)))
+				if region.get("enabled", false):
+					enabled += 1
+				for key: StringName in MechResources.KEYS:
+					committed[key] = int(committed.get(key, 0)) + int(region.get("committed", {}).get(key, 0))
+					spent[key] = int(spent.get(key, 0)) + int(region.get("spent", {}).get(key, 0))
+				if failure.is_empty() and not String(region.get("failure_reason", "")).is_empty():
+					failure = String(region["failure_reason"])
+			_dispatch_label.text = "调度区域 %d · 启用%d · 预授权 %s · 已花 %s" % [
+				regions.size(), enabled, MechResources.text(committed), MechResources.text(spent)]
+			if last_order > 0:
+				_dispatch_label.text += " · 最近订单 #%d" % last_order
+			if not failure.is_empty():
+				_dispatch_label.text += " · " + failure
 	$Root/SessionResult.visible = _session_ended
 	$Root/WorldInfo/Subtitle.text = "%s  /  战术视图" % state["scenario"]
 	if _generation != state["generation"]:
@@ -249,6 +296,12 @@ func is_minimap_fullscreen() -> bool:
 	return _minimap_fullscreen
 
 
+func begin_dispatch_region_selection() -> void:
+	set_minimap_fullscreen(true)
+	_minimap_view.set_region_mode(true)
+	feedback("区域框选：在全屏小地图按住左键拖出矩形，松开提交；M/Esc取消。")
+
+
 func toggle_minimap_fullscreen() -> void:
 	set_minimap_fullscreen(not _minimap_fullscreen)
 
@@ -257,6 +310,8 @@ func set_minimap_fullscreen(active: bool) -> void:
 	if _minimap_fullscreen == active:
 		return
 	_minimap_fullscreen = active
+	if not active:
+		_minimap_view.set_region_mode(false)
 	if active:
 		_layout_fullscreen_minimap()
 		feedback("小地图全屏：左键点击/拖动跳转镜头；M 或 Esc 返回。")
@@ -379,9 +434,19 @@ func present_selection(building: Dictionary, errors: Dictionary) -> void:
 		_details.text += "\n减速栅  格上敌人速度 %.0f%% · 每次进入扣10HP" % (
 			float(building.get("slow_fence_ratio", 1.0)) * 100.0)
 	if int(building.get("garrison_capacity", 0)) > 0:
-		_details.text += "\n驻防  最多%d名轻型射击单位 · 射程+%.0f" % [
-			int(building.get("garrison_capacity", 0)), float(building.get("garrison_range_bonus", 0.0))]
+		_details.text += "\n驻防  %d/%d名轻型射击单位 · 射程+%.0f · G进驻/U撤离" % [
+			int(building.get("garrison_count", 0)), int(building.get("garrison_capacity", 0)),
+			float(building.get("garrison_range_bonus", 0.0))]
 	if float(building.get("contract_interval_seconds", 0.0)) > 0.0:
+		var contract: Dictionary = building.get("contract", {})
+		var offer: Dictionary = contract.get("offer", {})
+		if not offer.is_empty():
+			_details.text += "\n合同  %s · %s · C接受 / V取消" % [
+				offer.get("unit_name", ""), MechResources.text(offer.get("price", {}))]
+		elif float(contract.get("delivery_seconds", 0.0)) > 0.0:
+			_details.text += "\n合同交付倒计时 %.1fs · V取消退款" % float(contract.get("delivery_seconds", 0.0))
+		else:
+			_details.text += "\n合同  下一份待生成"
 		_details.text += "\n接驳合同  %.0fs一份 · 交付%.0fs · 币价%.0f%%" % [
 			float(building.get("contract_interval_seconds", 0.0)),
 			float(building.get("contract_delivery_seconds", 0.0)),

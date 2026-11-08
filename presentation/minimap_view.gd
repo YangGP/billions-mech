@@ -6,6 +6,7 @@ extends Control
 ## so everything is computed from the current control size.
 
 signal focus_requested(world_position: Vector2)
+signal region_selected(cells: Array[Vector2i])
 
 const TERRAIN_OPEN := Color("16323c")
 const TERRAIN_ROUGH := Color("3f4433")
@@ -17,6 +18,8 @@ const OWN_UNIT := Color("72e9d0")
 const ENEMY := Color("f27c78")
 const MAINBRAIN := Color("72e9d0")
 const CAMERA_FRAME := Color(1.0, 1.0, 1.0, 0.85)
+const REGION_ENABLED := Color(0.45, 0.9, 0.78, 0.35)
+const REGION_DISABLED := Color(0.55, 0.6, 0.6, 0.22)
 
 var _dimensions := Vector2i.ZERO
 var _outline := PackedVector2Array()
@@ -35,6 +38,9 @@ var _map_offset := Vector2.ZERO
 var _polygon := PackedVector2Array()
 var _uvs := PackedVector2Array()
 var _dragging: bool = false
+var _region_mode: bool = false
+var _region_start := Vector2.ZERO
+var _region_end := Vector2.ZERO
 
 
 func _notification(what: int) -> void:
@@ -71,7 +77,29 @@ func present_camera(rect: Rect2) -> void:
 	queue_redraw()
 
 
+func set_region_mode(enabled: bool) -> void:
+	_region_mode = enabled
+	_dragging = false
+	queue_redraw()
+
+
 func _gui_input(event: InputEvent) -> void:
+	if _region_mode:
+		if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+			if event.pressed:
+				_region_start = event.position
+				_region_end = event.position
+				_dragging = true
+			elif _dragging:
+				_dragging = false
+				_region_end = event.position
+				_emit_region()
+			accept_event()
+		elif _dragging and event is InputEventMouseMotion:
+			_region_end = event.position
+			queue_redraw()
+			accept_event()
+		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		_dragging = event.pressed
 		if _dragging:
@@ -85,6 +113,20 @@ func _gui_input(event: InputEvent) -> void:
 		accept_event()
 
 
+func _emit_region() -> void:
+	var a: Vector2i = MechIsoGeometry.cell_at(_local_to_world(_region_start))
+	var b: Vector2i = MechIsoGeometry.cell_at(_local_to_world(_region_end))
+	var low := Vector2i(mini(a.x, b.x), mini(a.y, b.y))
+	var high := Vector2i(maxi(a.x, b.x), maxi(a.y, b.y))
+	var cells: Array[Vector2i] = []
+	for y: int in range(low.y, high.y + 1):
+		for x: int in range(low.x, high.x + 1):
+			cells.append(Vector2i(x, y))
+	region_selected.emit(cells)
+	_region_mode = false
+	queue_redraw()
+
+
 func _draw() -> void:
 	if _polygon.size() < 3 or _terrain_texture == null:
 		return
@@ -95,8 +137,12 @@ func _draw() -> void:
 		draw_colored_polygon(_footprint_local(mineral["cell"], Vector2i.ONE), MINERAL)
 	if _fog_texture != null:
 		draw_polygon(_polygon, PackedColorArray([Color.WHITE]), _uvs, _fog_texture)
-	# Future region overlays (command-node ranges, development-plan M10) are
-	# drawn here, above the fog and below the entity dots.
+	# Authorized dispatch regions: tinted cell footprints, above fog and below
+	# entity dots. Disabled regions stay visible but dimmed.
+	for region: Dictionary in _state.get("dispatch", {}).get("regions", []):
+		var fill: Color = REGION_ENABLED if region.get("enabled", false) else REGION_DISABLED
+		for cell: Vector2i in region.get("cells", []):
+			draw_colored_polygon(_footprint_local(cell, Vector2i.ONE), fill)
 	for entity: Dictionary in _state.get("entities", []):
 		if entity.get("is_building", false):
 			var fill: Color = Color(OWN_BUILDING, 0.4) if entity.get("hp", 1) <= 0 else OWN_BUILDING
@@ -115,6 +161,8 @@ func _draw() -> void:
 	var shown: Rect2 = _camera_rect.intersection(_bounds)
 	if shown.has_area():
 		draw_rect(Rect2(_w2l(shown.position), shown.size * _map_scale), CAMERA_FRAME, false, 1.5)
+	if _region_mode:
+		draw_rect(Rect2(_region_start, _region_end - _region_start).abs(), Color(0.45, 0.9, 0.78, 0.9), false, 2.0)
 
 
 func _recompute_fit() -> void:

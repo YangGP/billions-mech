@@ -4,6 +4,8 @@
 script = ExtResource("1")
 sight_radius = 8.0
 building_id = &"rapid_cannon"
+required_tech_level = 2
+required_mainbrain_level = 2
 display_name = "速射机炮"
 footprint = Vector2i(1, 1)
 cost = Dictionary[StringName, int]({&"coins": 90, &"metal_ore": 6, &"alloy": 4})

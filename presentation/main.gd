@@ -15,9 +15,14 @@ var _commands := MechCommandQueue.new()
 var _resume_after_settings: bool = false
 var _last_generation: int = -1
 var _last_map_revision: int = -1
+var _stress_mode: bool = false
+var _stress_timer: float = 0.0
+var _stress_step: int = 0
 var _last_coverage_revision: int = -1
 var _selected := Vector2i(-1, -1)
 var _build_id: StringName = &""
+var _build_cell := Vector2i(-1, -1)
+var _keyboard_build := false
 var _wall_dragging: bool = false
 var _wall_start := Vector2i.ZERO
 var _wall_end := Vector2i.ZERO
@@ -49,6 +54,15 @@ var _perf_frame_peak: float = 0.0
 
 
 func _ready() -> void:
+	# Some Windows/DPI configurations restore the window offscreen. Clamp the
+	# startup position so the player can always reach the toolbar.
+	var window := get_window()
+	var usable: Rect2i = DisplayServer.screen_get_usable_rect()
+	var position: Vector2i = window.position
+	position.x = clampi(position.x, usable.position.x, maxi(usable.position.x, usable.end.x - window.size.x))
+	position.y = clampi(position.y, usable.position.y, maxi(usable.position.y, usable.end.y - window.size.y))
+	window.position = position
+	_stress_mode = OS.get_cmdline_user_args().has("--stress")
 	_perf_enabled = OS.get_cmdline_user_args().has("--perf")
 	_sim.profiling_enabled = _perf_enabled
 	var initial_settings: MechFoundationSettings = SETTINGS
@@ -72,6 +86,7 @@ func _ready() -> void:
 	_hud.upgrade_cancelled.connect(_cancel_upgrade)
 	_hud.settings_requested.connect(_open_settings)
 	_hud.minimap_focus_requested.connect(_focus_minimap)
+	_hud.dispatch_region_selected.connect(_create_dispatch_region_from_cells)
 	_hud.repair_all_requested.connect(_repair_all)
 	_settings.close_requested.connect(_close_settings)
 	_settings.settings_applied.connect(_apply_camera_settings)
@@ -109,6 +124,8 @@ func _process(delta: float) -> void:
 	_update_cursor()
 	_hud.present_zoom(_camera.zoom.x)
 	_hud.present_camera(_camera.visible_world_rect())
+	if _stress_mode:
+		_stress_advance(delta)
 	if _perf_enabled:
 		var elapsed: int = Time.get_ticks_usec() - started
 		_perf_view_usec += elapsed
@@ -148,12 +165,57 @@ func _process(delta: float) -> void:
 			_perf_frame_peak = 0.0
 
 
+func _stress_advance(delta: float) -> void:
+	if _sim.session_ended():
+		return
+	_stress_timer += delta
+	if _stress_timer < 0.5:
+		return
+	_stress_timer = 0.0
+	_stress_step += 1
+	if _stress_step % 8 == 0:
+		var index: int = 0
+		for entity: Dictionary in _state["entities"]:
+			if not entity.get("is_unit", false) or entity.get("team", 1) != 1:
+				continue
+			var goal: Vector2 = Vector2(SETTINGS.map_definition.mainbrain_origin)
+			goal += Vector2(40 if index % 2 == 0 else -40, 40 if (index / 2) % 2 == 0 else -40)
+			_commands.submit(MechCommand.new(MechCommand.Type.MOVE_ENTITY,
+				{"entity_id": entity["id"], "target": goal}))
+			index += 1
+	var origin: Vector2i = SETTINGS.map_definition.mainbrain_origin
+	var footprint: Vector2i = SETTINGS.map_definition.mainbrain_footprint
+	if _stress_step % 2 == 1:
+		var y: int = origin.y + footprint.y + 2 + (_stress_step % 8)
+		var cells: Array[Vector2i] = []
+		for x: int in range(origin.x - 4, origin.x + footprint.x + 4):
+			cells.append(Vector2i(x, y))
+		_commands.submit(MechCommand.new(MechCommand.Type.PLACE_WALL_LINE, {"cells": cells}))
+	else:
+		for entity: Dictionary in _state["entities"]:
+			if entity.get("is_building", false) and entity.get("kind", &"") == &"armored_wall":
+				_commands.submit(MechCommand.new(MechCommand.Type.DEMOLISH,
+					{"entity_id": entity["id"]}))
+				break
+
+
 func _input(event: InputEvent) -> void:
 	if _settings.is_open():
-		if event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == KEY_ESCAPE:
+		if event is InputEventKey and event.pressed and not event.echo and _event_key(event) == KEY_ESCAPE:
 			_close_settings()
 			get_viewport().set_input_as_handled()
 		return
+	# Build hotkeys must run before focused HUD Buttons consume the key.
+	if event is InputEventKey and event.pressed and not event.echo and not _wall_dragging:
+		var key: int = _event_key(event)
+		if key in [KEY_Q, KEY_W, KEY_E]:
+			_request_build(&"compute_node" if key == KEY_Q else (&"armored_wall" if key == KEY_W else &"sentry_tower"))
+			get_viewport().set_input_as_handled()
+			return
+		if _build_id != &"" and _keyboard_build and key in [KEY_LEFT, KEY_RIGHT, KEY_UP, KEY_DOWN, KEY_ENTER]:
+			_handle_key(key)
+			get_viewport().set_input_as_handled()
+			return
 	if _selection_dragging:
 		if event is InputEventMouseMotion:
 			_selection_end = event.position
@@ -194,11 +256,11 @@ func _unhandled_input(event: InputEvent) -> void:
 	if _settings.is_open():
 		return
 	if event is InputEventKey and event.pressed and not event.echo:
-		if event.physical_keycode >= KEY_1 and event.physical_keycode <= KEY_9:
-			_handle_group(event.physical_keycode - KEY_0, event.ctrl_pressed)
+		if _event_key(event) >= KEY_1 and _event_key(event) <= KEY_9:
+			_handle_group(_event_key(event) - KEY_0, event.ctrl_pressed)
 			get_viewport().set_input_as_handled()
 			return
-		if _handle_key(event.physical_keycode):
+		if _handle_key(_event_key(event)):
 			get_viewport().set_input_as_handled()
 			return
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT and event.shift_pressed and _build_id == &"armored_wall":
@@ -246,6 +308,8 @@ func _select_world_position(world_position: Vector2) -> void:
 		return
 	var cell: Vector2i = MechIsoGeometry.cell_at(_world.to_local(world_position))
 	if _build_id != &"":
+		_keyboard_build = false
+	if _build_id != &"":
 		_commands.submit(MechCommand.new(MechCommand.Type.PLACE_BUILDING, {"building_id": _build_id, "origin": cell}))
 		return
 	var info: Dictionary = _sim.inspect_cell(cell)
@@ -258,7 +322,27 @@ func _select_world_position(world_position: Vector2) -> void:
 		_hud.feedback("请选择地图内的格子。", true)
 
 
+func _event_key(event: InputEventKey) -> int:
+	var key: int = int(event.physical_keycode)
+	return key if key != 0 else int(event.keycode)
+
+
 func _handle_key(key: int) -> bool:
+	if _build_id != &"" and _keyboard_build and key in [KEY_LEFT, KEY_RIGHT, KEY_UP, KEY_DOWN]:
+		match key:
+			KEY_LEFT:
+				_build_cell += Vector2i(-1, 0)
+			KEY_RIGHT:
+				_build_cell += Vector2i(1, 0)
+			KEY_UP:
+				_build_cell += Vector2i(0, -1)
+			KEY_DOWN:
+				_build_cell += Vector2i(0, 1)
+		_update_cursor()
+		return true
+	if _build_id != &"" and _keyboard_build and key == KEY_ENTER:
+		_commands.submit(MechCommand.new(MechCommand.Type.PLACE_BUILDING, {"building_id": _build_id, "origin": _build_cell}))
+		return true
 	match key:
 		KEY_F10:
 			_open_settings()
@@ -274,6 +358,24 @@ func _handle_key(key: int) -> bool:
 				_hud.feedback("攻击移动：左键指定目的地，右键或 Esc 取消。")
 		KEY_X:
 			_hud.request_demolition()
+		KEY_G:
+			_garrison_selected()
+		KEY_U:
+			_ungarrison_selected()
+		KEY_C:
+			_contract_selected(true)
+		KEY_V:
+			_contract_selected(false)
+		KEY_T:
+			_request_final_wave()
+		KEY_F6:
+			_hud.begin_dispatch_region_selection()
+		KEY_F7:
+			_create_dispatch_region()
+		KEY_F8:
+			_toggle_dispatch_region()
+		KEY_F9:
+			_delete_dispatch_region()
 		KEY_SPACE:
 			_toggle_pause()
 		KEY_R:
@@ -374,9 +476,11 @@ func _request_build(id: StringName) -> void:
 			_hud.feedback(entry["unavailable_reason"], true)
 			return
 		_build_id = id
+		_keyboard_build = true
+		_build_cell = SETTINGS.map_definition.mainbrain_origin + SETTINGS.map_definition.mainbrain_footprint + Vector2i(1, 0)
 		_hud.present_build(id)
 		_coverage.show()
-		_hud.feedback("%s：左键下单，中键拖图；右键退出。%s" % [entry["name"], "Shift＋左键拖线可连放墙。" if id == &"armored_wall" else ""])
+		_hud.feedback("%s：左键下单；方向键移动、Enter下单；右键退出。%s" % [entry["name"], "Shift＋左键拖线可连放墙。" if id == &"armored_wall" else ""])
 		_update_cursor()
 		return
 
@@ -389,6 +493,7 @@ func _cancel_wall_drag() -> void:
 func _cancel_build() -> void:
 	_cancel_wall_drag()
 	_build_id = &""
+	_keyboard_build = false
 	_hud.present_build(&"")
 	_coverage.hide()
 	_hud.feedback("已退出建造。左键点选/框选，右键下令；选中工厂右键设集结点。")
@@ -434,6 +539,87 @@ func _select_starting_units() -> void:
 	_refresh_selection()
 	if has_units:
 		_hud.feedback("训练场：已选择 %d 名卫兵。右键移动/攻击红叉训练靶；选工厂可生产卫兵。" % ids.size())
+
+
+func _garrison_selected() -> void:
+	if _sim.session_ended():
+		return
+	var units: Array[int] = _selected_units()
+	if units.is_empty():
+		_hud.feedback("先选择轻型射击单位，再按 G 进驻附近碉堡。", true)
+		return
+	for id: int in units:
+		_commands.submit(MechCommand.new(MechCommand.Type.GARRISON_UNIT, {"unit_id": id}))
+	_hud.feedback("已请求 %d 个单位进驻附近驻防碉堡。" % units.size())
+
+
+func _ungarrison_selected() -> void:
+	if _sim.session_ended() or _selection.ids.is_empty():
+		return
+	_commands.submit(MechCommand.new(MechCommand.Type.UNGARRISON_UNIT, {"building_id": _selection.ids[0]}))
+	_hud.feedback("已请求撤离该碉堡内的驻防单位。")
+
+
+func _dispatch_regions() -> Array:
+	return _state.get("dispatch", {}).get("regions", [])
+
+
+func _create_dispatch_region() -> void:
+	if _sim.session_ended():
+		return
+	var origin: Vector2i = SETTINGS.map_definition.mainbrain_origin + Vector2i(-2, -2)
+	var footprint: Vector2i = SETTINGS.map_definition.mainbrain_footprint + Vector2i(4, 4)
+	var cells: Array[Vector2i] = []
+	for y: int in range(footprint.y):
+		for x: int in range(footprint.x):
+			cells.append(origin + Vector2i(x, y))
+	_create_dispatch_region_from_cells(cells)
+
+
+func _create_dispatch_region_from_cells(cells: Array[Vector2i]) -> void:
+	if _sim.session_ended() or cells.is_empty():
+		return
+	_commands.submit(MechCommand.new(MechCommand.Type.CONFIGURE_DISPATCH_REGION, {
+		"cells": cells, "enabled": true, "name": "框选区域",
+		"budget_cap": {&"coins": 300, &"metal_ore": 30, &"fuel": 20, &"alloy": 20, &"crystals": 8}}))
+	_hud.feedback("已请求创建 %d 格授权区域。" % cells.size())
+
+
+func _toggle_dispatch_region() -> void:
+	var regions: Array = _dispatch_regions()
+	if regions.is_empty():
+		_hud.feedback("没有可切换的授权区域；先按 F7 创建。", true)
+		return
+	var region: Dictionary = regions[0]
+	_commands.submit(MechCommand.new(MechCommand.Type.CONFIGURE_DISPATCH_REGION, {
+		"region_id": int(region["id"]), "cells": region["cells"],
+		"enabled": not bool(region.get("enabled", true)), "budget_cap": region["budget_cap"]}))
+	_hud.feedback("已请求切换区域授权。")
+
+
+func _delete_dispatch_region() -> void:
+	var regions: Array = _dispatch_regions()
+	if regions.is_empty():
+		_hud.feedback("没有可删除的授权区域。", true)
+		return
+	_commands.submit(MechCommand.new(MechCommand.Type.DELETE_DISPATCH_REGION,
+		{"region_id": int(regions[0]["id"])}))
+	_hud.feedback("已请求删除授权区域。")
+
+
+func _request_final_wave() -> void:
+	if _sim.session_ended():
+		return
+	_commands.submit(MechCommand.new(MechCommand.Type.REQUEST_FINAL_WAVE))
+	_hud.feedback("已请求终波；需主脑 III 与科技 III，且在 campaign 配置下生效。")
+
+
+func _contract_selected(accept: bool) -> void:
+	if _sim.session_ended() or _selection.ids.is_empty():
+		return
+	var command: MechCommand.Type = MechCommand.Type.ACCEPT_CONTRACT if accept else MechCommand.Type.CANCEL_CONTRACT
+	_commands.submit(MechCommand.new(command, {"building_id": _selection.ids[0]}))
+	_hud.feedback("已请求接受合同。" if accept else "已请求取消合同并退款。")
 
 
 func _cancel_selection_drag() -> void:
@@ -583,6 +769,8 @@ func _on_command_finished(command_type: int, result: Dictionary) -> void:
 			_hud.feedback("升级已下单，支付差价 %s；旧级服务保持到完工。" % MechResources.text(result["cost"]))
 		MechCommand.Type.CANCEL_UPGRADE:
 			_hud.feedback("升级已取消，返还本次差价 %s。" % MechResources.text(result["refund"]))
+		MechCommand.Type.REQUEST_FINAL_WAVE:
+			_hud.feedback("终波已请求；待波次出完并清场后判定胜利。")
 		MechCommand.Type.SET_RALLY:
 			_hud.feedback("集结点已更新，新出厂部队将自动前往。")
 		MechCommand.Type.ISSUE_UNIT_ORDER:
@@ -707,7 +895,7 @@ func _wall_cells() -> Array[Vector2i]:
 func _update_cursor() -> void:
 	var mouse: Vector2 = get_viewport().get_mouse_position()
 	var cursor_visible: bool = not _settings.is_open() and get_window().has_focus() and get_viewport_rect().has_point(mouse) and not _hud.blocks_point(mouse)
-	var cell: Vector2i = _mouse_cell()
+	var cell: Vector2i = _build_cell if _build_id != &"" and _keyboard_build else _mouse_cell()
 	var info: Dictionary = {}
 	if cursor_visible:
 		info = _sim.inspect_cell(cell)
@@ -718,5 +906,5 @@ func _update_cursor() -> void:
 		preview = _sim.preview_wall_line(_wall_cells())
 	elif cursor_visible and _build_id != &"":
 		preview = _sim.preview_build(_build_id, cell)
-	_world.present_cursor(cell, _selected, preview, cursor_visible or _wall_dragging)
+	_world.present_cursor(cell, _selected, preview, cursor_visible or _wall_dragging or (_build_id != &"" and _keyboard_build))
 	_hud.present_cell(info, preview)

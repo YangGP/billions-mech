@@ -99,6 +99,10 @@ func set_move_path(entity_id: int, path: PackedVector2Array) -> void:
 	entity.set_move_path(path)
 
 
+func set_friendly_pass(enabled: bool) -> void:
+	_crowd.set_friendly_pass(enabled)
+
+
 func step(seconds: float, grid: MechGridState) -> void:
 	_motion_grid = grid
 	_motion_seconds = seconds
@@ -140,7 +144,7 @@ func _apply_velocities(request_id: int, velocities: Dictionary) -> void:
 		var velocity: Vector2 = velocities[id]
 		var desired: Vector2 = entity.position + velocity * _motion_seconds
 		# Final static guard only; all dynamic avoidance is performed by native RVO.
-		if _motion_grid.mobile_segment_clear(entity.position, desired):
+		if _motion_grid.mobile_segment_clear(entity.position, desired, {}, true):
 			entity.position = desired
 		entity.face_direction(entity.position - _starting_positions[id])
 		entity.finish_path_if_arrived()

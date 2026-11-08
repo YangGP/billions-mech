@@ -39,7 +39,9 @@ func plan_order(ids: Array, kind: StringName, goal: Vector2, target_id: int, reg
 		var unit: MechEntityState = registry.get_entity(raw_id)
 		if unit == null or unit.unit_definition == null or unit.team != 1 or unit.hp <= 0:
 			return {"ok": false, "reason": "所选单位已失效"}
-		if not grid.is_walkable(Vector2i(unit.position.floor())):
+		if unit.garrisoned:
+			return {"ok": false, "reason": "驻防中的单位须先撤离"}
+		if not grid.is_walkable(Vector2i(unit.position.floor()), true, {}, true):
 			return {"ok": false, "reason": "部队位于施工占地，待完工移出后再下令"}
 		selected[raw_id] = true
 	var paths: Dictionary = {}
@@ -50,7 +52,7 @@ func plan_order(ids: Array, kind: StringName, goal: Vector2, target_id: int, reg
 			return {"ok": false, "reason": "攻击目标已失效"}
 		goal = enemy.position
 	else:
-		if not goal.is_finite() or not grid.contains(Vector2i(goal.floor())) or not grid.is_walkable(Vector2i(goal.floor())):
+		if not goal.is_finite() or not grid.contains(Vector2i(goal.floor())) or not grid.is_walkable(Vector2i(goal.floor()), true, {}, true):
 			return {"ok": false, "reason": "目标超界或被地形/建筑阻挡"}
 		if not grid.mobile_position_clear(goal):
 			return {"ok": false, "reason": "目标过于贴近障碍，无法容纳单位"}
@@ -127,12 +129,12 @@ func advance(registry: MechEntityRegistry, grid: MechGridState, navigation: Mech
 				enemies[cell] = []
 			enemies[cell].append(entity)
 	for unit: MechEntityState in registry.all():
-		if unit.team != 1 or unit.unit_definition == null or unit.hp <= 0:
+		if unit.team != 1 or unit.unit_definition == null or unit.hp <= 0 or unit.garrisoned:
 			continue
 		unit.cooldown_ticks = maxi(0, unit.cooldown_ticks - 1)
 		unit.repath_ticks = maxi(0, unit.repath_ticks - 1)
 		unit.shot_ticks = maxi(0, unit.shot_ticks - 1)
-		if not grid.is_walkable(Vector2i(unit.position.floor())):
+		if not grid.is_walkable(Vector2i(unit.position.floor()), true, {}, true):
 			continue
 		if unit.order == &"move":
 			if not unit.has_move_order:
@@ -230,7 +232,7 @@ func _attack_path(unit: MechEntityState, target: MechEntityState, registry: Mech
 		for x: int in range(center.x - radius, center.x + radius + 1):
 			var cell := Vector2i(x, y)
 			var point: Vector2 = Vector2(cell) + Vector2(0.5, 0.5)
-			if grid.is_walkable(cell) and not cell in occupied and point.distance_to(target.position) <= unit.unit_definition.attack_range and _line_clear(point, target.position, grid):
+			if grid.is_walkable(cell, true, {}, true) and not cell in occupied and point.distance_to(target.position) <= unit.unit_definition.attack_range and _line_clear(point, target.position, grid):
 				candidates.append(cell)
 	candidates.sort_custom(func(a: Vector2i, b: Vector2i) -> bool: return Vector2(a).distance_squared_to(unit.position) < Vector2(b).distance_squared_to(unit.position))
 	for cell: Vector2i in candidates:

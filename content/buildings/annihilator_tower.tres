@@ -4,6 +4,8 @@
 script = ExtResource("1")
 sight_radius = 10.0
 building_id = &"annihilator_tower"
+required_tech_level = 3
+required_mainbrain_level = 3
 display_name = "歼灭炮塔"
 footprint = Vector2i(2, 2)
 cost = Dictionary[StringName, int]({&"coins": 400, &"metal_ore": 16, &"alloy": 30, &"crystals": 12})

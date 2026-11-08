@@ -78,14 +78,14 @@ func recompute(buildings: Array[MechBuildingState], grid: MechGridState, unit_ca
 			continue
 		_capacity_used += rules.capacity_cost
 		_power_reserved += rules.power_cost
-		_cooling_reserved += roundi(float(rules.cooling_cost * 10 * building.cooling_multiplier_tenths) / 10.0)
+		_cooling_reserved += roundi(float(rules.cooling_cost * 10 * building.cooling_multiplier_percent) / 100.0)
 		if building.upgrade_target != null:
 			# Reserve only the positive delta while the old level keeps serving.
 			_capacity_used += maxi(0, building.upgrade_target.capacity_cost - rules.capacity_cost)
 			_power_reserved += maxi(0, building.upgrade_target.power_cost - rules.power_cost)
 			_cooling_reserved += maxi(0, roundi(float(
-				building.upgrade_target.cooling_cost * 10 * building.cooling_multiplier_tenths) / 10.0)
-				- roundi(float(rules.cooling_cost * 10 * building.cooling_multiplier_tenths) / 10.0))
+				building.upgrade_target.cooling_cost * 10 * building.cooling_multiplier_percent) / 100.0)
+				- roundi(float(rules.cooling_cost * 10 * building.cooling_multiplier_percent) / 100.0))
 		if building.operating():
 			_capacity_total += rules.capacity_provided
 			_capacity_system_reserved += rules.capacity_system_reserved
@@ -97,13 +97,21 @@ func recompute(buildings: Array[MechBuildingState], grid: MechGridState, unit_ca
 			else:
 				_power_supply += rules.power_provided
 			_cooling_supply += rules.cooling_provided * 10
-			_income_rate += rules.income_per_minute * building.income_multiplier_tenths / 10
+			_income_rate += rules.income_per_minute * building.income_multiplier_percent / 100
 
 
-func reservation_error(rules: MechBuildingDefinition, available: Dictionary = {}, cost_override: Dictionary = {}) -> String:
+func contract_error(capacity_cost: int, price: Dictionary) -> String:
+	if _capacity_used > _capacity_supply:
+		return "算力超载，禁止新增合同"
+	if _capacity_used + capacity_cost > _capacity_supply:
+		return "算力容量不足（合同接受即预留）"
+	return spend_error(price)
+
+
+func reservation_error(rules: MechBuildingDefinition, available: Dictionary = {}, cost_override: Dictionary = {}, cooling_multiplier: float = 1.0) -> String:
 	if rules.power_cost > 0 and _power_reserved + rules.power_cost > _power_supply:
 		return "电力余量不足"
-	if rules.cooling_cost > 0 and _cooling_reserved + rules.cooling_cost * 10 > _cooling_supply:
+	if rules.cooling_cost > 0 and _cooling_reserved + roundi(rules.cooling_cost * 10 * cooling_multiplier) > _cooling_supply:
 		return "冷却余量不足"
 	if _capacity_used > _capacity_supply:
 		if rules.capacity_cost != 0 or not rules.supply_recovery():
@@ -113,12 +121,13 @@ func reservation_error(rules: MechBuildingDefinition, available: Dictionary = {}
 	return spend_error(rules.cost if cost_override.is_empty() else cost_override, available)
 
 
-func upgrade_error(current: MechBuildingDefinition, target: MechBuildingDefinition, cost: Dictionary) -> String:
+func upgrade_error(current: MechBuildingDefinition, target: MechBuildingDefinition, cost: Dictionary, cooling_multiplier: float = 1.0) -> String:
 	if current == null or target == null:
 		return "升级目标无效"
 	var capacity_delta: int = maxi(0, target.capacity_cost - current.capacity_cost)
 	var power_delta: int = maxi(0, target.power_cost - current.power_cost)
-	var cooling_delta: int = maxi(0, target.cooling_cost - current.cooling_cost) * 10
+	var cooling_delta: int = maxi(0, roundi(target.cooling_cost * 10 * cooling_multiplier)
+		- roundi(current.cooling_cost * 10 * cooling_multiplier))
 	if capacity_delta > 0 and (_capacity_used > _capacity_supply or _capacity_used + capacity_delta > _capacity_supply):
 		return "算力容量不足以预留升级增量"
 	if power_delta > 0 and _power_reserved + power_delta > _power_supply:
@@ -141,8 +150,8 @@ func advance_income(buildings: Array[MechBuildingState], hz: int) -> void:
 	for building: MechBuildingState in buildings:
 		if not building.operating():
 			continue
-		building.income_remainder += building.definition.income_per_minute * building.income_multiplier_tenths
-		var income_denominator: int = denominator * 10
+		building.income_remainder += building.definition.income_per_minute * building.income_multiplier_percent
+		var income_denominator: int = denominator * 100
 		if building.income_remainder >= income_denominator:
 			credit(MechResources.single(&"coins", floori(float(building.income_remainder) / income_denominator)))
 			building.income_remainder %= income_denominator
@@ -164,7 +173,7 @@ func advance_repairs(buildings: Array[MechBuildingState], hz: int) -> void:
 			continue
 		# 4 HP/s; material cost is the effective build recipe × 25% over a full
 		# repair. Fractions are kept per resource as numerator / (4*max_hp).
-		building.repair_hp_accumulator += 4
+		building.repair_hp_accumulator += roundi(building.repair_rate_override if building.repair_rate_override > 0.0 else 4.0)
 		if building.repair_hp_accumulator < hz:
 			continue
 		var denominator: int = 4 * maxi(1, building.definition.max_hp)

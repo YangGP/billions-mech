@@ -90,11 +90,11 @@ func _nav_signature(buildings: Array[MechBuildingState]) -> Dictionary:
 	for building: MechBuildingState in buildings:
 		if building.hp <= 0:
 			continue
-		if building.definition.building_id == WALL_ID:
+		if building.definition.is_wall_like():
 			wall_ids[building.entity_id] = true
 		if Rect2i(building.origin, building.definition.footprint).has_point(_goal):
 			continue
-		if building.definition.building_id != WALL_ID:
+		if not building.definition.is_wall_like():
 			proto_geometry[building.entity_id] = Vector4i(
 				building.origin.x, building.origin.y,
 				building.definition.footprint.x, building.definition.footprint.y
@@ -254,7 +254,7 @@ func _submit_zone(key: Vector3i, zone: Dictionary, grid: MechGridState, building
 	var frozen: Array[MechBuildingState] = []
 	var bounds: Rect2i = zone["bounds"]
 	for building: MechBuildingState in buildings:
-		if building.hp <= 0 or building.definition.building_id == WALL_ID or not bounds.grow(1).intersects(Rect2i(building.origin, building.definition.footprint)):
+		if building.hp <= 0 or building.definition.is_wall_like() or not bounds.grow(1).intersects(Rect2i(building.origin, building.definition.footprint)):
 			continue
 		var copy := MechBuildingState.new()
 		copy.entity_id = building.entity_id
@@ -314,7 +314,7 @@ func _collect_zone_result(grid: MechGridState, buildings: Array[MechBuildingStat
 func _zone_source_key(bounds: Rect2i, buildings: Array[MechBuildingState]) -> Dictionary:
 	var key: Dictionary = {}
 	for building: MechBuildingState in buildings:
-		if building.hp > 0 and building.definition.building_id != WALL_ID and bounds.grow(1).intersects(Rect2i(building.origin, building.definition.footprint)):
+		if building.hp > 0 and not building.definition.is_wall_like() and bounds.grow(1).intersects(Rect2i(building.origin, building.definition.footprint)):
 			key[building.entity_id] = Vector4i(building.origin.x, building.origin.y,
 				building.definition.footprint.x, building.definition.footprint.y)
 	return key
@@ -336,7 +336,7 @@ func _build_zone(zone: Dictionary, grid: MechGridState, buildings: Array[MechBui
 				exits[cell] = global_field.cost_at(cell)
 	var owners: Dictionary = {}
 	for building: MechBuildingState in buildings:
-		if building.hp <= 0 or building.definition.building_id == WALL_ID:
+		if building.hp <= 0 or building.definition.is_wall_like():
 			continue
 		var area := Rect2i(building.origin, building.definition.footprint)
 		if not bounds.intersects(area.grow(1)):
@@ -428,7 +428,7 @@ func advance(registry: MechEntityRegistry, grid: MechGridState, navigation: Mech
 		for y: int in range(building.definition.footprint.y):
 			for x: int in range(building.definition.footprint.x):
 				building_cells[building.origin + Vector2i(x, y)] = building.entity_id
-				if building.definition.building_id != WALL_ID:
+				if not building.definition.is_wall_like():
 					non_wall_cells[building.origin + Vector2i(x, y)] = building.entity_id
 				_mark_active_region(building.origin + Vector2i(x, y), active_regions)
 	var unit_buckets: Dictionary = {}
@@ -463,7 +463,9 @@ func advance(registry: MechEntityRegistry, grid: MechGridState, navigation: Mech
 	for enemy: MechEntityState in enemies:
 		if enemy.slow_ticks > 0:
 			enemy.slow_ticks -= 1
-		enemy.slow_multiplier = 0.4 if enemy.slow_ticks > 0 else 1.0
+		if enemy.slow_ticks <= 0:
+			enemy.slow_effect_multiplier = 1.0
+		enemy.slow_multiplier = enemy.slow_effect_multiplier if enemy.slow_ticks > 0 else 1.0
 		enemy.slow_multiplier = minf(enemy.slow_multiplier, enemy.fence_slow_multiplier)
 		var cell := Vector2i(enemy.position.floor())
 		var near_assets: bool = active_regions.has(_activity_bucket(cell))
@@ -751,7 +753,7 @@ func _acquire_target(enemy: MechEntityState, grid: MechGridState, unit_buckets: 
 			if building_id <= 0:
 				continue
 			var building: MechBuildingState = buildings_by_id.get(building_id)
-			if building == null or building.definition.building_id == WALL_ID:
+			if building == null or building.definition.is_wall_like():
 				continue
 			var cell_center := Vector2(cell) + Vector2(0.5, 0.5)
 			var building_distance: float = enemy.position.distance_squared_to(cell_center)
@@ -861,7 +863,7 @@ func _blocker_at(point: Vector2, grid: MechGridState, buildings_by_id: Dictionar
 				continue
 			if occupant > 0 and buildings_by_id.has(occupant):
 				var blocking: MechBuildingState = buildings_by_id[occupant]
-				if ignore_walls and blocking.definition.building_id == WALL_ID:
+				if ignore_walls and blocking.definition.is_wall_like():
 					continue
 				if _circle_hits_cell(point, cell, radius):
 					return {"blocked": true, "building": occupant}

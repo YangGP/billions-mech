@@ -6,8 +6,13 @@ extends RefCounted
 var _navigation := AStarGrid2D.new()
 var _grid: MechGridState
 var _ignored_occupants: Dictionary = {}
+var _friendly_pass: bool = false
 var _revision: int = -1
 var _terrain_revision: int = -1
+
+
+func set_friendly_pass(enabled: bool) -> void:
+	_friendly_pass = enabled
 
 
 func rebuild(grid: MechGridState, ignored_occupants: Dictionary = {}) -> void:
@@ -25,13 +30,13 @@ func rebuild(grid: MechGridState, ignored_occupants: Dictionary = {}) -> void:
 		for y: int in range(grid.dimensions().y):
 			for x: int in range(grid.dimensions().x):
 				var cell := Vector2i(x, y)
-				_navigation.set_point_solid(cell, not grid.is_walkable(cell, true, _ignored_occupants))
+				_navigation.set_point_solid(cell, not grid.is_walkable(cell, true, _ignored_occupants, _friendly_pass))
 				_navigation.set_point_weight_scale(cell, grid.movement_weight(cell))
 	else:
 		# set_point_solid updates the native grid in place; update() would erase
 		# all point data and force a full-map rewrite for every wall segment.
 		for cell: Vector2i in grid.navigation_changes_since(_revision):
-			_navigation.set_point_solid(cell, not grid.is_walkable(cell, true, _ignored_occupants))
+			_navigation.set_point_solid(cell, not grid.is_walkable(cell, true, _ignored_occupants, _friendly_pass))
 	_revision = grid.revision()
 	_terrain_revision = grid.terrain_revision()
 
@@ -41,7 +46,7 @@ func find_path(from: Vector2, target_cell: Vector2i) -> PackedVector2Array:
 
 
 func find_path_to_point(from: Vector2, target: Vector2) -> PackedVector2Array:
-	if not from.is_finite() or not target.is_finite() or not _grid.mobile_position_clear(target, _ignored_occupants):
+	if not from.is_finite() or not target.is_finite() or not _grid.mobile_position_clear(target, _ignored_occupants, _friendly_pass):
 		return PackedVector2Array()
 	var target_cell := Vector2i(target.floor())
 	var cells: Array[Vector2i] = _navigation.get_id_path(Vector2i(from.floor()), target_cell)
@@ -66,7 +71,7 @@ func find_path_to_point(from: Vector2, target: Vector2) -> PackedVector2Array:
 
 
 func segment_clear(from: Vector2, to: Vector2) -> bool:
-	return _grid.mobile_segment_clear(from, to, _ignored_occupants)
+	return _grid.mobile_segment_clear(from, to, _ignored_occupants, _friendly_pass)
 
 
 func _straighten_path(points: PackedVector2Array) -> PackedVector2Array:

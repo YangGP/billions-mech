@@ -33,6 +33,16 @@ var repair_remainder: int = 0
 ## Kept across repair toggles, full HP and ruin/rebuild; converted on upgrade.
 var repair_material_remainder: Dictionary[StringName, int] = {}
 var repair_hp_accumulator: int = 0
+var repair_rate_override: float = 0.0
+var repair_auto_source: int = 0
+var repair_manual_hold: bool = false
+var garrison_unit_ids: Array[int] = []
+var contract_offer: Dictionary = {}
+var contract_timer_ticks: int = -1
+var contract_delivery_ticks: int = 0
+var contract_unit_id: StringName = &""
+var contract_paid: Dictionary = {}
+var contract_normal_cost: Dictionary = {}
 var income_remainder: int = 0
 ## Runtime output of an environment source (wind/solar); definition fields stay
 ## immutable and shared. Recomputed only when the explored map changes.
@@ -49,10 +59,10 @@ var upgrade_target: MechBuildingDefinition
 var upgrade_elapsed: int = 0
 var upgrade_total: int = 0
 var upgrade_paid: Dictionary[StringName, int] = MechResources.empty()
-## Aura runtime multipliers in tenths; reset to 10 when no aura applies.
-var income_multiplier_tenths: int = 10
-var extraction_multiplier_tenths: int = 10
-var cooling_multiplier_tenths: int = 10
+## Aura runtime multipliers in percent; reset to 100 when no aura applies.
+var income_multiplier_percent: int = 100
+var extraction_multiplier_percent: int = 100
+var cooling_multiplier_percent: int = 100
 var attack_cooldown_ticks: int = 0
 var shot_ticks: int = 0
 var shot_target: Vector2 = Vector2.ZERO
@@ -78,6 +88,11 @@ func configure(id: int, rules: MechBuildingDefinition, cell: Vector2i, hz: int, 
 
 func operating() -> bool:
 	return phase == Phase.OPERATING and powered
+
+
+func refresh_definition_ticks(hz: int) -> void:
+	build_ticks = maxi(1, ceili(definition.construction_seconds * hz))
+	demolition_ticks = maxi(1, ceili(definition.demolition_seconds * hz))
 
 
 func advance_construction() -> bool:
@@ -120,9 +135,9 @@ func mark_ruined() -> void:
 	upgrade_elapsed = 0
 	upgrade_total = 0
 	upgrade_paid = MechResources.empty()
-	income_multiplier_tenths = 10
-	extraction_multiplier_tenths = 10
-	cooling_multiplier_tenths = 10
+	income_multiplier_percent = 100
+	extraction_multiplier_percent = 100
+	cooling_multiplier_percent = 100
 	attack_cooldown_ticks = 0
 	shot_ticks = 0
 
@@ -132,6 +147,9 @@ func reset_repair_state() -> void:
 	repair_remainder = 0
 	repair_hp_accumulator = 0
 	repair_waiting_for_funds = false
+	repair_rate_override = 0.0
+	repair_auto_source = 0
+	repair_manual_hold = false
 
 
 func convert_repair_denominator(old_max_hp: int, new_max_hp: int) -> void:
@@ -185,9 +203,9 @@ func snapshot() -> Dictionary:
 		"repairing": repairing, "threatened": threatened, "powered": powered,
 		"repair_waiting_for_materials": repair_waiting_for_funds,
 		"repair_material_remainder": MechResources.copy(repair_material_remainder),
-		"income_multiplier_tenths": income_multiplier_tenths,
-		"extraction_multiplier_tenths": extraction_multiplier_tenths,
-		"cooling_multiplier_tenths": cooling_multiplier_tenths,
+		"income_multiplier_percent": income_multiplier_percent,
+		"extraction_multiplier_percent": extraction_multiplier_percent,
+		"cooling_multiplier_percent": cooling_multiplier_percent,
 		"environment_power": environment_power,
 		"processing": {"active": processing_active, "elapsed": processing_elapsed,
 			"total": processing_total, "paid": MechResources.copy(processing_paid),

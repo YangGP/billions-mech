@@ -15,6 +15,7 @@ var _grid_revision: int = -1
 var _revision: int = 0
 var _explored_revision: int = 0
 var _explored_changed: bool = false
+var _explored_changes: Array[Vector2i] = []
 
 
 func reset(grid: MechGridState) -> void:
@@ -28,10 +29,17 @@ func reset(grid: MechGridState) -> void:
 	_revision += 1
 	_explored_revision += 1
 	_explored_changed = false
+	_explored_changes.clear()
 
 
 func explored_revision() -> int:
 	return _explored_revision
+
+
+func consume_explored_changes() -> Array[Vector2i]:
+	var result: Array[Vector2i] = _explored_changes.duplicate()
+	_explored_changes.clear()
+	return result
 
 
 func update(grid: MechGridState, registry: MechEntityRegistry, buildings: Array[MechBuildingState], probe_radius: float) -> bool:
@@ -97,6 +105,7 @@ func _mark_explored(index: int) -> void:
 		return
 	_explored[index] = State.EXPLORED
 	_explored_changed = true
+	_explored_changes.append(Vector2i(index % _dimensions.x, index / _dimensions.x))
 
 
 func _cast_source(grid: MechGridState, center: Vector2, radius: float) -> PackedInt32Array:

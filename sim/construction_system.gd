@@ -61,7 +61,7 @@ func catalog(economy: MechEconomySystem) -> Array[Dictionary]:
 	return result
 
 
-func preview_placement(id: StringName, origin: Vector2i, grid: MechGridState, economy: MechEconomySystem, minerals: MechMineralSystem, available: Dictionary = {}, planned_cells: Dictionary = {}, environment: MechEnvironmentEnergy = null, vision: MechVisionSystem = null) -> Dictionary:
+func preview_placement(id: StringName, origin: Vector2i, grid: MechGridState, economy: MechEconomySystem, minerals: MechMineralSystem, available: Dictionary = {}, planned_cells: Dictionary = {}, environment: MechEnvironmentEnergy = null, vision: MechVisionSystem = null, cooling_multiplier: float = 1.0) -> Dictionary:
 	var rules: MechBuildingDefinition = definition(id)
 	if rules == null or not rules.buildable:
 		return {"ok": false, "reason": "该建筑不可下单", "cells": [], "origin": origin, "footprint": Vector2i.ONE}
@@ -112,7 +112,7 @@ func preview_placement(id: StringName, origin: Vector2i, grid: MechGridState, ec
 				if environment_power <= 0:
 					reason = "环境评分不足（需已探索有效地形）"
 	if reason.is_empty():
-		reason = economy.reservation_error(rules, available)
+		reason = economy.reservation_error(rules, available, {}, cooling_multiplier)
 	if not reason.is_empty() and terrain_error.is_empty() and coverage_error.is_empty() and overlap_error.is_empty():
 		for cell_info: Dictionary in result["cells"]:
 			cell_info["ok"] = false

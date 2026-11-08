@@ -21,7 +21,7 @@ extends Resource
 ## First-wave migration switch. Development mode keeps the old "silence or
 ## 8 operating nodes" trigger; fixed-time mode ignores development and uses
 ## silence_seconds + wave_announce_seconds (P2d switches the standard config).
-enum WaveTrigger { DEVELOPMENT_OR_TIME, TIME_ONLY }
+enum WaveTrigger { DEVELOPMENT_OR_TIME, TIME_ONLY, DEVELOPMENT_SCORE }
 
 ## Threat side (values.md §2/§12/§13/§15). Training keeps threat_enabled off.
 @export var enemy_definitions: Array[MechEnemyDefinition] = []
@@ -35,7 +35,15 @@ enum WaveTrigger { DEVELOPMENT_OR_TIME, TIME_ONLY }
 @export_range(1.0, 500.0, 1.0) var first_wave_budget: float = 25.0
 @export_range(1.0, 3.0, 0.01) var wave_budget_growth: float = 1.6
 @export_range(1, 32, 1) var development_node_threshold: int = 8
+## P8 candidate metric: net scheduling + military scale. The formal first-wave
+## rule still needs handover acceptance; development_node_threshold remains for
+## the legacy mode.
+@export_range(1, 200, 1) var development_score_threshold: int = 24
 @export_range(2, 32, 1) var flank_wave_interval: int = 4
+## Campaign mode keeps waves running until an explicit final-wave request;
+## four-wave mode remains the default for the existing acceptance slice.
+@export var campaign_mode: bool = false
+@export_range(100.0, 5000.0, 10.0) var final_wave_budget: float = 2000.0
 ## First-slice victory gate (development-plan M6): 0 = endless waves; otherwise
 ## the director stops after this many waves and a cleared field wins.
 @export_range(0, 32, 1) var total_waves: int = 4

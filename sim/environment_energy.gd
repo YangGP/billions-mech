@@ -82,9 +82,10 @@ func score(energy_type: StringName, origin: Vector2i, footprint: Vector2i, grid:
 			elif energy_type == &"solar":
 				if terrain == MechGridState.Terrain.OPEN:
 					points += 1
-	points *= maxi(1, multiplier)
 	if energy_type == &"wind":
-		return mini(cap if cap > 0 else WIND_CAP, points / 4)
+		var base_power: int = mini(WIND_CAP, points / 4)
+		return mini(cap if cap > 0 else WIND_CAP, base_power * maxi(1, multiplier))
 	if energy_type == &"solar":
-		return mini(cap if cap > 0 else SOLAR_CAP, points / 2)
+		var base_power: int = mini(SOLAR_CAP, points / 2)
+		return mini(cap if cap > 0 else SOLAR_CAP, base_power * maxi(1, multiplier))
 	return 0

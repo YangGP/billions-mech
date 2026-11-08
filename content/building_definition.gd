@@ -42,6 +42,8 @@ extends Resource
 ## are reached only through upgrade_to; tech_level is the tech-center rank.
 @export var level: int = 1
 @export var tech_level: int = 0
+@export var required_tech_level: int = 0
+@export var required_mainbrain_level: int = 0
 @export var upgrade_to: MechBuildingDefinition
 @export var upgrade_cost: Dictionary[StringName, int] = {}
 @export var upgrade_seconds: float = 0.0
@@ -67,6 +69,10 @@ extends Resource
 @export_range(0.1, 3.0, 0.01) var aura_multiplier: float = 1.0
 
 
+func is_wall_like() -> bool:
+	return building_id in [&"armored_wall", &"alloy_wall"]
+
+
 func validation_error() -> String:
 	if building_id == &"" or display_name.is_empty():
 		return "建筑缺少编号或名称"
@@ -80,7 +86,7 @@ func validation_error() -> String:
 		return "建筑系统预留或冷却无效"
 	if alloy_recipe != null and not alloy_recipe.validation_error().is_empty():
 		return "建筑合金配方无效"
-	if level < 1 or tech_level < 0 or tech_level > 3:
+	if level < 1 or tech_level < 0 or tech_level > 3 or required_tech_level < 0 or required_tech_level > 3 or required_mainbrain_level < 0 or required_mainbrain_level > 3:
 		return "建筑等级或科技等级无效"
 	if environment_output_multiplier < 1 or environment_output_cap < 0:
 		return "环境电源倍率或上限无效"
@@ -148,6 +154,8 @@ func snapshot() -> Dictionary:
 		"trap_damage": trap_damage, "slow_multiplier": slow_multiplier,
 		"slow_seconds": slow_seconds, "one_shot": one_shot,
 		"level": level, "tech_level": tech_level,
+		"required_tech_level": required_tech_level,
+		"required_mainbrain_level": required_mainbrain_level,
 		"upgrade_target": upgrade_to.building_id if upgrade_to != null else &"",
 		"upgrade_target_name": upgrade_to.display_name if upgrade_to != null else "",
 		"upgrade_cost": MechResources.copy(upgrade_cost),

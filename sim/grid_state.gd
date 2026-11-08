@@ -10,6 +10,8 @@ var _dimensions: Vector2i = Vector2i.ZERO
 var _terrain := PackedByteArray()
 var _occupancy := PackedInt32Array()
 var _pass_through: Dictionary[int, bool] = {}
+## Player-only pass-through (gates); enemy path validation must not use it.
+var _friendly_pass: Dictionary[int, bool] = {}
 var _coverage := PackedByteArray()
 ## Explicit environment layers; water is also obstacle terrain, wind is not.
 var _wind := PackedByteArray()
@@ -41,6 +43,7 @@ func configure(definition: MechMapDefinition) -> void:
 	_occupancy.resize(_terrain.size())
 	_occupancy.fill(0)
 	_pass_through.clear()
+	_friendly_pass.clear()
 	_coverage.resize(_terrain.size())
 	_coverage.fill(0)
 	_coverage_changes.clear()
@@ -250,6 +253,7 @@ func release(entity_id: int) -> void:
 			_occupancy[index] = 0
 			_navigation_changes[index] = _revision
 	_pass_through.erase(entity_id)
+	_friendly_pass.erase(entity_id)
 
 
 ## Pass-through occupants keep their cells (placement checks and mineral
@@ -268,9 +272,24 @@ func set_pass_through(entity_id: int, enabled: bool) -> void:
 			_navigation_changes[index] = _revision
 
 
-func is_walkable(cell: Vector2i, include_buildings: bool = true, ignored_occupants: Dictionary = {}) -> bool:
+func is_walkable(cell: Vector2i, include_buildings: bool = true, ignored_occupants: Dictionary = {}, friendly_pass: bool = false) -> bool:
 	return contains(cell) and terrain_at(cell) != Terrain.OBSTACLE \
-		and (not include_buildings or ignored_occupants.has(occupant_at(cell)) or not _blocks_path(occupant_at(cell)))
+		and (not include_buildings or ignored_occupants.has(occupant_at(cell))
+			or not _blocks_path(occupant_at(cell))
+			or (friendly_pass and _friendly_pass.has(occupant_at(cell))))
+
+
+func set_friendly_pass(entity_id: int, enabled: bool) -> void:
+	if _friendly_pass.has(entity_id) == enabled:
+		return
+	if enabled:
+		_friendly_pass[entity_id] = true
+	else:
+		_friendly_pass.erase(entity_id)
+	_revision += 1
+	for index: int in range(_occupancy.size()):
+		if _occupancy[index] == entity_id:
+			_navigation_changes[index] = _revision
 
 
 func _blocks_path(occupant: int) -> bool:
@@ -283,7 +302,7 @@ func is_pass_through(cell: Vector2i) -> bool:
 	return occupant != 0 and _pass_through.has(occupant)
 
 
-func mobile_position_clear(point: Vector2, ignored_occupants: Dictionary = {}) -> bool:
+func mobile_position_clear(point: Vector2, ignored_occupants: Dictionary = {}, friendly_pass: bool = false) -> bool:
 	if not point_inside(point):
 		return false
 	# Match the native RVO circle, including at building corners.
@@ -292,7 +311,7 @@ func mobile_position_clear(point: Vector2, ignored_occupants: Dictionary = {}) -
 	for y: int in range(low.y, high.y + 1):
 		for x: int in range(low.x, high.x + 1):
 			var cell := Vector2i(x, y)
-			if is_walkable(cell, true, ignored_occupants):
+			if is_walkable(cell, true, ignored_occupants, friendly_pass):
 				continue
 			var closest: Vector2 = point.clamp(Vector2(cell), Vector2(cell + Vector2i.ONE))
 			if point.distance_squared_to(closest) < MOBILE_RADIUS * MOBILE_RADIUS:
@@ -300,10 +319,10 @@ func mobile_position_clear(point: Vector2, ignored_occupants: Dictionary = {}) -
 	return true
 
 
-func mobile_segment_clear(from: Vector2, to: Vector2, ignored_occupants: Dictionary = {}) -> bool:
+func mobile_segment_clear(from: Vector2, to: Vector2, ignored_occupants: Dictionary = {}, friendly_pass: bool = false) -> bool:
 	var steps: int = maxi(1, ceili(from.distance_to(to) / 0.1))
 	for index: int in range(1, steps + 1):
-		if not mobile_position_clear(from.lerp(to, float(index) / steps), ignored_occupants):
+		if not mobile_position_clear(from.lerp(to, float(index) / steps), ignored_occupants, friendly_pass):
 			return false
 	return true
 

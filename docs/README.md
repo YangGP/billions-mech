@@ -30,6 +30,8 @@
 
 ## 实施与检查
 
+[0.5.48逐提交审查](../validation/review-0.5.48.md)按顺序审核交接后22个提交，列出15项实现问题、后续已修复项、计划硬缺口及独立快照检查结果；构建通过不表示玩法交付通过。
+
 [二级建造菜单](../validation/build-menu.md)记录0.5.27的六分类、31项目录、已开放/缺料/未开放区分与原生画面检查。新建筑功能仍按原计划逐批接入。
 
 [五项资源账本与单一开发图](../validation/p1-ledger-single-map.md)记录0.5.26的删除范围、付款/退款/队列迁移、供给接口、既有检查和待验项。
@@ -73,6 +75,22 @@
 [P6a 第三阶段与晶体](../validation/p6a-crystal-tech-iii.md) 记录晶体站/深层、主脑III、科技III、节点III与前置。
 
 [P6b 末期军备](../validation/p6b-endgame-waves.md) 记录歼灭/电磁/高级工厂/磁轨内容与终波缺口。
+
+[P7a 区域授权](../validation/p7a-dispatch-regions.md) 记录调度中心、区域纯数据模型与自动化缺口。
+
+[P7b 有限自动化](../validation/p7b-limited-automation.md) 记录区域配置命令、自动维修入口与闭环缺口。
+
+[P8 最终对账](../validation/p8-final-audit.md) 记录内容盘点、检查证据与未验收清单。
+
+[0.5.48 交接状态](../validation/0.5.48-handoff-status.md) 汇总提交链、硬缺口与建议验收顺序。
+
+[0.5.49 审查修复](../validation/review-fixes-0.5.49.md) 记录优先审查项的代码修复与剩余缺口。
+
+[0.5.58 原生启动观察](../validation/native-smoke-0.5.58.md) 记录非 headless 启动与基础渲染截图。
+
+[0.5.61 最终交接状态](../validation/0.5.61-final-status.md) 汇总已推进项、证据与未完成清单。
+
+[P8 批量建拆压力](../validation/p8-stress-0.5.79.md) 记录 `--stress` 模式与阶段耗时。
 
 [M6 bundle 本地审查](../validation/m6-bundle-review.md) 记录本次合入的两个提交、原生导入发现的编译/接线问题、穿墙寻路修复，以及本地 43 个脚本、49 项既有回归、启动和原生画面的复验结果与限制。
 

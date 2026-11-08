@@ -18,6 +18,7 @@ var _tick_rate: int = 30
 var _defs: Dictionary = {}
 var _main_band: Array[Vector2i] = []
 var _flank_band: Array[Vector2i] = []
+var _all_bands: Array[Vector2i] = []
 var _main_edge: StringName = &"north"
 var _flank_edge: StringName = &"east"
 var _phase: StringName = &"silence"
@@ -31,8 +32,14 @@ var _first_wave_budget: float = 25.0
 var _budget_growth: float = 1.6
 var _total_waves: int = 0
 var _development_nodes: int = 8
+var _development_score_threshold: int = 24
+var _development_score: int = 0
 var _wave_trigger_mode: int = MechFoundationSettings.WaveTrigger.DEVELOPMENT_OR_TIME
 var _flank_every: int = 4
+var _campaign_mode: bool = false
+var _final_wave_budget: float = 2000.0
+var _final_requested: bool = false
+var _campaign_stage: int = 1
 var _tier_label: String = ""
 var _edge: StringName = &""
 var _edge_name: String = ""
@@ -58,10 +65,13 @@ func configure(settings: MechFoundationSettings) -> String:
 	_release_window_ticks = maxi(1, ceili(settings.wave_release_seconds * settings.simulation_hz))
 	_first_wave_budget = maxf(1.0, settings.first_wave_budget)
 	_budget_growth = maxf(1.0, settings.wave_budget_growth)
-	_total_waves = maxi(0, settings.total_waves)
+	_total_waves = 0 if settings.campaign_mode else maxi(0, settings.total_waves)
 	_development_nodes = maxi(1, settings.development_node_threshold)
+	_development_score_threshold = maxi(1, settings.development_score_threshold)
 	_wave_trigger_mode = settings.wave_trigger_mode
 	_flank_every = maxi(2, settings.flank_wave_interval)
+	_campaign_mode = settings.campaign_mode
+	_final_wave_budget = maxf(100.0, settings.final_wave_budget)
 	return ""
 
 
@@ -72,6 +82,7 @@ func reset(grid: MechGridState, map_definition: MechMapDefinition, active: bool,
 	_wave_index = 0
 	_tick_counter = 0
 	_tier_label = ""
+	_final_requested = false
 	_edge = &""
 	_edge_name = ""
 	_pending.clear()
@@ -98,6 +109,9 @@ func advance(grid: MechGridState, buildings: Array[MechBuildingState]) -> Array[
 			var time_due: bool = _tick_counter >= _silence_ticks
 			var development_due: bool = _wave_trigger_mode == MechFoundationSettings.WaveTrigger.DEVELOPMENT_OR_TIME \
 				and _operating_nodes(buildings) >= _development_nodes
+			if _wave_trigger_mode == MechFoundationSettings.WaveTrigger.DEVELOPMENT_SCORE:
+				_development_score = _development_progress(buildings)
+				development_due = _development_score >= _development_score_threshold
 			if time_due or development_due:
 				_announce()
 		&"announced":
@@ -108,6 +122,18 @@ func advance(grid: MechGridState, buildings: Array[MechBuildingState]) -> Array[
 			if _tick_counter >= maxi(1, _wave_interval_ticks - _announce_delay_ticks):
 				_announce()
 	return requests
+
+
+func request_final_wave() -> bool:
+	if not _campaign_mode or _final_requested or _phase == &"done":
+		return false
+	_final_requested = true
+	_total_waves = _wave_index + 1
+	return true
+
+
+func set_campaign_stage(stage: int) -> void:
+	_campaign_stage = clampi(stage, 1, 3)
 
 
 func state() -> Dictionary:
@@ -136,6 +162,12 @@ func state() -> Dictionary:
 		"seconds_remaining": seconds_remaining,
 		"next_wave_number": next_wave_number, "next_edge": next_edge,
 		"next_edge_name": next_edge_name,
+		"final_requested": _final_requested,
+		"final_phase": "none" if not _final_requested else ("done" if _phase == &"done" else ("clearing" if _phase == &"active" else "requested")),
+		"campaign_mode": _campaign_mode,
+		"campaign_stage": _campaign_stage,
+		"development_score": _development_score,
+		"development_score_threshold": _development_score_threshold,
 		"edge": _edge, "edge_name": _edge_name, "tier": _tier_label,
 		"total_waves": _total_waves, "exhausted": exhausted()}
 
@@ -149,9 +181,12 @@ func exhausted() -> bool:
 func _announce() -> void:
 	# The upcoming wave number is the current index + 1 (values.md §12 curve).
 	var wave_number: int = _wave_index + 1
-	var budget: float = _first_wave_budget * pow(_budget_growth, wave_number - 1)
+	var budget: float = _budget_for(wave_number)
 	_tier_label = "小股" if budget < 40.0 else ("常规" if budget < 80.0 else "大量")
-	if wave_number % _flank_every == 0 and not _flank_band.is_empty():
+	if _final_requested and wave_number >= _total_waves:
+		_edge = &"all"
+		_edge_name = "全边"
+	elif wave_number % _flank_every == 0 and not _flank_band.is_empty():
 		_edge = _flank_edge
 		_edge_name = {"north": "北", "south": "南", "west": "西", "east": "东"}.get(String(_flank_edge), "侧翼")
 	else:
@@ -163,18 +198,28 @@ func _announce() -> void:
 
 func _queue_wave() -> void:
 	var wave_number: int = _wave_index + 1
-	var budget: float = _first_wave_budget * pow(_budget_growth, wave_number - 1)
+	var budget: float = _budget_for(wave_number)
 	var builder: MechEnemyDefinition = _defs[&"builder"]
 	var band: Array[Vector2i] = _flank_band if wave_number % _flank_every == 0 and not _flank_band.is_empty() else _main_band
+	if _final_requested and wave_number >= _total_waves and not _all_bands.is_empty():
+		band = _all_bands
 	if band.is_empty():
 		band = _main_band
 	if band.is_empty():
 		return
-	# Composition: prototype first from WAVE 3, builders fill the remaining budget.
+	# Composition: prototype first from WAVE 3, recyclers from the II-stage
+	# slice, builders fill the remaining budget.
 	var entries: Array[StringName] = []
 	if wave_number >= PROTOTYPE_FROM_WAVE:
 		entries.append(&"prototype")
 		budget -= _defs[&"prototype"].threat_cost
+	var recycler: MechEnemyDefinition = _defs.get(&"recycler")
+	if recycler != null and (wave_number >= 2 or (_campaign_mode and _campaign_stage >= 2)):
+		var recycler_budget: float = budget * 0.25
+		var recyclers: int = maxi(0, floori(recycler_budget / recycler.threat_cost))
+		for index: int in range(recyclers):
+			entries.append(&"recycler")
+		budget -= recyclers * recycler.threat_cost
 	var builders: int = maxi(0, floori(budget / builder.threat_cost))
 	for index: int in range(builders):
 		entries.append(&"builder")
@@ -194,6 +239,25 @@ func _queue_wave() -> void:
 	# director goes quiet for good; the drained pending list finishes the wave.
 	if _total_waves > 0 and _wave_index >= _total_waves:
 		_phase = &"done"
+
+
+func _budget_for(wave_number: int) -> float:
+	if _final_requested and wave_number >= _total_waves:
+		return _final_wave_budget
+	var stage_multiplier: float = [1.0, 1.5, 2.2][_campaign_stage - 1] if _campaign_mode else 1.0
+	return _first_wave_budget * stage_multiplier * pow(_budget_growth, wave_number - 1)
+
+
+func _development_progress(buildings: Array[MechBuildingState]) -> int:
+	var score: int = 0
+	for building: MechBuildingState in buildings:
+		if building.phase != MechBuildingState.Phase.OPERATING or building.definition == null:
+			continue
+		score += maxi(0, building.definition.capacity_provided - building.definition.capacity_system_reserved)
+		if not building.definition.produced_units.is_empty():
+			score += 2
+		score += maxi(0, building.definition.tech_level)
+	return score
 
 
 func _operating_nodes(buildings: Array[MechBuildingState]) -> int:
@@ -220,6 +284,9 @@ func _collect_bands(grid: MechGridState, map_definition: MechMapDefinition) -> v
 	_main_edge = _nearest_side(sides, map_definition.main_gate)
 	_flank_band = _nearest_band(sides, map_definition.flank)
 	_flank_edge = _nearest_side(sides, map_definition.flank)
+	_all_bands.clear()
+	for side: StringName in sides:
+		_all_bands.append_array(sides[side])
 
 
 func _nearest_band(sides: Dictionary, marker: Vector2i) -> Array[Vector2i]:
