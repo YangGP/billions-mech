@@ -40,6 +40,8 @@
 
 [视角与 HUD](../validation/reference-view-hud.md) 记录 0.5.23-dev 对用户截图的格线比例估计、普通缩放与全图总览、底部指挥台布局、原生画面与交互待验。
 
+[P0/P1-R 接手核对](../validation/p0-p1r-takeover.md) 记录 0.5.27-dev 基线、交易闭环静态审计、生产队列/退款修复与开发默认；不表示 P1 原生交易验收完成。
+
 [M6 bundle 本地审查](../validation/m6-bundle-review.md) 记录本次合入的两个提交、原生导入发现的编译/接线问题、穿墙寻路修复，以及本地 43 个脚本、49 项既有回归、启动和原生画面的复验结果与限制。
 
 [卡顿与游荡节奏调整](../validation/performance-wanderers.md) 记录 0.5.18-dev 的后台行军场、局部 A*/RVO 更新、视野记忆复用、开局禁刷与游荡移速调整，以及加速战斗性能证据和待验项。

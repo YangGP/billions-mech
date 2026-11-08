@@ -20,6 +20,9 @@ func register_factory(building: MechBuildingState) -> void:
 		return
 	_queues[building.entity_id] = []
 	_rallies[building.entity_id] = building.origin + Vector2i(0, building.definition.footprint.y)
+	# A rebuilt factory is a fresh queue; a stale blocked flag would otherwise
+	# keep the empty factory reporting "出口受阻" forever.
+	_blocked.erase(building.entity_id)
 
 
 func reserved_capacity() -> int:
@@ -35,7 +38,10 @@ func order_error(building: MechBuildingState, rules: MechUnitDefinition, economy
 		return "请选择组装厂"
 	if not building.operating():
 		return "工厂须已完工且正常供电"
-	if _queues[building.entity_id].size() >= building.definition.queue_limit:
+	if not _queues.has(building.entity_id):
+		return "工厂未注册生产队列"
+	var queue: Array = _queues.get(building.entity_id, [])
+	if queue.size() >= building.definition.queue_limit:
 		return "生产队列已满"
 	return economy.production_error(rules.capacity_cost, rules.cost)
 
@@ -57,13 +63,15 @@ func has_ticket(factory_id: int, ticket: int) -> bool:
 
 
 func cancel(factory_id: int, ticket: int) -> Dictionary:
-	var queue: Array = _queues[factory_id]
+	var queue: Array = _queues.get(factory_id, [])
 	for index: int in range(queue.size()):
 		var item: Dictionary = queue[index]
 		if item["ticket"] == ticket:
 			queue.remove_at(index)
 			_blocked.erase(factory_id)
-			return item["paid_cost"]
+			# Refund is an external result; never hand out the queue item's
+			# mutable dictionary.
+			return MechResources.copy(item["paid_cost"])
 	return MechResources.empty()
 
 

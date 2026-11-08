@@ -31,6 +31,7 @@ var _first_wave_budget: float = 25.0
 var _budget_growth: float = 1.6
 var _total_waves: int = 0
 var _development_nodes: int = 8
+var _wave_trigger_mode: int = MechFoundationSettings.WaveTrigger.DEVELOPMENT_OR_TIME
 var _flank_every: int = 4
 var _tier_label: String = ""
 var _edge: StringName = &""
@@ -59,6 +60,7 @@ func configure(settings: MechFoundationSettings) -> String:
 	_budget_growth = maxf(1.0, settings.wave_budget_growth)
 	_total_waves = maxi(0, settings.total_waves)
 	_development_nodes = maxi(1, settings.development_node_threshold)
+	_wave_trigger_mode = settings.wave_trigger_mode
 	_flank_every = maxi(2, settings.flank_wave_interval)
 	return ""
 
@@ -93,7 +95,10 @@ func advance(grid: MechGridState, buildings: Array[MechBuildingState]) -> Array[
 		_pending = remaining
 	match _phase:
 		&"silence":
-			if _tick_counter >= _silence_ticks or _operating_nodes(buildings) >= _development_nodes:
+			var time_due: bool = _tick_counter >= _silence_ticks
+			var development_due: bool = _wave_trigger_mode == MechFoundationSettings.WaveTrigger.DEVELOPMENT_OR_TIME \
+				and _operating_nodes(buildings) >= _development_nodes
+			if time_due or development_due:
 				_announce()
 		&"announced":
 			if _tick_counter >= _announce_delay_ticks:

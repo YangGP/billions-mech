@@ -15,9 +15,15 @@ extends Resource
 @export_range(0.1, 10.0, 0.1) var probe_speed: float = 2.5
 @export_range(0.5, 64.0, 0.5) var probe_sight_radius: float = 7.0
 
+## First-wave migration switch. Development mode keeps the old "silence or
+## 8 operating nodes" trigger; fixed-time mode ignores development and uses
+## silence_seconds + wave_announce_seconds (P2d switches the standard config).
+enum WaveTrigger { DEVELOPMENT_OR_TIME, TIME_ONLY }
+
 ## Threat side (values.md §2/§12/§13/§15). Training keeps threat_enabled off.
 @export var enemy_definitions: Array[MechEnemyDefinition] = []
 @export var threat_enabled: bool = true
+@export var wave_trigger_mode: WaveTrigger = WaveTrigger.DEVELOPMENT_OR_TIME
 @export_range(0.0, 3600.0, 1.0) var silence_seconds: float = 600.0
 @export_range(1.0, 300.0, 1.0) var wave_announce_seconds: float = 30.0
 @export_range(10.0, 1200.0, 1.0) var wave_interval_seconds: float = 600.0

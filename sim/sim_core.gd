@@ -246,7 +246,7 @@ func execute_command(command: MechCommand) -> Dictionary:
 				"placed": placed, "skipped": result["origins"].size() - placed, "cost": spent}
 		MechCommand.Type.CANCEL_CONSTRUCTION:
 			var building: MechBuildingState = _construction.get_building(command.payload["entity_id"])
-			var refund: Dictionary = building.paid_cost
+			var refund: Dictionary = MechResources.copy(building.paid_cost)
 			_remove_building(building.entity_id, refund)
 			result = {"ok": true, "reason": "", "refund": refund}
 		MechCommand.Type.DEMOLISH:
