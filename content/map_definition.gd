@@ -3,9 +3,9 @@ class_name MechMapDefinition
 extends Resource
 ## Hand-authored rectangular terrain stamps, not a random map generator.
 
-@export var map_id: StringName = &"first_outpost"
-@export var display_name: String = "隘口前哨"
-@export var dimensions: Vector2i = Vector2i(48, 48)
+@export var map_id: StringName = &"development_basin_128"
+@export var display_name: String = "四隘盆地 · 128开发图"
+@export var dimensions: Vector2i = Vector2i(128, 128)
 ## Clockwise boundary in logical coordinates; edges are north/east/south/west.
 ## Empty preserves the rectangular grid used by older maps.
 @export var playable_polygon := PackedVector2Array()
@@ -13,11 +13,11 @@ extends Resource
 @export var obstacle_rects: Array[Rect2i] = []
 @export var rough_rects: Array[Rect2i] = []
 @export_range(1.0, 10.0, 0.1) var rough_movement_weight: float = 2.0
-@export var mainbrain_origin: Vector2i = Vector2i(23, 28)
-@export var mainbrain_footprint: Vector2i = Vector2i(4, 4)
-@export var probe_cell: Vector2i = Vector2i(21, 33)
-@export var main_gate: Vector2i = Vector2i(24, 11)
-@export var flank: Vector2i = Vector2i(46, 21)
+@export var mainbrain_origin: Vector2i = Vector2i(61, 61)
+@export var mainbrain_footprint: Vector2i = Vector2i(5, 5)
+@export var probe_cell: Vector2i = Vector2i(60, 68)
+@export var main_gate: Vector2i = Vector2i(64, 43)
+@export var flank: Vector2i = Vector2i(89, 64)
 @export var minerals: Array[MechMineralDefinition] = []
 
 
@@ -56,7 +56,7 @@ func validation_error() -> String:
 	for mineral: MechMineralDefinition in minerals:
 		if mineral == null or mineral.mineral_id == &"" or mineral.amount < 1:
 			return "矿点定义或储量无效"
-		if not mineral.resource_kind in ["ore", "metal", "rare"]:
+		if not MechResources.mineable(StringName(mineral.resource_kind)):
 			return "矿点类型无效"
 		if not contains_cell(mineral.cell) or Rect2i(mainbrain_origin, mainbrain_footprint).has_point(mineral.cell):
 			return "矿点超界或与主脑重叠"

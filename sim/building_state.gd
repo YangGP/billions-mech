@@ -15,7 +15,7 @@ var definition: MechBuildingDefinition
 var origin: Vector2i
 var phase: Phase = Phase.CONSTRUCTING
 var hp: int = 1
-var paid_cost: Vector4i = Vector4i.ZERO
+var paid_cost: Dictionary[StringName, int] = MechResources.empty()
 var paid_refund_ratio: float = 0.5
 var mineral_id: StringName = &""
 var extraction_remainder: int = 0
@@ -42,7 +42,7 @@ func configure(id: int, rules: MechBuildingDefinition, cell: Vector2i, hz: int, 
 	entity_id = id
 	definition = rules
 	origin = cell
-	paid_cost = Vector4i.ZERO if completed else rules.cost
+	paid_cost = MechResources.empty() if completed else MechResources.copy(rules.cost)
 	paid_refund_ratio = rules.refund_ratio
 	build_ticks = maxi(1, ceili(rules.construction_seconds * hz))
 	demolition_ticks = maxi(1, ceili(rules.demolition_seconds * hz))
@@ -65,11 +65,11 @@ func advance_construction() -> bool:
 	return elapsed_build_ticks == build_ticks
 
 
-func refund() -> Vector4i:
+func refund() -> Dictionary[StringName, int]:
 	return MechResources.scaled(paid_cost, paid_refund_ratio)
 
 
-func rebuild_cost() -> Vector4i:
+func rebuild_cost() -> Dictionary[StringName, int]:
 	return MechResources.scaled(definition.cost, REBUILD_COST_RATIO)
 
 
@@ -84,7 +84,7 @@ func mark_ruined() -> void:
 	waiting_for_clearance = false
 	reset_repair_state()
 	threatened = false
-	paid_cost = Vector4i.ZERO
+	paid_cost = MechResources.empty()
 	extraction_remainder = 0
 	income_remainder = 0
 	attack_cooldown_ticks = 0
@@ -116,7 +116,7 @@ func status() -> String:
 func snapshot() -> Dictionary:
 	var result: Dictionary = definition.snapshot()
 	result.merge({"entity_id": entity_id, "origin": origin, "is_building": true,
-		"phase": phase, "status": status(), "hp": hp, "paid_cost": paid_cost,
+		"phase": phase, "status": status(), "hp": hp, "paid_cost": MechResources.copy(paid_cost),
 		"build_progress": float(elapsed_build_ticks) / build_ticks,
 		"demolition_progress": float(elapsed_demolition_ticks) / demolition_ticks,
 		"demolition_seconds": definition.demolition_seconds, "refund": refund(),

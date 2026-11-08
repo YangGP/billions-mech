@@ -161,11 +161,11 @@ func _check_distant_decisions() -> void:
 
 
 func _check_session() -> void:
-	var settings: MechFoundationSettings = load("res://content/foundation.tres").duplicate(true)
+	var settings: MechFoundationSettings = load("res://content/development_128.tres").duplicate(true)
 	var map := MechMapDefinition.new()
 	map.dimensions = Vector2i(32, 32)
 	map.mainbrain_origin = Vector2i(2, 2)
-	map.probe_cell = Vector2i(6, 6)
+	map.probe_cell = Vector2i(7, 7)
 	map.main_gate = Vector2i(20, 4)
 	map.flank = Vector2i(20, 20)
 	var deposit := MechMineralDefinition.new()
@@ -209,16 +209,16 @@ func _check_session() -> void:
 	for entity: Dictionary in sim.snapshot()["entities"]:
 		shown = shown or entity["id"] == enemy_id
 	_check(shown, "scout reveals an enemy again")
-	sim._registry.teleport(sim._probe_id, Vector2(6.5, 6.5))
+	sim._registry.teleport(sim._probe_id, Vector2(7.5, 7.5))
 	sim._on_movement_finished()
 	_check(sim.inspect_cell(Vector2i(28, 29))["vision"] == MechVisionSystem.State.EXPLORED, "returning scout leaves gray memory")
 	sim._threat._active = true
-	sim._infect_asset(Vector4i(20, 0, 0, 0), Vector2(28.5, 28.5))
+	sim._infect_asset(MechResources.single(&"coins", 20), Vector2(28.5, 28.5))
 	_check(sim.snapshot()["alert"].get("text", "").contains("感疫脉冲"), "unseen infection provides a qualitative direction alert")
 	sim.execute_command(MechCommand.new(MechCommand.Type.RESET_SESSION))
 	_check(sim.snapshot()["alert"].is_empty(), "restart clears old alerts")
 	_check(sim.inspect_cell(Vector2i(28, 29))["vision"] == MechVisionSystem.State.UNEXPLORED, "restart rebuilds initial fog")
-	sim.configure(load("res://content/training.tres"))
+	sim.configure(settings.duplicate(true))
 	_check(sim.inspect_cell(Vector2i(28, 29))["vision"] == MechVisionSystem.State.UNEXPLORED, "scenario switch discards previous exploration")
 	sim.damage_building(sim._mainbrain_id, 99999)
 	_check(sim.session_ended() and sim.snapshot()["vision"]["cells"].count(MechVisionSystem.State.VISIBLE) > 0, "defeat retains surviving scout sight")

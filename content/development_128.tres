@@ -1,7 +1,7 @@
-[gd_resource type="Resource" script_class="MechFoundationSettings" load_steps=16 format=3]
+[gd_resource type="Resource" script_class="MechFoundationSettings" load_steps=17 format=3]
 
 [ext_resource type="Script" path="res://content/foundation_settings.gd" id="1"]
-[ext_resource type="Resource" path="res://content/maps/first_outpost.tres" id="2"]
+[ext_resource type="Resource" path="res://content/maps/development_basin_128.tres" id="2"]
 [ext_resource type="Resource" path="res://content/buildings/mainbrain.tres" id="3"]
 [ext_resource type="Resource" path="res://content/buildings/compute_node.tres" id="4"]
 [ext_resource type="Resource" path="res://content/buildings/armored_wall.tres" id="5"]
@@ -16,17 +16,16 @@
 [ext_resource type="Resource" path="res://content/enemies/recycler.tres" id="14"]
 [ext_resource type="Resource" path="res://content/enemies/prototype.tres" id="15"]
 
+[ext_resource type="Script" path="res://content/unit_definition.gd" id="16"]
+
 [resource]
 script = ExtResource("1")
 simulation_hz = 30
+scenario_name = "128×128开发测试"
 map_definition = ExtResource("2")
 building_definitions = Array[ExtResource("7")]([ExtResource("3"), ExtResource("4"), ExtResource("5"), ExtResource("6"), ExtResource("8"), ExtResource("9")])
-unit_definition = ExtResource("10")
-scenario_name = "单位训练场"
-starting_resources = Vector4i(250, 50, 0, 0)
-starting_buildings = Dictionary[Vector2i, StringName]({Vector2i(66, 69): &"assembly_plant", Vector2i(60, 65): &"compute_node", Vector2i(60, 67): &"compute_node"})
-starting_unit_cells = Array[Vector2i]([Vector2i(63, 69), Vector2i(64, 69), Vector2i(63, 70), Vector2i(64, 70)])
-practice_target_cells = Array[Vector2i]([Vector2i(72, 62), Vector2i(71, 57)])
+unit_definitions = Array[ExtResource("16")]([ExtResource("10")])
+starting_resources = Dictionary[StringName, int]({&"coins": 250, &"metal_ore": 50})
 probe_speed = 2.5
 enemy_definitions = Array[ExtResource("11")]([ExtResource("12"), ExtResource("13"), ExtResource("14"), ExtResource("15")])
-threat_enabled = false
+threat_enabled = true

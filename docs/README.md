@@ -4,10 +4,20 @@
 
 ## 当前文档
 
+让其它AI接手实现时，从[后续任务包与AI交接说明](ai-development-handoff.md)进入：包含20包实施顺序、代码入口、接口约定、开发默认、逐包验收和可复制提示词。以包含二级菜单及本计划的0.5.27-dev提交为交接基线，不能只拉取上一版`3d0db66`。
+
+本轮执行顺序见[资源、供给与建筑开发计划](economy-buildings-implementation-plan.md)：P0–P8分为基础经济、中期建筑、末期与调度三个可交付版本，含31类建筑的批次归属、依赖、接入位置和验收标准。0.5.26已移除旧地图与训练场，统一128×128开发图及5×5主脑；P1五项资源账本、供给字段与多单位目录已接入，P2新供给设施尚未实施。
+
+最新设计见[建筑目录 V2](building-roster-v2.md)：参照《亿万僵尸》建立31类常规建筑、升级路线与6项预留终局工程。[资源与建筑 V1](resource-building-proposal-v1.md)继续负责资源、节点系统预留/调度、风能/太阳能环境采集发电、冷却和满足参考产量时的无燃料开局核算。核心方向已确认，新增规则及具体数值为提案，新经济参数尚未切换；地图与主脑占地已先行接入。
+
 | 文档 | 负责内容 |
 |---|---|
+| [AI开发交接](ai-development-handoff.md) | 0.5.27提交基线、20个任务包、具体实施和验收、交接模板 |
+| [本轮开发计划](economy-buildings-implementation-plan.md) | P0–P8任务、版本A/B/C、依赖、31类建筑归属与验收 |
+| [建筑目录 V2](building-roster-v2.md) | 完整建筑、原作对应、造价、升级、科技前置与终局工程提案 |
+| [资源与建筑 V1](resource-building-proposal-v1.md) | 新资源产线、节点容量、电/冷却供给与开局账面核算 |
 | [基础设定](game-design-concept.md) | 游戏身份、三幕、胜负、体验验证 |
-| [资源](resources.md) | 币、矿石/金属/稀有、容量、电力与覆盖 |
+| [资源](resources.md) | 五项账本迁移状态、旧经济基线与新供给提案入口 |
 | [建造经营](building-economy.md) | 建筑、解锁、建造/生产/维修/拆除 |
 | [操作](operations.md) | 目标操作方案、快捷键与 HUD |
 | [地图地形](map-terrain.md) | 地形、矿点、主口、出生与退守纵深 |
@@ -20,11 +30,21 @@
 
 ## 实施与检查
 
+[二级建造菜单](../validation/build-menu.md)记录0.5.27的六分类、31项目录、已开放/缺料/未开放区分与原生画面检查。新建筑功能仍按原计划逐批接入。
+
+[五项资源账本与单一开发图](../validation/p1-ledger-single-map.md)记录0.5.26的删除范围、付款/退款/队列迁移、供给接口、既有检查和待验项。
+
+[128×128开发图](../validation/development-map-128/README.md)记录新图布局、资源预留、34目标连通、预览运行时路线、原生画面及旧经济边界。
+
+[探图与实时视野分离](../validation/exploration-sight.md) 记录 0.5.24-dev 的无阻挡地形探索、受 LOS 约束的实时可见、原生对照画面和检查边界。
+
+[视角与 HUD](../validation/reference-view-hud.md) 记录 0.5.23-dev 对用户截图的格线比例估计、普通缩放与全图总览、底部指挥台布局、原生画面与交互待验。
+
 [M6 bundle 本地审查](../validation/m6-bundle-review.md) 记录本次合入的两个提交、原生导入发现的编译/接线问题、穿墙寻路修复，以及本地 43 个脚本、49 项既有回归、启动和原生画面的复验结果与限制。
 
 [卡顿与游荡节奏调整](../validation/performance-wanderers.md) 记录 0.5.18-dev 的后台行军场、局部 A*/RVO 更新、视野记忆复用、开局禁刷与游荡移速调整，以及加速战斗性能证据和待验项。
 
-[破口接敌场](../validation/assault-field.md) 记录 0.5.21-dev 的地形-only 全局场、32×32 局部破口场、源建筑选择、重建条件与检查边界。
+[破口接敌场](../validation/assault-field.md) 记录当前 0.5.22-dev 的静态全局场、多区域缺口导流、顺路建筑目标、结构失效及检查边界，并保留 0.5.21 的历史方案。
 
 [M5 实施与检查](../validation/m5-threat-defense.md) 汇总当前实现及有效检查结果，[bundle 审查记录](../validation/m5-bundle-review.md) 保留逐提交结论；待验收清单与后续顺序统一看[开发计划](development-plan.md)。
 

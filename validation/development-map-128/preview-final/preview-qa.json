@@ -1,0 +1,137 @@
+{
+  "schema": "generate2dmap.scene_preview_qa.v1",
+  "status": "pass",
+  "method": "build_scene_preview: bundle files resolved relative to the bundle and checked against their sha256 when given; collision read through forge_nav (the D2 blocking set; tile collision converted into world solids, material classes into BLOCK and one_way pixel planes); tiles layers pre-rendered from tileset manifests; art found in the D6 order and embedded as data URIs; map-runtime.mjs inlined verbatim; the page scanned for anything that loads from outside it; size gate; optional headless-Chromium run (--verify).",
+  "notProven": [
+    "Collision is forge_nav's D2 blocking set and the page walks it with map-runtime.mjs, which mirrors forge_nav rule for rule; their agreement is tested on synthetic fixtures (tests/test_map_runtime_js.py), not on this map. Rotated shapes can differ by one ulp of sin and cos between a browser and Python.",
+    "Without --verify, or when it prints SKIPPED, the page was assembled and scanned but never run in a browser.",
+    "The actor is a debug marker sized from collision.actorRadius, not character art; animation, lights, atmosphere, stage data, camera bounds and occluder masks are not drawn.",
+    "Draw order is whole-object Y-sort by (sortY, x, id); per-pixel occlusion, fades and cut-aways are not simulated.",
+    "Route checks walk the forge_nav grid with the runtime walker at --speed; an engine controller (acceleration, physics colliders, other speeds) may behave differently. one_way material blocks moving down onto it on every map (N11); a top-down map should not use it.",
+    "Footprint samples lie half a nav cell apart (N10): a solid thinner than that can fall between the samples of the footprint's rim; the actor's centre path is tested exactly (thin-gap rule).",
+    "Only headless Chromium is exercised (with --verify); other browsers, devices and touch input are not tested."
+  ],
+  "checks": [
+    {
+      "id": "html-size",
+      "status": "pass",
+      "value": 115855,
+      "threshold": 16000000
+    },
+    {
+      "id": "external-references",
+      "status": "pass",
+      "value": [],
+      "threshold": []
+    },
+    {
+      "id": "ascii-only",
+      "status": "pass",
+      "value": true,
+      "threshold": true
+    },
+    {
+      "id": "single-inline-script",
+      "status": "pass",
+      "value": true,
+      "threshold": true
+    },
+    {
+      "id": "runtime-inlined",
+      "status": "pass",
+      "value": "map-runtime.mjs",
+      "threshold": null
+    },
+    {
+      "id": "object-art",
+      "status": "pass",
+      "value": [],
+      "threshold": []
+    },
+    {
+      "id": "build-warnings",
+      "status": "pass",
+      "value": 0,
+      "threshold": 0
+    }
+  ],
+  "inputs": [
+    {
+      "path": "../map-bundle.json",
+      "sha256": "37e6ae52b527b6d82dd5635b2613b9416f984d79144c88d547273361bf6aa45d",
+      "bytes": 27643
+    }
+  ],
+  "outputs": [
+    {
+      "path": "preview.html",
+      "sha256": "a7aa734b12fc359c08fd75daa6853bd1f7616013c24137025109bc4e406a56d5",
+      "bytes": 115855
+    }
+  ],
+  "tool": {
+    "name": "build_scene_preview",
+    "version": "0.4.0"
+  },
+  "preview": {
+    "file": "preview.html",
+    "bytes": 115855,
+    "sha256": "a7aa734b12fc359c08fd75daa6853bd1f7616013c24137025109bc4e406a56d5",
+    "runtime": {
+      "file": "map-runtime.mjs",
+      "version": "1.1.2",
+      "sha256": "c1fc3d9bf15cfa53fdfeb050ce4252f7ace4c923066ca4e135dea576e7445273"
+    },
+    "world": [
+      512,
+      512
+    ],
+    "zoom": 2,
+    "speed": 60.0,
+    "actorHeight": 12.0,
+    "actorRadius": 0.88,
+    "ySquash": 1.0,
+    "start": "base",
+    "layers": [
+      {
+        "name": "entities",
+        "source": "objects"
+      }
+    ],
+    "drawOrder": [],
+    "objectArt": {
+      "object.image": 0,
+      "props": 0,
+      "prop-pack": 0,
+      "occluder.source": 0,
+      "missing": []
+    },
+    "counts": {
+      "objects": 0,
+      "portals": 0,
+      "spawns": 1,
+      "interactions": 0,
+      "anchors": 34
+    },
+    "images": {
+      "count": 0,
+      "bytes": 0
+    },
+    "materialMap": null,
+    "collision": {
+      "collisionSolids": 0,
+      "rects": 301,
+      "footprints": 0,
+      "tileSolids": 0,
+      "blockingMaterialClasses": []
+    },
+    "hashes": {
+      "checked": 0,
+      "unchecked": 0
+    }
+  },
+  "warnings": [],
+  "verify": {
+    "status": "not-requested"
+  }
+}

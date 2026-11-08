@@ -28,7 +28,7 @@ const MOVEMENT_NOISE_SECONDS: float = 2.0
 ## enemy remains within MechBuildingState.THREAT_RADIUS (twice per second).
 const COMBAT_SCAN_SECONDS: float = 0.5
 var _settings: MechFoundationSettings
-var _unit_definition: MechUnitDefinition
+var _unit_definitions: Dictionary[StringName, MechUnitDefinition] = {}
 var _map_definition: MechMapDefinition
 var _probe_speed: float = 2.5
 var _probe_id: int = 0
@@ -36,7 +36,7 @@ var _mainbrain_id: int = 0
 var _generation: int = 0
 var _tick_rate: int = 30
 var _in_tick: bool = false
-var _starting_resources := Vector4i.ZERO
+var _starting_resources := MechResources.empty()
 var _navigation_revision: int = -1
 var _outcome: StringName = &"ongoing"
 var _alert: Dictionary = {}
@@ -64,8 +64,10 @@ func shutdown() -> void:
 
 
 func _on_movement_finished() -> void:
-	# Movement can finish many times inside one native RVO step. The fog is
-	# refreshed once on the next simulation phase instead of once per unit.
+	# The registry emits once after the complete native batch, not per unit.
+	# Publish sight at the committed positions, including the last frame before
+	# pausing; source caching makes unchanged updates inexpensive.
+	_sync_vision()
 	state_changed.emit()
 
 
@@ -155,7 +157,9 @@ func configure(settings: MechFoundationSettings) -> bool:
 	if not settings_error.is_empty():
 		return _configuration_error(settings_error)
 	_settings = settings
-	_unit_definition = settings.unit_definition
+	_unit_definitions.clear()
+	for rules: MechUnitDefinition in settings.unit_definitions:
+		_unit_definitions[rules.unit_id] = rules
 	_map_definition = settings.map_definition
 	_construction.configure(settings.building_definitions)
 	var wave_error: String = _waves.configure(settings)
@@ -174,7 +178,7 @@ func configure(settings: MechFoundationSettings) -> bool:
 	_towers.combat_noise = _threat.note_combat
 	_probe_speed = maxf(0.1, settings.probe_speed)
 	_tick_rate = maxi(1, settings.simulation_hz)
-	_starting_resources = settings.starting_resources
+	_starting_resources = MechResources.copy(settings.starting_resources)
 	_clock.configure(_tick_rate)
 	_reset()
 	return true
@@ -203,13 +207,14 @@ func execute_command(command: MechCommand) -> Dictionary:
 			configure(command.payload["settings"])
 			result = {"ok": true, "reason": "", "scenario": _settings.scenario_name}
 		MechCommand.Type.QUEUE_UNIT:
-			if not _economy.try_spend(_unit_definition.cost):
+			var rules: MechUnitDefinition = _unit_definitions[result["unit_id"]]
+			if not _economy.try_spend(rules.cost):
 				return _reject("资源不足，生产未下单")
-			var ticket: int = _production.enqueue(command.payload["factory_id"], _unit_definition, _tick_rate)
+			var ticket: int = _production.enqueue(command.payload["factory_id"], rules, _tick_rate)
 			_recompute_economy()
 			result = {"ok": true, "reason": "", "ticket": ticket}
 		MechCommand.Type.CANCEL_PRODUCTION:
-			var refund: Vector4i = _production.cancel(command.payload["factory_id"], command.payload["ticket"])
+			var refund: Dictionary = _production.cancel(command.payload["factory_id"], command.payload["ticket"])
 			_economy.credit(refund)
 			_recompute_economy()
 			result = {"ok": true, "reason": "", "refund": refund}
@@ -226,7 +231,7 @@ func execute_command(command: MechCommand) -> Dictionary:
 				_threat.note_construction(Vector2(command.payload["origin"]) + Vector2(0.5, 0.5))
 		MechCommand.Type.PLACE_WALL_LINE:
 			var placed: int = 0
-			var spent := Vector4i.ZERO
+			var spent := MechResources.empty()
 			var noise_origin := Vector2i.ZERO
 			for cell: Vector2i in result["origins"]:
 				var placement: Dictionary = _place(&"armored_wall", cell)
@@ -234,14 +239,14 @@ func execute_command(command: MechCommand) -> Dictionary:
 					if placed == 0:
 						noise_origin = cell
 					placed += 1
-					spent += placement["cost"]
+					spent = MechResources.add(spent, placement["cost"])
 			if placed > 0:
 				_threat.note_construction(Vector2(noise_origin) + Vector2(0.5, 0.5))
 			result = {"ok": placed > 0, "reason": "" if placed > 0 else "墙线没有可下单的格子",
 				"placed": placed, "skipped": result["origins"].size() - placed, "cost": spent}
 		MechCommand.Type.CANCEL_CONSTRUCTION:
 			var building: MechBuildingState = _construction.get_building(command.payload["entity_id"])
-			var refund: Vector4i = building.paid_cost
+			var refund: Dictionary = building.paid_cost
 			_remove_building(building.entity_id, refund)
 			result = {"ok": true, "reason": "", "refund": refund}
 		MechCommand.Type.DEMOLISH:
@@ -250,7 +255,7 @@ func execute_command(command: MechCommand) -> Dictionary:
 			if clearing:
 				# Clearing a base never refunds (values.md §7); paid_cost zero makes
 				# the demolition-completion refund path come out empty.
-				building.paid_cost = Vector4i.ZERO
+				building.paid_cost = MechResources.empty()
 			building.phase = MechBuildingState.Phase.DEMOLISHING
 			building.elapsed_demolition_ticks = 0
 			building.repairing = false
@@ -273,10 +278,10 @@ func execute_command(command: MechCommand) -> Dictionary:
 			building.repair_waiting_for_funds = _economy.coins() == 0
 		MechCommand.Type.REBUILD:
 			var building: MechBuildingState = _construction.get_building(command.payload["entity_id"])
-			var cost: Vector4i = building.rebuild_cost()
+			var cost: Dictionary = building.rebuild_cost()
 			if not _economy.try_spend(cost):
 				return _reject("资源不足，重建未下单")
-			building.paid_cost = cost
+			building.paid_cost = MechResources.copy(cost)
 			building.phase = MechBuildingState.Phase.CONSTRUCTING
 			building.elapsed_build_ticks = 0
 			building.elapsed_demolition_ticks = 0
@@ -418,7 +423,9 @@ func advance_one_tick() -> void:
 		damage_building(hit["id"], hit["damage"])
 	for id: int in enemy_result["dead_units"]:
 		# Units destroyed by enemies feed infection at the wreck (values.md §14).
-		_infect_asset(_unit_definition.cost, _registry.position_of(id))
+		var dead: MechEntityState = _registry.get_entity(id)
+		if dead != null and dead.unit_definition != null:
+			_infect_asset(dead.unit_definition.cost, dead.position)
 		_remove_entity(id)
 	if not enemy_result["dead_units"].is_empty():
 		_recompute_economy()
@@ -497,8 +504,8 @@ func snapshot() -> Dictionary:
 		if entity.get("shot_ticks", 0) > 0 and not _vision.is_visible(entity["shot_target"]):
 			entity["shot_ticks"] = 0
 	var economy: Dictionary = _economy.snapshot()
-	var production: Vector4i = _minerals.production_rate(_construction.all())
-	production.x = economy["income_rate"]
+	var production: Dictionary = _minerals.production_rate(_construction.all())
+	production[&"coins"] = economy["income_rate"]
 	economy["production_per_minute"] = production
 	economy["unit_capacity"] = _units.capacity_used(_registry)
 	economy["queued_capacity"] = _production.reserved_capacity()
@@ -509,7 +516,7 @@ func snapshot() -> Dictionary:
 			minerals.append(mineral)
 	return {"clock": _clock.snapshot(), "entities": entities, "economy": economy, "minerals": minerals,
 		"vision": _vision.snapshot(), "repair_all": _repair_all_status(),
-		"scenario": _settings.scenario_name, "unit_catalog": _unit_definition.snapshot(),
+		"scenario": _settings.scenario_name, "unit_catalog": _unit_catalog(),
 		"catalog": _construction.catalog(_economy), "probe_id": _probe_id,
 		"mainbrain_id": _mainbrain_id, "generation": _generation,
 		"session": {"outcome": _outcome, "ended": session_ended(),
@@ -551,8 +558,15 @@ func _building_snapshot(building: MechBuildingState) -> Dictionary:
 	var mineral: Dictionary = _minerals.deposit(building.mineral_id)
 	result["mineral"] = mineral
 	result["production"] = _production.snapshot(building.entity_id)
-	if building.definition.produced_unit != &"":
-		result["production_error"] = "本局已结束" if session_ended() else _production.order_error(building, _unit_definition, _economy)
+	if not building.definition.produced_units.is_empty():
+		var options: Array[Dictionary] = []
+		for unit_id: StringName in building.definition.produced_units:
+			var rules: MechUnitDefinition = _unit_definitions[unit_id]
+			var option: Dictionary = rules.snapshot()
+			option["production_error"] = "本局已结束" if session_ended() else _production.order_error(building, rules, _economy)
+			options.append(option)
+		result["unit_options"] = options
+		result["production_error"] = options[0]["production_error"]
 	if not mineral.is_empty() and mineral["remaining"] == 0 and building.operating():
 		result["status"] = "矿点已耗竭 · 停产"
 	return result
@@ -562,8 +576,15 @@ func _recompute_economy() -> void:
 	_economy.recompute(_construction.all(), _grid, _units.capacity_used(_registry), _production.reserved_capacity())
 
 
-func _spawn_unit(building: MechBuildingState, rally: Vector2i) -> bool:
-	return _units.spawn(building, rally, _unit_definition, _registry, _grid, _navigation)
+func _spawn_unit(building: MechBuildingState, rally: Vector2i, unit_id: StringName) -> bool:
+	return _units.spawn(building, rally, _unit_definitions[unit_id], _registry, _grid, _navigation)
+
+
+func _unit_catalog() -> Dictionary:
+	var result: Dictionary = {}
+	for id: StringName in _unit_definitions:
+		result[id] = _unit_definitions[id].snapshot()
+	return result
 
 
 ## Wave releases, wanderer backfill and infection arrive as spawn requests;
@@ -585,7 +606,7 @@ func _release_spawns(requests: Array[Dictionary]) -> void:
 			_enemies.create(_registry, rules, request["position"])
 
 
-func _infect_asset(cost: Vector4i, position: Vector2) -> void:
+func _infect_asset(cost: Dictionary, position: Vector2) -> void:
 	var requests: Array[Dictionary] = _threat.infect(cost, position)
 	if requests.is_empty():
 		return
@@ -612,12 +633,19 @@ func _validate_production_command(command: MechCommand) -> Dictionary:
 	if typeof(command.payload.get("factory_id")) != TYPE_INT:
 		return _reject("工厂编号无效")
 	var building: MechBuildingState = _construction.get_building(command.payload["factory_id"])
-	if building == null or building.definition.produced_unit == &"":
+	if building == null or building.definition.produced_units.is_empty():
 		return _reject("请选择有效组装厂")
 	if command.type == MechCommand.Type.QUEUE_UNIT:
-		var error: String = _production.order_error(building, _unit_definition, _economy)
+		var requested: Variant = command.payload.get("unit_id", building.definition.produced_units[0])
+		if not requested is StringName and not requested is String:
+			return _reject("单位类型无效")
+		var unit_id := StringName(requested)
+		if unit_id not in building.definition.produced_units or not _unit_definitions.has(unit_id):
+			return _reject("该工厂不能生产此单位")
+		var error: String = _production.order_error(building, _unit_definitions[unit_id], _economy)
 		if not error.is_empty():
 			return _reject(error)
+		return {"ok": true, "reason": "", "unit_id": unit_id}
 	elif command.type == MechCommand.Type.CANCEL_PRODUCTION:
 		if typeof(command.payload.get("ticket")) != TYPE_INT or not _production.has_ticket(building.entity_id, command.payload["ticket"]):
 			return _reject("生产订单已不存在")
@@ -634,7 +662,7 @@ func _remove_entity(id: int) -> void:
 	if entity == null:
 		return
 	if _construction.get_building(id) != null:
-		_remove_building(id, Vector4i.ZERO)
+		_remove_building(id, MechResources.empty())
 		return
 	if _grid.occupant_at(Vector2i(entity.position.floor())) == id:
 		_grid.release(id)
@@ -735,16 +763,14 @@ func damage_building(entity_id: int, amount: int) -> Dictionary:
 		# the wreck plus a combat pulse (values.md §14). Demolish/cancel paths never
 		# pass through here, so controlled teardown stays infection-free.
 		var rules: MechBuildingDefinition = building.definition
-		if not rules.is_core:
-			_enemies.note_breach(Vector2(building.origin) + Vector2(rules.footprint) * 0.5)
-		if not rules.is_core and rules.capacity_cost > 0:
+		if not rules.is_core and rules.infectable:
 			_infect_asset(rules.cost, Vector2(building.origin) + Vector2(rules.footprint) * 0.5)
 		if rules.is_core:
-			_remove_building(entity_id, Vector4i.ZERO)
+			_remove_building(entity_id, MechResources.empty())
 		elif building.phase == MechBuildingState.Phase.CONSTRUCTING:
 			# Under-construction losses leave no base: nothing has sunk
 			# into the site yet, so it is removed outright.
-			_remove_building(entity_id, Vector4i.ZERO)
+			_remove_building(entity_id, MechResources.empty())
 		else:
 			# Finished buildings leave an occupying base (building-economy.md
 			# §4.1): cells and the mineral binding stay held, but the base
@@ -815,15 +841,15 @@ func _place(id: StringName, origin: Vector2i) -> Dictionary:
 	building.mineral_id = check["mineral_id"]
 	_production.register_factory(building)
 	_recompute_economy()
-	return {"ok": true, "reason": "", "entity_id": entity_id, "origin": origin, "cost": rules.cost}
+	return {"ok": true, "reason": "", "entity_id": entity_id, "origin": origin, "cost": MechResources.copy(rules.cost)}
 
 
-func _remove_building(entity_id: int, refund: Vector4i, refund_orders: bool = false) -> void:
+func _remove_building(entity_id: int, refund: Dictionary, refund_orders: bool = false) -> void:
 	_grid.release(entity_id)
 	_minerals.release(entity_id)
 	_construction.remove(entity_id)
 	_registry.remove(entity_id)
-	_economy.credit(refund + _production.remove_factory(entity_id, refund_orders))
+	_economy.credit(MechResources.add(refund, _production.remove_factory(entity_id, refund_orders)))
 	if entity_id == _mainbrain_id:
 		_grid.set_core_coverage(Vector2i.ZERO, Vector2i.ONE, -1)
 		_outcome = &"defeat"
@@ -859,10 +885,13 @@ func _validate_building_action(command: MechCommand) -> Dictionary:
 		MechCommand.Type.REBUILD:
 			if building.phase != MechBuildingState.Phase.RUINED:
 				return _reject("仅摧毁基座可重建")
-			# Reservations stay held by the base itself; only funds gate a rebuild.
-			var funds_error: String = _economy.spend_error(building.rebuild_cost())
-			if not funds_error.is_empty():
-				return _reject(funds_error)
+			# A base retains land/mineral ownership, but released its operational
+			# reservations. Rebuilding must reserve them again at its discounted cost.
+			if not _grid.footprint_covered(building.origin, building.definition.footprint):
+				return _reject("超出供电覆盖")
+			var rebuild_error: String = _economy.reservation_error(building.definition, {}, building.rebuild_cost())
+			if not rebuild_error.is_empty():
+				return _reject(rebuild_error)
 	return {"ok": true, "reason": ""}
 
 
@@ -1026,7 +1055,7 @@ func _reset() -> void:
 		_production.register_factory(_construction.add(entity_id, id, origin, _tick_rate, true))
 	_probe_id = _registry.create(&"probe", "验证实体", Vector2(_map_definition.probe_cell) + Vector2(0.5, 0.5), _probe_speed)
 	for cell: Vector2i in _settings.starting_unit_cells:
-		_units.create(_registry, _unit_definition, cell)
+		_units.create(_registry, _unit_definitions[_settings.starting_unit_id], cell)
 	for cell: Vector2i in _settings.practice_target_cells:
 		var id: int = _registry.create(&"practice_target", "训练靶", Vector2(cell) + Vector2(0.5, 0.5))
 		var target: MechEntityState = _registry.get_entity(id)
@@ -1047,14 +1076,23 @@ func _reset() -> void:
 
 
 func _settings_error(settings: MechFoundationSettings) -> String:
-	if settings == null or settings.map_definition == null or settings.unit_definition == null:
+	if settings == null or settings.map_definition == null or settings.unit_definitions.is_empty():
 		return "缺少场景、地图或单位定义"
 	var error: String = settings.map_definition.validation_error()
 	if not error.is_empty():
 		return error
-	error = settings.unit_definition.validation_error()
-	if not error.is_empty():
-		return error
+	var units: Dictionary[StringName, MechUnitDefinition] = {}
+	for rules: MechUnitDefinition in settings.unit_definitions:
+		if rules == null:
+			return "空单位定义"
+		error = rules.validation_error()
+		if not error.is_empty():
+			return error
+		if units.has(rules.unit_id):
+			return "重复单位编号"
+		units[rules.unit_id] = rules
+	if not units.has(settings.starting_unit_id):
+		return "初始单位类型未配置"
 	if not MechResources.valid(settings.starting_resources):
 		return "开局资源无效"
 	if settings.simulation_hz < 10 or settings.simulation_hz > 120 or not is_finite(settings.probe_speed) or settings.probe_speed <= 0.0:
@@ -1090,16 +1128,17 @@ func _settings_error(settings: MechFoundationSettings) -> String:
 		var rules: MechBuildingDefinition = construction.definition(settings.starting_buildings[origin])
 		if rules == null or rules.is_core or rules.mined_resource != &"":
 			return "场景初始建筑定义无效"
-		if rules.produced_unit != &"" and rules.produced_unit != settings.unit_definition.unit_id:
-			return "工厂与单位类型不一致"
 		if not grid.footprint_covered(origin, rules.footprint) or not minerals.placement(rules, origin)["ok"]:
 			return "初始建筑超出覆盖或占用矿点"
 		if not grid.try_occupy(next_id, origin, rules.footprint)["ok"]:
 			return "初始建筑重叠或地形无效"
 		next_id += 1
 	for rules: MechBuildingDefinition in settings.building_definitions:
-		if rules.produced_unit != &"" and rules.produced_unit != settings.unit_definition.unit_id:
-			return "工厂生产类型未配置"
+		var products: Dictionary = {}
+		for product: StringName in rules.produced_units:
+			if not units.has(product) or products.has(product):
+				return "工厂生产类型未配置或重复"
+			products[product] = true
 	var positions: Dictionary = {}
 	var movable: Array[Vector2i] = settings.starting_unit_cells.duplicate()
 	movable.append(settings.map_definition.probe_cell)

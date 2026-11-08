@@ -2,7 +2,9 @@ class_name MechIsoGeometry
 extends RefCounted
 ## Projection is a presentation concern; sim uses square logical cells.
 
-const HALF_TILE := Vector2(32.0, 16.0)
+## Reference screenshot grid slopes are approximately ±37 degrees (3:4).
+const HALF_TILE := Vector2(32.0, 24.0)
+const GROUND_RATIO: float = HALF_TILE.y / HALF_TILE.x
 
 
 static func project(point: Vector2) -> Vector2:

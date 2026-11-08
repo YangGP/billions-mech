@@ -1,34 +1,135 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=16 format=3]
 
 [ext_resource type="Script" path="res://presentation/map_hud.gd" id="1"]
 [ext_resource type="Script" path="res://presentation/minimap_view.gd" id="2"]
+[ext_resource type="Script" path="res://presentation/foundation_view.gd" id="3"]
+[ext_resource type="Script" path="res://presentation/build_menu.gd" id="4"]
 
 [sub_resource type="SystemFont" id="SystemFont_cjk"]
 font_names = PackedStringArray("Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC", "sans-serif")
 
-[sub_resource type="Theme" id="Theme_hud"]
-default_font = SubResource("SystemFont_cjk")
-default_font_size = 15
-
 [sub_resource type="StyleBoxFlat" id="StyleBox_panel"]
-bg_color = Color(0.045, 0.09, 0.12, 0.96)
+bg_color = Color(0.066667, 0.105882, 0.117647, 0.960784)
 border_width_left = 1
 border_width_top = 1
 border_width_right = 1
 border_width_bottom = 1
-border_color = Color(0.165, 0.302, 0.349, 1)
-corner_radius_top_left = 8
-corner_radius_top_right = 8
-corner_radius_bottom_right = 8
-corner_radius_bottom_left = 8
+border_color = Color(0.400000, 0.415686, 0.329412, 1.000000)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_left = 3
+corner_radius_bottom_right = 3
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_normal"]
+bg_color = Color(0.113725, 0.168627, 0.176471, 1.000000)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.294118, 0.364706, 0.349020, 1.000000)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_left = 3
+corner_radius_bottom_right = 3
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_hover"]
+bg_color = Color(0.164706, 0.235294, 0.219608, 1.000000)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.835294, 0.709804, 0.443137, 1.000000)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_left = 3
+corner_radius_bottom_right = 3
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_pressed"]
+bg_color = Color(0.207843, 0.262745, 0.184314, 1.000000)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.894118, 0.752941, 0.478431, 1.000000)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_left = 3
+corner_radius_bottom_right = 3
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_disabled"]
+bg_color = Color(0.078431, 0.125490, 0.137255, 1.000000)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.168627, 0.223529, 0.223529, 1.000000)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_left = 3
+corner_radius_bottom_right = 3
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_bar"]
+bg_color = Color(0.031373, 0.058824, 0.070588, 1.000000)
+border_width_left = 0
+border_width_top = 0
+border_width_right = 0
+border_width_bottom = 0
+border_color = Color(0.149020, 0.235294, 0.239216, 1.000000)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_left = 3
+corner_radius_bottom_right = 3
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_hp"]
+bg_color = Color(0.427451, 0.858824, 0.756863, 1.000000)
+border_width_left = 0
+border_width_top = 0
+border_width_right = 0
+border_width_bottom = 0
+border_color = Color(0.427451, 0.858824, 0.756863, 1.000000)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_left = 3
+corner_radius_bottom_right = 3
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_build"]
+bg_color = Color(0.850980, 0.717647, 0.427451, 1.000000)
+border_width_left = 0
+border_width_top = 0
+border_width_right = 0
+border_width_bottom = 0
+border_color = Color(0.850980, 0.717647, 0.427451, 1.000000)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_left = 3
+corner_radius_bottom_right = 3
 
 [sub_resource type="StyleBoxFlat" id="StyleBox_selection"]
-bg_color = Color(0.447, 0.914, 0.816, 0.08)
+bg_color = Color(0.447059, 0.913725, 0.815686, 0.078431)
 border_width_left = 1
 border_width_top = 1
 border_width_right = 1
 border_width_bottom = 1
-border_color = Color(0.447, 0.914, 0.816, 0.9)
+border_color = Color(0.447059, 0.913725, 0.815686, 1.000000)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_left = 3
+corner_radius_bottom_right = 3
+
+[sub_resource type="Theme" id="Theme_hud"]
+default_font = SubResource("SystemFont_cjk")
+default_font_size = 14
+Button/colors/font_color = Color(0.901961, 0.874510, 0.800000, 1.000000)
+Button/colors/font_hover_color = Color(1.000000, 0.890196, 0.631373, 1.000000)
+Button/colors/font_pressed_color = Color(1.000000, 0.890196, 0.631373, 1.000000)
+Button/colors/font_disabled_color = Color(0.450980, 0.505882, 0.482353, 1.000000)
+Button/styles/normal = SubResource("StyleBox_normal")
+Button/styles/hover = SubResource("StyleBox_hover")
+Button/styles/pressed = SubResource("StyleBox_pressed")
+Button/styles/disabled = SubResource("StyleBox_disabled")
+ProgressBar/styles/background = SubResource("StyleBox_bar")
+ProgressBar/styles/fill = SubResource("StyleBox_hp")
+Label/colors/font_color = Color(0.870588, 0.874510, 0.815686, 1.000000)
 
 [node name="HUD" type="CanvasLayer"]
 script = ExtResource("1")
@@ -45,530 +146,770 @@ theme = SubResource("Theme_hud")
 
 [node name="Minimap" type="Panel" parent="Root"]
 layout_mode = 0
+anchor_left = 0.0
 anchor_top = 1.0
+anchor_right = 0.0
 anchor_bottom = 1.0
-offset_left = 20.0
-offset_top = -410.0
-offset_right = 260.0
-offset_bottom = -170.0
+offset_left = 16.0
+offset_top = -270.0
+offset_right = 264.0
+offset_bottom = -16.0
 theme_override_styles/panel = SubResource("StyleBox_panel")
 
 [node name="Title" type="Label" parent="Root/Minimap"]
 layout_mode = 0
-offset_left = 10.0
-offset_top = 9.0
-offset_right = 120.0
-offset_bottom = 36.0
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 0.0
+anchor_bottom = 0.0
+offset_left = 12.0
+offset_top = 7.0
+offset_right = 128.0
+offset_bottom = 31.0
 mouse_filter = 2
-modulate = Color(0.5058823529411764, 0.611764705882353, 0.6627450980392157, 1)
-theme_override_font_sizes/font_size = 13
 text = "战术地图"
+theme_override_font_sizes/font_size = 13
+modulate = Color(0.850980, 0.741176, 0.505882, 1.000000)
+
 
 [node name="Expand" type="Button" parent="Root/Minimap"]
 layout_mode = 0
 anchor_left = 1.0
+anchor_top = 0.0
 anchor_right = 1.0
-offset_left = -104.0
-offset_top = 4.0
+anchor_bottom = 0.0
+offset_left = -98.0
+offset_top = 5.0
 offset_right = -8.0
-offset_bottom = 36.0
+offset_bottom = 31.0
 focus_mode = 0
 text = "全屏 [M]"
+theme_override_font_sizes/font_size = 12
 
 [node name="View" type="Control" parent="Root/Minimap"]
-layout_mode = 1
-anchors_preset = 15
+layout_mode = 0
+anchor_left = 0.0
+anchor_top = 0.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 8.0
-offset_top = 44.0
-offset_right = -8.0
-offset_bottom = -8.0
+offset_left = 10.0
+offset_top = 38.0
+offset_right = -10.0
+offset_bottom = -10.0
 mouse_filter = 0
 clip_contents = true
 script = ExtResource("2")
 
 [node name="Header" type="Panel" parent="Root"]
 layout_mode = 0
-anchor_right = 1.0
-offset_left = 20.0
-offset_top = 18.0
-offset_right = -20.0
-offset_bottom = 130.0
-theme_override_styles/panel = SubResource("StyleBox_panel")
-
-[node name="Inspector" type="Panel" parent="Root"]
-layout_mode = 0
-anchor_left = 1.0
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = -370.0
-offset_top = 144.0
-offset_right = -20.0
-offset_bottom = -184.0
-theme_override_styles/panel = SubResource("StyleBox_panel")
-
-[node name="Toolbar" type="Panel" parent="Root"]
-layout_mode = 0
+anchor_left = 0.0
 anchor_top = 1.0
-anchor_right = 1.0
+anchor_right = 0.0
 anchor_bottom = 1.0
-offset_left = 20.0
-offset_top = -158.0
-offset_right = -20.0
-offset_bottom = -18.0
+offset_left = 272.0
+offset_top = -224.0
+offset_right = 432.0
+offset_bottom = -16.0
 theme_override_styles/panel = SubResource("StyleBox_panel")
 
 [node name="Title" type="Label" parent="Root/Header"]
 layout_mode = 0
-offset_left = 22.0
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 0.0
+anchor_bottom = 0.0
+offset_left = 14.0
 offset_top = 10.0
-offset_right = 432.0
-offset_bottom = 38.0
+offset_right = 146.0
+offset_bottom = 30.0
 mouse_filter = 2
-modulate = Color(0.8352941176470589, 0.9019607843137255, 0.9215686274509803, 1)
-theme_override_font_sizes/font_size = 22
-text = "B I L L I O N S  /  M E C H"
-
-[node name="Subtitle" type="Label" parent="Root/Header"]
-layout_mode = 0
-offset_left = 23.0
-offset_top = 43.0
-offset_right = 473.0
-offset_bottom = 63.0
-mouse_filter = 2
-modulate = Color(0.5058823529411764, 0.611764705882353, 0.6627450980392157, 1)
+text = "防御计时"
 theme_override_font_sizes/font_size = 13
-text = "白模开发  /  经济与采矿"
+modulate = Color(0.850980, 0.741176, 0.505882, 1.000000)
 
-[node name="MapName" type="Label" parent="Root/Header"]
-layout_mode = 0
-offset_left = 455.0
-offset_top = 17.0
-offset_right = 795.0
-offset_bottom = 45.0
-mouse_filter = 2
-modulate = Color(0.8352941176470589, 0.9019607843137255, 0.9215686274509803, 1)
-theme_override_font_sizes/font_size = 20
-text = "隘口前哨   /   正方形地图"
 
 [node name="Clock" type="Label" parent="Root/Header"]
 layout_mode = 0
-anchor_left = 1.0
-anchor_right = 1.0
-offset_left = -670.0
-offset_top = 17.0
-offset_right = -500.0
-offset_bottom = 45.0
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 0.0
+anchor_bottom = 0.0
+offset_left = 12.0
+offset_top = 44.0
+offset_right = 150.0
+offset_bottom = 88.0
 mouse_filter = 2
-modulate = Color(0.8352941176470589, 0.9019607843137255, 0.9215686274509803, 1)
-theme_override_font_sizes/font_size = 22
-text = "00:00.00"
+text = "00:00"
+theme_override_font_sizes/font_size = 29
+modulate = Color(0.901961, 0.847059, 0.666667, 1.000000)
+horizontal_alignment = 1
 
 [node name="State" type="Label" parent="Root/Header"]
 layout_mode = 0
-anchor_left = 1.0
-anchor_right = 1.0
-offset_left = -470.0
-offset_top = 20.0
-offset_right = -250.0
-offset_bottom = 48.0
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 0.0
+anchor_bottom = 0.0
+offset_left = 12.0
+offset_top = 94.0
+offset_right = 150.0
+offset_bottom = 118.0
 mouse_filter = 2
-modulate = Color(0.4470588235294118, 0.9137254901960784, 0.8156862745098039, 1)
-theme_override_font_sizes/font_size = 16
 text = "运行中"
+theme_override_font_sizes/font_size = 13
+modulate = Color(0.611765, 0.776471, 0.701961, 1.000000)
+horizontal_alignment = 1
 
 [node name="Pause" type="Button" parent="Root/Header"]
 layout_mode = 0
-anchor_left = 1.0
-anchor_right = 1.0
-offset_left = -240.0
-offset_top = 12.0
-offset_right = -118.0
-offset_bottom = 55.0
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 0.0
+anchor_bottom = 0.0
+offset_left = 12.0
+offset_top = 130.0
+offset_right = 148.0
+offset_bottom = 174.0
 focus_mode = 0
 text = "暂停 [空格]"
 
-[node name="Settings" type="Button" parent="Root/Header"]
-layout_mode = 0
-anchor_left = 1.0
-anchor_right = 1.0
-offset_left = -108.0
-offset_top = 12.0
-offset_right = -18.0
-offset_bottom = 55.0
-focus_mode = 0
-text = "设置"
-tooltip_text = "基础设置 [F10]"
 
-[node name="Coins" type="Label" parent="Root/Header"]
+[node name="Hint" type="Label" parent="Root/Header"]
 layout_mode = 0
-anchor_right = 0.25
-offset_left = 22.0
-offset_top = 70.0
-offset_right = -15.0
-offset_bottom = 98.0
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 0.0
+anchor_bottom = 0.0
+offset_left = 12.0
+offset_top = 179.0
+offset_right = 148.0
+offset_bottom = 198.0
 mouse_filter = 2
-modulate = Color(0.4470588235294118, 0.9137254901960784, 0.8156862745098039, 1)
-theme_override_font_sizes/font_size = 18
-text = "算力币  250   +2/分钟"
+text = "时间随暂停冻结"
+theme_override_font_sizes/font_size = 11
+modulate = Color(0.513725, 0.584314, 0.552941, 1.000000)
+horizontal_alignment = 1
 
-[node name="Scenario" type="Button" parent="Root/Header"]
+[node name="Inspector" type="Panel" parent="Root"]
 layout_mode = 0
-anchor_left = 1.0
-anchor_right = 1.0
-offset_left = -880.0
-offset_top = 12.0
-offset_right = -700.0
-offset_bottom = 55.0
-focus_mode = 0
-text = "单位训练场"
-
-[node name="Ore" type="Label" parent="Root/Header"]
-layout_mode = 0
-anchor_left = 0.25
-anchor_right = 0.5
-offset_left = 15.0
-offset_top = 70.0
-offset_right = -15.0
-offset_bottom = 98.0
-mouse_filter = 2
-theme_override_font_sizes/font_size = 18
-text = "矿石  50   +0/分钟"
-
-[node name="Capacity" type="Label" parent="Root/Header"]
-layout_mode = 0
-anchor_left = 0.5
-anchor_right = 0.75
-offset_left = 15.0
-offset_top = 70.0
-offset_right = -15.0
-offset_bottom = 98.0
-mouse_filter = 2
-modulate = Color(0.8352941176470589, 0.9019607843137255, 0.9215686274509803, 1)
-theme_override_font_sizes/font_size = 18
-text = "算力容量  0 / 10"
-
-[node name="Power" type="Label" parent="Root/Header"]
-layout_mode = 0
-anchor_left = 0.75
-anchor_right = 1.0
-offset_left = 15.0
-offset_top = 70.0
-offset_right = -25.0
-offset_bottom = 98.0
-mouse_filter = 2
-modulate = Color(0.8352941176470589, 0.9019607843137255, 0.9215686274509803, 1)
-theme_override_font_sizes/font_size = 18
-text = "电力余量  60 / 60"
-
-[node name="Feedback" type="Label" parent="Root"]
-layout_mode = 0
-anchor_right = 1.0
-offset_left = 42.0
-offset_top = 151.0
-offset_right = -398.0
-offset_bottom = 181.0
-mouse_filter = 2
-modulate = Color(0.4470588235294118, 0.9137254901960784, 0.8156862745098039, 1)
-theme_override_font_sizes/font_size = 16
-text = "先建算力节点启动经济；中键拖图，左键下单。"
+anchor_left = 0.0
+anchor_top = 1.0
+anchor_right = 0.54
+anchor_bottom = 1.0
+offset_left = 440.0
+offset_top = -224.0
+offset_right = -4.0
+offset_bottom = -16.0
+theme_override_styles/panel = SubResource("StyleBox_panel")
 
 [node name="Title" type="Label" parent="Root/Inspector"]
 layout_mode = 0
-offset_left = 20.0
-offset_top = 19.0
-offset_right = 330.0
-offset_bottom = 49.0
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 1.0
+anchor_bottom = 0.0
+offset_left = 16.0
+offset_top = 10.0
+offset_right = -16.0
+offset_bottom = 38.0
 mouse_filter = 2
-modulate = Color(0.8352941176470589, 0.9019607843137255, 0.9215686274509803, 1)
-theme_override_font_sizes/font_size = 21
-text = "空间信息"
+text = "指挥中心"
+theme_override_font_sizes/font_size = 20
+modulate = Color(0.913725, 0.847059, 0.678431, 1.000000)
+
+
+[node name="Portrait" type="SubViewportContainer" parent="Root/Inspector"]
+layout_mode = 0
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 0.0
+anchor_bottom = 0.0
+offset_left = 16.0
+offset_top = 56.0
+offset_right = 104.0
+offset_bottom = 144.0
+mouse_filter = 2
+stretch = true
+
+[node name="Viewport" type="SubViewport" parent="Root/Inspector/Portrait"]
+transparent_bg = true
+handle_input_locally = false
+size = Vector2i(160, 160)
+disable_3d = true
+render_target_update_mode = 1
+
+[node name="Model" type="Node2D" parent="Root/Inspector/Portrait/Viewport"]
+position = Vector2(80, 116)
+script = ExtResource("3")
 
 [node name="Status" type="Label" parent="Root/Inspector"]
 layout_mode = 0
-offset_left = 20.0
-offset_top = 60.0
-offset_right = 330.0
-offset_bottom = 86.0
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 1.0
+anchor_bottom = 0.0
+offset_left = 120.0
+offset_top = 45.0
+offset_right = -204.0
+offset_bottom = 66.0
 mouse_filter = 2
-modulate = Color(0.4470588235294118, 0.9137254901960784, 0.8156862745098039, 1)
-theme_override_font_sizes/font_size = 17
-text = "施工中"
-visible = false
-
-[node name="BuildLabel" type="Label" parent="Root/Inspector"]
-layout_mode = 0
-offset_left = 20.0
-offset_top = 101.0
-offset_right = 330.0
-offset_bottom = 125.0
-mouse_filter = 2
-modulate = Color(0.5058823529411764, 0.611764705882353, 0.6627450980392157, 1)
-theme_override_font_sizes/font_size = 14
-text = "施工进度  0%"
-visible = false
-
-[node name="BuildProgress" type="ProgressBar" parent="Root/Inspector"]
-layout_mode = 0
-offset_left = 20.0
-offset_top = 130.0
-offset_right = 330.0
-offset_bottom = 142.0
-mouse_filter = 2
-show_percentage = false
+text = ""
+theme_override_font_sizes/font_size = 13
+modulate = Color(0.611765, 0.776471, 0.701961, 1.000000)
 visible = false
 
 [node name="HpLabel" type="Label" parent="Root/Inspector"]
 layout_mode = 0
-offset_left = 20.0
-offset_top = 154.0
-offset_right = 330.0
-offset_bottom = 178.0
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 1.0
+anchor_bottom = 0.0
+offset_left = 120.0
+offset_top = 69.0
+offset_right = -204.0
+offset_bottom = 89.0
 mouse_filter = 2
-modulate = Color(0.8352941176470589, 0.9019607843137255, 0.9215686274509803, 1)
-theme_override_font_sizes/font_size = 14
-text = "血量"
+text = ""
+theme_override_font_sizes/font_size = 13
+modulate = Color(0.870588, 0.874510, 0.815686, 1.000000)
 visible = false
 
 [node name="HpProgress" type="ProgressBar" parent="Root/Inspector"]
 layout_mode = 0
-offset_left = 20.0
-offset_top = 184.0
-offset_right = 330.0
-offset_bottom = 196.0
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 1.0
+anchor_bottom = 0.0
+offset_left = 120.0
+offset_top = 94.0
+offset_right = -204.0
+offset_bottom = 100.0
 mouse_filter = 2
 show_percentage = false
 visible = false
 
 [node name="Details" type="Label" parent="Root/Inspector"]
 layout_mode = 0
-offset_left = 20.0
-offset_top = 215.0
-offset_right = 330.0
-offset_bottom = 317.0
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 1.0
+anchor_bottom = 0.0
+offset_left = 120.0
+offset_top = 108.0
+offset_right = -204.0
+offset_bottom = 198.0
 mouse_filter = 2
-modulate = Color(0.5058823529411764, 0.611764705882353, 0.6627450980392157, 1)
-theme_override_font_sizes/font_size = 14
 text = ""
+theme_override_font_sizes/font_size = 12
+modulate = Color(0.607843, 0.666667, 0.643137, 1.000000)
 visible = false
-theme_override_constants/line_spacing = 8
+theme_override_constants/line_spacing = 3
+autowrap_mode = 2
 
-[node name="Primary" type="Button" parent="Root/Inspector"]
+[node name="BuildLabel" type="Label" parent="Root/Inspector"]
 layout_mode = 0
-offset_left = 20.0
-offset_top = 334.0
-offset_right = 330.0
-offset_bottom = 372.0
-focus_mode = 0
-text = "维修"
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 0.0
+anchor_bottom = 0.0
+offset_left = 16.0
+offset_top = 158.0
+offset_right = 108.0
+offset_bottom = 179.0
+mouse_filter = 2
+text = ""
+theme_override_font_sizes/font_size = 11
+modulate = Color(0.803922, 0.713725, 0.490196, 1.000000)
 visible = false
 
-[node name="Demolish" type="Button" parent="Root/Inspector"]
+[node name="BuildProgress" type="ProgressBar" parent="Root/Inspector"]
 layout_mode = 0
-offset_left = 20.0
-offset_top = 383.0
-offset_right = 330.0
-offset_bottom = 421.0
-focus_mode = 0
-text = "拆除 [X]"
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 0.0
+anchor_bottom = 0.0
+offset_left = 16.0
+offset_top = 184.0
+offset_right = 104.0
+offset_bottom = 190.0
+mouse_filter = 2
+show_percentage = false
 visible = false
+theme_override_styles/fill = SubResource("StyleBox_build")
 
 [node name="CellInfo" type="Label" parent="Root/Inspector"]
 layout_mode = 0
-anchor_top = 1.0
-anchor_bottom = 1.0
-offset_left = 20.0
-offset_top = -125.0
-offset_right = 330.0
-offset_bottom = -17.0
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 1.0
+anchor_bottom = 0.0
+offset_left = 120.0
+offset_top = 50.0
+offset_right = -16.0
+offset_bottom = 198.0
 mouse_filter = 2
-modulate = Color(0.8352941176470589, 0.9019607843137255, 0.9215686274509803, 1)
-theme_override_font_sizes/font_size = 14
 text = "鼠标移至地图查看格子"
+theme_override_font_sizes/font_size = 13
+modulate = Color(0.682353, 0.733333, 0.701961, 1.000000)
 theme_override_constants/line_spacing = 6
+autowrap_mode = 2
 
-[node name="Produce" type="Button" parent="Root/Inspector"]
-visible = false
+[node name="Primary" type="Button" parent="Root/Inspector"]
 layout_mode = 0
-offset_left = 20.0
-offset_top = 440.0
-offset_right = 330.0
-offset_bottom = 480.0
+anchor_left = 1.0
+anchor_top = 0.0
+anchor_right = 1.0
+anchor_bottom = 0.0
+offset_left = -188.0
+offset_top = 45.0
+offset_right = -12.0
+offset_bottom = 80.0
 focus_mode = 0
-text = "生产卫兵 · 20 币"
+text = "维修"
+visible = false
+theme_override_font_sizes/font_size = 12
+
+[node name="Demolish" type="Button" parent="Root/Inspector"]
+layout_mode = 0
+anchor_left = 1.0
+anchor_top = 0.0
+anchor_right = 1.0
+anchor_bottom = 0.0
+offset_left = -188.0
+offset_top = 86.0
+offset_right = -12.0
+offset_bottom = 119.0
+focus_mode = 0
+text = "拆除 [X]"
+visible = false
+theme_override_font_sizes/font_size = 12
+
+[node name="Produce" type="MenuButton" parent="Root/Inspector"]
+layout_mode = 0
+anchor_left = 1.0
+anchor_top = 0.0
+anchor_right = 1.0
+anchor_bottom = 0.0
+offset_left = -188.0
+offset_top = 125.0
+offset_right = -12.0
+offset_bottom = 158.0
+focus_mode = 0
+text = "生产卫兵"
+visible = false
+theme_override_font_sizes/font_size = 12
 
 [node name="Queue" type="Label" parent="Root/Inspector"]
-visible = false
 layout_mode = 0
-offset_left = 20.0
-offset_top = 488.0
-offset_right = 330.0
-offset_bottom = 536.0
+anchor_left = 1.0
+anchor_top = 0.0
+anchor_right = 1.0
+anchor_bottom = 0.0
+offset_left = -188.0
+offset_top = 161.0
+offset_right = -12.0
+offset_bottom = 186.0
 mouse_filter = 2
-text = "队列 0 / 5"
-theme_override_font_sizes/font_size = 14
+text = ""
+theme_override_font_sizes/font_size = 11
+modulate = Color(0.690196, 0.733333, 0.694118, 1.000000)
+visible = false
 
 [node name="CancelProduction" type="Button" parent="Root/Inspector"]
+layout_mode = 0
+anchor_left = 1.0
+anchor_top = 0.0
+anchor_right = 1.0
+anchor_bottom = 0.0
+offset_left = -188.0
+offset_top = 184.0
+offset_right = -12.0
+offset_bottom = 206.0
+focus_mode = 0
+text = "取消队首"
 visible = false
-layout_mode = 0
-offset_left = 20.0
-offset_top = 544.0
-offset_right = 330.0
-offset_bottom = 584.0
-focus_mode = 0
-text = "取消队首 · 全额退款"
+theme_override_font_sizes/font_size = 11
 
-[node name="ComputeNode" type="Button" parent="Root/Toolbar"]
+[node name="Toolbar" type="Panel" parent="Root"]
 layout_mode = 0
-offset_left = 22.0
-offset_top = 13.0
-offset_right = 212.0
-offset_bottom = 62.0
-focus_mode = 0
-text = "Q 算力节点\n30 币"
-toggle_mode = true
+anchor_left = 0.54
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 4.0
+offset_top = -224.0
+offset_right = -360.0
+offset_bottom = -16.0
+theme_override_styles/panel = SubResource("StyleBox_panel")
+script = ExtResource("4")
+
+[node name="Title" type="Label" parent="Root/Toolbar"]
+layout_mode = 0
+offset_left = 12.0
+offset_top = 8.0
+offset_right = 350.0
+offset_bottom = 30.0
+mouse_filter = 2
+text = "建造 · 经济"
 theme_override_font_sizes/font_size = 14
-
-[node name="ArmoredWall" type="Button" parent="Root/Toolbar"]
-layout_mode = 0
-offset_left = 224.0
-offset_top = 13.0
-offset_right = 414.0
-offset_bottom = 62.0
-focus_mode = 0
-text = "W 装甲墙\n2 币"
-toggle_mode = true
-theme_override_font_sizes/font_size = 14
-
-[node name="SentryTower" type="Button" parent="Root/Toolbar"]
-layout_mode = 0
-offset_left = 426.0
-offset_top = 13.0
-offset_right = 616.0
-offset_bottom = 62.0
-focus_mode = 0
-text = "E 哨戒炮塔\n120 币 + 20 矿石"
-toggle_mode = true
-theme_override_font_sizes/font_size = 14
-
-[node name="MiningStation" type="Button" parent="Root/Toolbar"]
-layout_mode = 0
-offset_left = 628.0
-offset_top = 13.0
-offset_right = 818.0
-offset_bottom = 62.0
-focus_mode = 0
-theme_override_font_sizes/font_size = 14
-text = "采矿站\n80 币"
-toggle_mode = true
-
-[node name="CancelBuild" type="Button" parent="Root/Toolbar"]
-layout_mode = 0
-offset_left = 1032.0
-offset_top = 13.0
-offset_right = 1142.0
-offset_bottom = 58.0
-focus_mode = 0
-text = "取消建造"
-
-[node name="AssemblyPlant" type="Button" parent="Root/Toolbar"]
-layout_mode = 0
-offset_left = 830.0
-offset_top = 13.0
-offset_right = 1020.0
-offset_bottom = 62.0
-focus_mode = 0
-theme_override_font_sizes/font_size = 14
-text = "组装厂\n300 币 + 40 矿石"
-toggle_mode = true
+modulate = Color(0.850980, 0.741176, 0.505882, 1.0)
 
 [node name="Zoom" type="Label" parent="Root/Toolbar"]
 layout_mode = 0
 anchor_left = 1.0
 anchor_right = 1.0
-offset_left = -608.0
-offset_top = 25.0
-offset_right = -546.0
-offset_bottom = 49.0
+offset_left = -150.0
+offset_top = 9.0
+offset_right = -12.0
+offset_bottom = 30.0
 mouse_filter = 2
-modulate = Color(0.5058823529411764, 0.611764705882353, 0.6627450980392157, 1)
-theme_override_font_sizes/font_size = 14
-text = "78%"
+text = "70%"
+theme_override_font_sizes/font_size = 12
+modulate = Color(0.580392, 0.643137, 0.603922, 1.0)
+horizontal_alignment = 2
 
-[node name="FitMap" type="Button" parent="Root/Toolbar"]
+[node name="Categories" type="HBoxContainer" parent="Root/Toolbar"]
 layout_mode = 0
-anchor_left = 1.0
 anchor_right = 1.0
-offset_left = -542.0
-offset_top = 13.0
-offset_right = -390.0
-offset_bottom = 58.0
-focus_mode = 0
-text = "地图全景 [Home]"
+offset_left = 10.0
+offset_top = 35.0
+offset_right = -10.0
+offset_bottom = 64.0
+theme_override_constants/separation = 4
 
-[node name="FocusCore" type="Button" parent="Root/Toolbar"]
+[node name="Buildings" type="ScrollContainer" parent="Root/Toolbar"]
 layout_mode = 0
-anchor_left = 1.0
 anchor_right = 1.0
-offset_left = -378.0
-offset_top = 13.0
-offset_right = -226.0
-offset_bottom = 58.0
-focus_mode = 0
-text = "回主脑 [F1]"
+offset_left = 10.0
+offset_top = 70.0
+offset_right = -10.0
+offset_bottom = 154.0
+horizontal_scroll_mode = 0
+vertical_scroll_mode = 4
+scroll_vertical_custom_step = 44.0
 
-[node name="Restart" type="Button" parent="Root/Toolbar"]
+[node name="Grid" type="GridContainer" parent="Root/Toolbar/Buildings"]
+layout_mode = 2
+size_flags_horizontal = 3
+columns = 3
+theme_override_constants/h_separation = 5
+theme_override_constants/v_separation = 4
+
+[node name="CancelBuild" type="Button" parent="Root/Toolbar"]
 layout_mode = 0
-anchor_left = 1.0
-anchor_right = 1.0
-offset_left = -214.0
-offset_top = 13.0
-offset_right = -25.0
-offset_bottom = 58.0
+anchor_right = 0.25
+offset_left = 10.0
+offset_top = 165.0
+offset_right = -4.0
+offset_bottom = 198.0
 focus_mode = 0
-text = "重新开始 [R]"
+text = "取消 [Esc]"
+disabled = true
+theme_override_font_sizes/font_size = 12
 
 [node name="RepairAll" type="Button" parent="Root/Toolbar"]
 layout_mode = 0
-anchor_left = 1.0
-anchor_right = 1.0
-offset_left = -724.0
-offset_top = 13.0
-offset_right = -620.0
-offset_bottom = 58.0
+anchor_left = 0.25
+anchor_right = 0.5
+offset_left = 3.0
+offset_top = 165.0
+offset_right = -4.0
+offset_bottom = 198.0
 focus_mode = 0
 text = "一键修复"
+theme_override_font_sizes/font_size = 12
 
-[node name="PlacementInfo" type="Label" parent="Root/Toolbar"]
+[node name="FitMap" type="Button" parent="Root/Toolbar"]
 layout_mode = 0
-anchor_right = 1.0
-offset_left = 22.0
-offset_top = 70.0
-offset_right = -38.0
-offset_bottom = 97.0
-mouse_filter = 2
-modulate = Color(0.5058823529411764, 0.611764705882353, 0.6627450980392157, 1)
-theme_override_font_sizes/font_size = 15
-text = "选择建筑以显示覆盖与下单预览。"
+anchor_left = 0.5
+anchor_right = 0.75
+offset_left = 3.0
+offset_top = 165.0
+offset_right = -4.0
+offset_bottom = 198.0
+focus_mode = 0
+text = "全图 [Home]"
+theme_override_font_sizes/font_size = 12
 
-[node name="Controls" type="Label" parent="Root/Toolbar"]
+[node name="FocusCore" type="Button" parent="Root/Toolbar"]
 layout_mode = 0
+anchor_left = 0.75
 anchor_right = 1.0
-offset_left = 22.0
-offset_top = 110.0
-offset_right = -28.0
-offset_bottom = 132.0
+offset_left = 3.0
+offset_top = 165.0
+offset_right = -10.0
+offset_bottom = 198.0
+focus_mode = 0
+text = "主脑 [F1]"
+theme_override_font_sizes/font_size = 12
+
+[node name="Resources" type="Panel" parent="Root"]
+layout_mode = 0
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -352.0
+offset_top = -224.0
+offset_right = -16.0
+offset_bottom = -16.0
+theme_override_styles/panel = SubResource("StyleBox_panel")
+
+[node name="Title" type="Label" parent="Root/Resources"]
+layout_mode = 0
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 0.0
+anchor_bottom = 0.0
+offset_left = 16.0
+offset_top = 10.0
+offset_right = 318.0
+offset_bottom = 33.0
 mouse_filter = 2
-modulate = Color(0.5058823529411764, 0.611764705882353, 0.6627450980392157, 1)
+text = "殖民地资源"
+theme_override_font_sizes/font_size = 14
+modulate = Color(0.850980, 0.741176, 0.505882, 1.000000)
+
+
+[node name="Coins" type="Label" parent="Root/Resources"]
+layout_mode = 0
+offset_left = 18.0
+offset_top = 34.0
+offset_right = 320.0
+offset_bottom = 54.0
+mouse_filter = 2
+text = "算力币  250   +2/分钟"
+theme_override_font_sizes/font_size = 14
+modulate = Color(0.850980, 0.862745, 0.800000, 1.000000)
+
+[node name="Ore" type="Label" parent="Root/Resources"]
+layout_mode = 0
+offset_left = 18.0
+offset_top = 54.0
+offset_right = 320.0
+offset_bottom = 74.0
+mouse_filter = 2
+text = "金属矿  50   +0/分钟"
+theme_override_font_sizes/font_size = 14
+modulate = Color(0.850980, 0.862745, 0.800000, 1.000000)
+
+[node name="Fuel" type="Label" parent="Root/Resources"]
+layout_mode = 0
+offset_left = 18.0
+offset_top = 74.0
+offset_right = 320.0
+offset_bottom = 94.0
+mouse_filter = 2
+text = "燃料  0   +0/分钟"
+theme_override_font_sizes/font_size = 14
+modulate = Color(0.850980, 0.862745, 0.800000, 1.000000)
+
+[node name="Alloy" type="Label" parent="Root/Resources"]
+layout_mode = 0
+offset_left = 18.0
+offset_top = 94.0
+offset_right = 320.0
+offset_bottom = 114.0
+mouse_filter = 2
+text = "合金  0   +0/分钟"
+theme_override_font_sizes/font_size = 14
+modulate = Color(0.850980, 0.862745, 0.800000, 1.000000)
+
+[node name="Crystals" type="Label" parent="Root/Resources"]
+layout_mode = 0
+offset_left = 18.0
+offset_top = 114.0
+offset_right = 320.0
+offset_bottom = 134.0
+mouse_filter = 2
+text = "稀有晶体  0   +0/分钟"
+theme_override_font_sizes/font_size = 14
+modulate = Color(0.850980, 0.862745, 0.800000, 1.000000)
+
+[node name="Capacity" type="Label" parent="Root/Resources"]
+layout_mode = 0
+offset_left = 18.0
+offset_top = 134.0
+offset_right = 320.0
+offset_bottom = 154.0
+mouse_filter = 2
+text = "调度  0 / 10"
+theme_override_font_sizes/font_size = 14
+modulate = Color(0.850980, 0.862745, 0.800000, 1.000000)
+
+[node name="Power" type="Label" parent="Root/Resources"]
+layout_mode = 0
+offset_left = 18.0
+offset_top = 154.0
+offset_right = 320.0
+offset_bottom = 174.0
+mouse_filter = 2
+text = "电力余量  60 / 60"
+theme_override_font_sizes/font_size = 14
+modulate = Color(0.850980, 0.862745, 0.800000, 1.000000)
+
+[node name="Cooling" type="Label" parent="Root/Resources"]
+layout_mode = 0
+offset_left = 18.0
+offset_top = 174.0
+offset_right = 320.0
+offset_bottom = 194.0
+mouse_filter = 2
+text = "冷却  0 / 0"
+theme_override_font_sizes/font_size = 14
+modulate = Color(0.850980, 0.862745, 0.800000, 1.000000)
+
+[node name="WorldInfo" type="Panel" parent="Root"]
+layout_mode = 0
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 0.0
+anchor_bottom = 0.0
+offset_left = 16.0
+offset_top = 16.0
+offset_right = 340.0
+offset_bottom = 77.0
+theme_override_styles/panel = SubResource("StyleBox_panel")
+
+[node name="MapName" type="Label" parent="Root/WorldInfo"]
+layout_mode = 0
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 0.0
+anchor_bottom = 0.0
+offset_left = 14.0
+offset_top = 7.0
+offset_right = 310.0
+offset_bottom = 33.0
+mouse_filter = 2
+text = "隘口前哨"
+theme_override_font_sizes/font_size = 20
+modulate = Color(0.913725, 0.847059, 0.678431, 1.000000)
+
+
+[node name="Subtitle" type="Label" parent="Root/WorldInfo"]
+layout_mode = 0
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 0.0
+anchor_bottom = 0.0
+offset_left = 15.0
+offset_top = 36.0
+offset_right = 310.0
+offset_bottom = 54.0
+mouse_filter = 2
+text = "标准开局 / 战术视图"
+theme_override_font_sizes/font_size = 12
+modulate = Color(0.580392, 0.643137, 0.603922, 1.000000)
+
+
+[node name="System" type="Panel" parent="Root"]
+layout_mode = 0
+anchor_left = 1.0
+anchor_top = 0.0
+anchor_right = 1.0
+anchor_bottom = 0.0
+offset_left = -294.0
+offset_top = 16.0
+offset_right = -16.0
+offset_bottom = 58.0
+theme_override_styles/panel = SubResource("StyleBox_panel")
+
+[node name="Restart" type="Button" parent="Root/System"]
+layout_mode = 0
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 0.0
+anchor_bottom = 0.0
+offset_left = 8.0
+offset_top = 6.0
+offset_right = 122.0
+offset_bottom = 36.0
+focus_mode = 0
+text = "重开 [R]"
+theme_override_font_sizes/font_size = 12
+
+[node name="Settings" type="Button" parent="Root/System"]
+layout_mode = 0
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 0.0
+anchor_bottom = 0.0
+offset_left = 130.0
+offset_top = 6.0
+offset_right = 206.0
+offset_bottom = 36.0
+focus_mode = 0
+text = "设置"
+theme_override_font_sizes/font_size = 12
+tooltip_text = "基础设置 [F10]"
+
+[node name="Help" type="Label" parent="Root/System"]
+layout_mode = 0
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 0.0
+anchor_bottom = 0.0
+offset_left = 216.0
+offset_top = 10.0
+offset_right = 268.0
+offset_bottom = 33.0
+mouse_filter = 0
+text = "操作 [?]"
+theme_override_font_sizes/font_size = 11
+modulate = Color(0.721569, 0.733333, 0.639216, 1.000000)
+tooltip_text = "左键点选 / 框选；Shift 追加 / Ctrl 切换\n右键移动、攻击或工厂集结点；A＋左键攻击移动\nCtrl＋1–9 编队；1–9 召回\n中键拖图；滚轮缩放；空格暂停\nQ 节点 / W 墙 / E 炮塔；X 拆除；M 地图\nHome 全图；F1 主脑；F10 设置"
+
+[node name="StatusStrip" type="Panel" parent="Root"]
+layout_mode = 0
+anchor_left = 0.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 280.0
+offset_top = -278.0
+offset_right = -16.0
+offset_bottom = -232.0
+theme_override_styles/panel = SubResource("StyleBox_panel")
+
+[node name="Feedback" type="Label" parent="Root/StatusStrip"]
+layout_mode = 0
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 1.0
+anchor_bottom = 0.0
+offset_left = 12.0
+offset_top = 3.0
+offset_right = -12.0
+offset_bottom = 25.0
+mouse_filter = 2
+text = "先建算力节点启动经济。"
 theme_override_font_sizes/font_size = 13
-text = "左键点选 / 框选    Shift 追加 / Ctrl 切换    右键 移动 / 攻击 / 工厂集结点    A＋左键 攻击移动    Ctrl＋1–9 编队    1–9 召回    中键 拖图    空格 暂停"
+modulate = Color(0.850980, 0.741176, 0.505882, 1.000000)
+clip_text = true
+
+[node name="PlacementInfo" type="Label" parent="Root/StatusStrip"]
+layout_mode = 0
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 1.0
+anchor_bottom = 0.0
+offset_left = 12.0
+offset_top = 25.0
+offset_right = -12.0
+offset_bottom = 43.0
+mouse_filter = 2
+text = "选择建筑以显示覆盖与下单预览。"
+theme_override_font_sizes/font_size = 11
+modulate = Color(0.580392, 0.643137, 0.603922, 1.000000)
+clip_text = true
 
 [node name="SelectionBox" type="Panel" parent="Root"]
 visible = false
 layout_mode = 0
 mouse_filter = 2
 theme_override_styles/panel = SubResource("StyleBox_selection")
+
 
 [node name="SessionResult" type="Panel" parent="Root"]
 visible = false
@@ -583,6 +924,7 @@ offset_right = 260.0
 offset_bottom = 145.0
 theme_override_styles/panel = SubResource("StyleBox_panel")
 
+
 [node name="Title" type="Label" parent="Root/SessionResult"]
 layout_mode = 0
 offset_left = 24.0
@@ -595,6 +937,7 @@ theme_override_font_sizes/font_size = 30
 text = "防守失败"
 horizontal_alignment = 1
 
+
 [node name="Details" type="Label" parent="Root/SessionResult"]
 layout_mode = 0
 offset_left = 24.0
@@ -606,23 +949,16 @@ theme_override_font_sizes/font_size = 17
 text = "主脑已被摧毁\n战场已停止\n可继续查看战场，或开始新的一局。"
 horizontal_alignment = 1
 
+
 [node name="Restart" type="Button" parent="Root/SessionResult"]
 layout_mode = 0
-offset_left = 32.0
+offset_left = 150.0
 offset_top = 215.0
-offset_right = 252.0
+offset_right = 370.0
 offset_bottom = 263.0
 focus_mode = 0
 text = "重新开始 [R]"
 
-[node name="Scenario" type="Button" parent="Root/SessionResult"]
-layout_mode = 0
-offset_left = 268.0
-offset_top = 215.0
-offset_right = 488.0
-offset_bottom = 263.0
-focus_mode = 0
-text = "进入训练场"
 
 [node name="DemolitionDialog" type="ConfirmationDialog" parent="."]
 title = "拆除建筑"

@@ -121,7 +121,7 @@ func _paint_map() -> void:
 			_painter.draw_colored_polygon(polygon, fill)
 			var outline: PackedVector2Array = polygon.duplicate()
 			outline.append(polygon[0])
-			_painter.draw_polyline(outline, Color(0.24, 0.40, 0.45, 0.25), 0.8, true)
+			_painter.draw_polyline(outline, Color(0.59, 0.61, 0.53, 0.22), 0.9, true)
 			var center: Vector2 = MechIsoGeometry.cell_center(cell)
 			if kind == MechGridState.Terrain.ROUGH:
 				_painter.draw_line(center + Vector2(-11, 2), center + Vector2(-2, -3), Color("83816a"), 1.0, true)
@@ -132,9 +132,12 @@ func _paint_map() -> void:
 			var y: int = diagonal - x
 			if playable[y * dimensions.x + x] != 0 and terrain[y * dimensions.x + x] == MechGridState.Terrain.OBSTACLE:
 				_draw_rock(MechIsoGeometry.cell_center(Vector2i(x, y)), x + y, boundary)
-	var border: PackedVector2Array = boundary.duplicate()
-	border.append(border[0])
-	_painter.draw_polyline(border, Color("587b8c"), 2.0, true)
+	# A boundary stroke extends outside the fog polygon and leaks unexplored
+	# map edges. Keep that authoring guide in the editor only.
+	if Engine.is_editor_hint():
+		var border: PackedVector2Array = boundary.duplicate()
+		border.append(border[0])
+		_painter.draw_polyline(border, Color("587b8c"), 2.0, true)
 
 
 func _draw_markers() -> void:

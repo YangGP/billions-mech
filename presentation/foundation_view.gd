@@ -50,11 +50,11 @@ func present_selection(ids: Array[int]) -> void:
 
 func _building_metrics(id: StringName) -> Vector3:
 	match id:
-		&"armored_wall": return Vector3(25, 31, 15.5)
-		&"sentry_tower": return Vector3(30, 47, 23.5)
-		&"mining_station": return Vector3(36, 47, 23.5)
-		&"assembly_plant": return Vector3(48, 75, 37.5)
-	return Vector3(58, 47, 23.5)
+		&"armored_wall": return Vector3(25, 31, 31 * MechIsoGeometry.GROUND_RATIO)
+		&"sentry_tower": return Vector3(30, 47, 47 * MechIsoGeometry.GROUND_RATIO)
+		&"mining_station": return Vector3(36, 47, 47 * MechIsoGeometry.GROUND_RATIO)
+		&"assembly_plant": return Vector3(48, 75, 75 * MechIsoGeometry.GROUND_RATIO)
+	return Vector3(58, 47, 47 * MechIsoGeometry.GROUND_RATIO)
 
 
 func pick_building(screen_point: Vector2) -> int:
@@ -67,7 +67,7 @@ func pick_building(screen_point: Vector2) -> int:
 		var point: Vector2 = _project(entity["position"])
 		var hull := PackedVector2Array()
 		if entity["kind"] == &"mainbrain":
-			hull = PackedVector2Array([Vector2(0, -100), Vector2(65, -68), Vector2(65, -20), Vector2(0, 12), Vector2(-65, -20), Vector2(-65, -68)])
+			hull = _mainbrain_hull()
 			var visual_scale: Vector2 = Vector2(entity["footprint"]) / MAINBRAIN_REFERENCE_SIZE
 			for index: int in range(hull.size()):
 				hull[index] *= visual_scale
@@ -307,7 +307,8 @@ func _draw_building(building: Dictionary, point: Vector2, opacity: float = 1.0) 
 	height *= scale_height
 	_draw_shadow(point, Vector2(footprint.x * 29.0, footprint.y * 14.0))
 	if id == &"armored_wall":
-		var directions: Array[Vector2] = [Vector2(-32, -16), Vector2(32, -16), Vector2(32, 16), Vector2(-32, 16)]
+		var half: Vector2 = MechIsoGeometry.HALF_TILE
+		var directions: Array[Vector2] = [Vector2(-half.x, -half.y), Vector2(half.x, -half.y), half, Vector2(-half.x, half.y)]
 		var mask: int = building.get("connections", 0)
 		for index: int in range(directions.size()):
 			if mask & (1 << index):
@@ -361,9 +362,11 @@ func _draw_mainbrain(world_point: Vector2, footprint: Vector2i) -> void:
 	draw_set_transform(world_point, 0.0, Vector2(footprint) / MAINBRAIN_REFERENCE_SIZE)
 	var point := Vector2.ZERO
 	_draw_shadow(point, Vector2(82.0, 34.0))
-	var top := PackedVector2Array([point + Vector2(0, -100), point + Vector2(65, -68), point + Vector2(0, -36), point + Vector2(-65, -68)])
-	var left := PackedVector2Array([point + Vector2(-65, -68), point + Vector2(0, -36), point + Vector2(0, 12), point + Vector2(-65, -20)])
-	var right := PackedVector2Array([point + Vector2(0, -36), point + Vector2(65, -68), point + Vector2(65, -20), point + Vector2(0, 12)])
+	var hull: PackedVector2Array = _mainbrain_hull()
+	var depth: float = 65.0 * MechIsoGeometry.GROUND_RATIO
+	var top := PackedVector2Array([hull[0], hull[1], Vector2(0, -68 + depth), hull[5]])
+	var left := PackedVector2Array([hull[5], top[2], hull[3], hull[4]])
+	var right := PackedVector2Array([top[2], hull[1], hull[2], hull[3]])
 	draw_colored_polygon(left, Color("a3b0b8"))
 	draw_colored_polygon(right, Color("748792"))
 	draw_colored_polygon(top, Color("d6dfe3"))
@@ -375,6 +378,12 @@ func _draw_mainbrain(world_point: Vector2, footprint: Vector2i) -> void:
 	draw_circle(point + Vector2(-43, -31), 3.0, CYAN)
 	draw_circle(point + Vector2(-29, -24), 3.0, CYAN)
 	draw_set_transform(Vector2.ZERO)
+
+
+func _mainbrain_hull() -> PackedVector2Array:
+	var depth: float = 65.0 * MechIsoGeometry.GROUND_RATIO
+	return PackedVector2Array([Vector2(0, -68 - depth), Vector2(65, -68),
+		Vector2(65, -20), Vector2(0, -20 + depth), Vector2(-65, -20), Vector2(-65, -68)])
 
 
 func _draw_probe(point: Vector2, facing: Vector2 = Vector2.UP) -> void:
@@ -392,5 +401,5 @@ func _draw_shadow(point: Vector2, radius: Vector2) -> void:
 	var polygon := PackedVector2Array()
 	for index: int in range(32):
 		var angle: float = TAU * float(index) / 32.0
-		polygon.append(point + Vector2(cos(angle), sin(angle)) * radius)
+		polygon.append(point + Vector2(cos(angle), sin(angle) * MechIsoGeometry.GROUND_RATIO / 0.5) * radius)
 	draw_colored_polygon(polygon, Color(0.0, 0.0, 0.0, 0.35))

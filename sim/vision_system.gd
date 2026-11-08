@@ -1,6 +1,7 @@
 class_name MechVisionSystem
 extends RefCounted
-## Authoritative, monotonic exploration. LOS footprints are cached per source;
+## Exploration covers each source's radius regardless of occlusion. Live sight
+## additionally requires terrain LOS. LOS footprints are cached per source;
 ## movement within a tile does not rebuild visibility or upload the fog texture.
 
 enum State { UNEXPLORED, EXPLORED, VISIBLE }
@@ -49,10 +50,6 @@ func update(grid: MechGridState, registry: MechEntityRegistry, buildings: Array[
 			for x: int in range(_dimensions.x):
 				if grid.is_covered(Vector2i(x, y)):
 					_explored[y * _dimensions.x + x] = State.EXPLORED
-	# Exploration stores exactly UNEXPLORED/EXPLORED (0/1). Native copying
-	# restores remembered cells without a script loop over the whole map on
-	# every source movement, production spawn or tower destruction.
-	var next: PackedByteArray = _explored.duplicate()
 	var footprints: Dictionary = {}
 	for id: int in sources:
 		var source: Vector3 = sources[id]
@@ -62,9 +59,13 @@ func update(grid: MechGridState, registry: MechEntityRegistry, buildings: Array[
 		else:
 			cells = _cast_source(grid, Vector2(source.x, source.y), source.z)
 		footprints[id] = cells
+	# Casting first records the full exploration discs, including occluded
+	# terrain. Copy afterwards so new gray cells appear in this same update.
+	# Memory is 0/1 and monotonic; live visibility is a separate current union.
+	var next: PackedByteArray = _explored.duplicate()
+	for cells: PackedInt32Array in footprints.values():
 		for index: int in cells:
 			next[index] = State.VISIBLE
-			_explored[index] = 1
 	_sources = sources
 	_footprints = footprints
 	_grid_revision = grid.coverage_revision()
@@ -83,8 +84,12 @@ func _cast_source(grid: MechGridState, center: Vector2, radius: float) -> Packed
 		for x: int in range(low.x, high.x + 1):
 			var cell := Vector2i(x, y)
 			var point := Vector2(cell) + Vector2(0.5, 0.5)
-			if grid.contains(cell) and center.distance_squared_to(point) <= radius * radius and grid.terrain_line_clear(center, point, true):
-				result.append(y * _dimensions.x + x)
+			if not grid.contains(cell) or center.distance_squared_to(point) > radius * radius:
+				continue
+			var index: int = y * _dimensions.x + x
+			_explored[index] = State.EXPLORED
+			if grid.terrain_line_clear(center, point, true):
+				result.append(index)
 	return result
 
 

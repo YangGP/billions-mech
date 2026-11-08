@@ -4,7 +4,7 @@ extends Resource
 
 @export var unit_id: StringName = &"sentinel"
 @export var display_name: String = "卫兵"
-@export var cost: Vector4i = Vector4i(20, 0, 0, 0)
+@export var cost: Dictionary[StringName, int] = {&"coins": 20}
 @export var production_seconds: float = 20.0
 @export var capacity_cost: int = 1
 @export var max_hp: int = 100
@@ -32,6 +32,6 @@ func validation_error() -> String:
 
 
 func snapshot() -> Dictionary:
-	return {"unit_id": unit_id, "name": display_name, "cost": cost,
+	return {"unit_id": unit_id, "name": display_name, "cost": MechResources.copy(cost),
 		"production_seconds": production_seconds, "capacity_cost": capacity_cost,
 		"max_hp": max_hp, "damage": damage, "attack_range": attack_range}

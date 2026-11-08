@@ -2,10 +2,14 @@ class_name MechMapCamera
 extends Camera2D
 ## Native Camera2D with view-only controls; never reads or writes sim internals.
 
-const MIN_ZOOM: float = 0.18
+const MIN_ZOOM: float = 0.5
+const OVERVIEW_MIN_ZOOM: float = 0.12
 const MAX_ZOOM: float = 2.0
+const HUD_BOTTOM: float = 280.0
 const PAN_SPEED: float = 850.0
 const EDGE_WIDTH: float = 16.0
+
+@export_range(0.5, 2.0, 0.01) var initial_zoom: float = 0.70
 
 var _bounds := Rect2()
 var _focus := Vector2.ZERO
@@ -41,7 +45,7 @@ func _ready() -> void:
 func configure(bounds: Rect2, focus: Vector2) -> void:
 	_bounds = bounds.grow(100.0)
 	_focus = focus
-	zoom = Vector2.ONE * 0.78
+	zoom = Vector2.ONE * clampf(initial_zoom, MIN_ZOOM, MAX_ZOOM)
 	focus_mainbrain()
 
 
@@ -53,15 +57,15 @@ func focus_mainbrain() -> void:
 
 func fit_map() -> void:
 	_stop_drag()
-	var visible: Vector2 = get_viewport_rect().size - Vector2(100.0, 360.0)
-	var factor: float = clampf(minf(visible.x / _bounds.size.x, visible.y / _bounds.size.y), MIN_ZOOM, MAX_ZOOM)
+	var visible: Vector2 = _play_area_size() - Vector2(80.0, 80.0)
+	var factor: float = clampf(minf(visible.x / _bounds.size.x, visible.y / _bounds.size.y), OVERVIEW_MIN_ZOOM, MAX_ZOOM)
 	zoom = Vector2.ONE * factor
 	position = _bounds.get_center()
 	_clamp_position()
 
 
 func visible_world_rect() -> Rect2:
-	var half: Vector2 = get_viewport_rect().size / zoom * 0.5
+	var half: Vector2 = _play_area_size() / zoom * 0.5
 	return Rect2(position - half, half * 2.0)
 
 
@@ -80,10 +84,15 @@ func handle_event(event: InputEvent) -> bool:
 			_last_drag_position = event.position
 			return true
 		if event.pressed and event.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
+			# Whole-map overview is a separate mode. Scrolling out must never
+			# jump inward to the regular tactical minimum.
+			if zoom.x < MIN_ZOOM and event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+				return true
 			var before: Vector2 = get_global_mouse_position()
 			var step: float = pow(1.15, zoom_speed_factor)
 			var multiplier: float = step if event.button_index == MOUSE_BUTTON_WHEEL_UP else 1.0 / step
 			zoom = Vector2.ONE * clampf(zoom.x * multiplier, MIN_ZOOM, MAX_ZOOM)
+			_update_view_offset()
 			force_update_scroll()
 			position += before - get_global_mouse_position()
 			_clamp_position()
@@ -135,14 +144,25 @@ func _process(delta: float) -> void:
 
 
 func _clamp_position() -> void:
+	_update_view_offset()
 	if _bounds.size.is_zero_approx():
 		return
-	var half_view: Vector2 = get_viewport_rect().size / zoom * 0.5
+	var half_view: Vector2 = _play_area_size() / zoom * 0.5
 	var low: Vector2 = _bounds.position + half_view
 	var high: Vector2 = _bounds.end - half_view
 	position.x = clampf(position.x, low.x, high.x) if low.x <= high.x else _bounds.get_center().x
 	position.y = clampf(position.y, low.y, high.y) if low.y <= high.y else _bounds.get_center().y
 	force_update_scroll()
+
+
+func _play_area_size() -> Vector2:
+	var extent: Vector2 = get_viewport_rect().size
+	return Vector2(extent.x, maxf(240.0, extent.y - HUD_BOTTOM))
+
+
+func _update_view_offset() -> void:
+	# Keep the focus in the centre of the battlefield above the command dock.
+	offset = Vector2(0.0, (get_viewport_rect().size.y - _play_area_size().y) * 0.5 / zoom.y)
 
 
 func _on_mouse_entered() -> void:

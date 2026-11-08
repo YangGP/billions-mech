@@ -61,7 +61,7 @@ func catalog(economy: MechEconomySystem) -> Array[Dictionary]:
 	return result
 
 
-func preview_placement(id: StringName, origin: Vector2i, grid: MechGridState, economy: MechEconomySystem, minerals: MechMineralSystem, available: Vector4i = Vector4i(-1, -1, -1, -1), planned_cells: Dictionary = {}) -> Dictionary:
+func preview_placement(id: StringName, origin: Vector2i, grid: MechGridState, economy: MechEconomySystem, minerals: MechMineralSystem, available: Dictionary = {}, planned_cells: Dictionary = {}) -> Dictionary:
 	var rules: MechBuildingDefinition = definition(id)
 	if rules == null or not rules.buildable:
 		return {"ok": false, "reason": "该建筑不可下单", "cells": [], "origin": origin, "footprint": Vector2i.ONE}
@@ -98,7 +98,7 @@ func preview_placement(id: StringName, origin: Vector2i, grid: MechGridState, ec
 			cell_info["reason"] = reason
 	result["ok"] = reason.is_empty()
 	result["reason"] = reason
-	result["cost"] = rules.cost
+	result["cost"] = MechResources.copy(rules.cost)
 	result["building_id"] = id
 	result["mineral_id"] = mineral_check["mineral_id"]
 	return result
@@ -107,18 +107,18 @@ func preview_placement(id: StringName, origin: Vector2i, grid: MechGridState, ec
 func preview_wall_line(cells: Array[Vector2i], grid: MechGridState, economy: MechEconomySystem, minerals: MechMineralSystem) -> Dictionary:
 	var planned: Dictionary = {}
 	var combined: Array[Dictionary] = []
-	var available: Vector4i = economy.balance()
+	var available: Dictionary = economy.balance()
 	var count: int = 0
 	for cell: Vector2i in cells:
 		var preview: Dictionary = preview_placement(&"armored_wall", cell, grid, economy, minerals, available, planned)
 		combined.append_array(preview["cells"])
 		if preview["ok"]:
 			planned[cell] = true
-			available -= preview["cost"]
+			available = MechResources.subtract(available, preview["cost"])
 			count += 1
 	return {"ok": count > 0, "reason": "" if count > 0 else "墙线没有可下单的格子",
 		"cells": combined, "planned_count": count, "skipped_count": cells.size() - count,
-		"cost": economy.balance() - available, "line": true}
+		"cost": MechResources.subtract(economy.balance(), available), "line": true}
 
 
 func advance(try_clear_footprint: Callable) -> Dictionary:

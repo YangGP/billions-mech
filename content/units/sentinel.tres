@@ -4,7 +4,7 @@
 script = ExtResource("1")
 unit_id = &"sentinel"
 display_name = "卫兵"
-cost = Vector4i(20, 0, 0, 0)
+cost = Dictionary[StringName, int]({&"coins": 20})
 production_seconds = 20.0
 capacity_cost = 1
 max_hp = 100

@@ -6,7 +6,7 @@
 [ext_resource type="Script" path="res://presentation/foundation_view.gd" id="4"]
 [ext_resource type="Script" path="res://presentation/map_camera.gd" id="5"]
 [ext_resource type="PackedScene" path="res://scenes/ui/map_hud.tscn" id="6"]
-[ext_resource type="Resource" path="res://content/maps/first_outpost.tres" id="7"]
+[ext_resource type="Resource" path="res://content/maps/development_basin_128.tres" id="7"]
 [ext_resource type="PackedScene" path="res://scenes/ui/settings_menu.tscn" id="8"]
 [ext_resource type="Script" path="res://presentation/fog_view.gd" id="9"]
 
@@ -29,8 +29,8 @@ script = ExtResource("4")
 preview_map = ExtResource("7")
 
 [node name="MapCamera" type="Camera2D" parent="."]
-position = Vector2(-32, 2080)
-zoom = Vector2(0.78, 0.78)
+position = Vector2(-32, 3144)
+zoom = Vector2(0.7, 0.7)
 script = ExtResource("5")
 
 [node name="HUD" parent="." instance=ExtResource("6")]

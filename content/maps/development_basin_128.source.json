@@ -1,0 +1,1292 @@
+{
+  "schema": "billions-mech.development-map.v1",
+  "id": "development_basin_128",
+  "name": "四隘盆地 · 128开发图",
+  "dimensions": [
+    128,
+    128
+  ],
+  "layout_mode": "authored_grid",
+  "art_source": "existing",
+  "art_route": "existing Godot terrain/entity renderers; no new generated art",
+  "camera": {
+    "projection": "isometric",
+    "tile_pixels": [
+      64,
+      48
+    ],
+    "viewport": [
+      1920,
+      1080
+    ],
+    "normal_zoom": 0.7
+  },
+  "mainbrain": {
+    "origin": [
+      61,
+      61
+    ],
+    "footprint": [
+      5,
+      5
+    ]
+  },
+  "probe_cell": [
+    60,
+    68
+  ],
+  "wanderer_exclusion_radius": 28,
+  "gates": {
+    "north": [
+      64,
+      43
+    ],
+    "east": [
+      89,
+      64
+    ],
+    "south": [
+      64,
+      86
+    ],
+    "west": [
+      36,
+      63
+    ]
+  },
+  "retreat_lines": [
+    {
+      "id": "outer",
+      "bounds": [
+        25,
+        25,
+        78,
+        78
+      ]
+    },
+    {
+      "id": "basin",
+      "bounds": [
+        42,
+        46,
+        43,
+        35
+      ]
+    },
+    {
+      "id": "core",
+      "bounds": [
+        54,
+        54,
+        22,
+        22
+      ]
+    }
+  ],
+  "obstacle_polygons": [
+    [
+      [
+        30,
+        38
+      ],
+      [
+        48,
+        36
+      ],
+      [
+        56,
+        39
+      ],
+      [
+        57,
+        44
+      ],
+      [
+        46,
+        47
+      ],
+      [
+        35,
+        44
+      ],
+      [
+        30,
+        42
+      ]
+    ],
+    [
+      [
+        72,
+        39
+      ],
+      [
+        83,
+        36
+      ],
+      [
+        94,
+        39
+      ],
+      [
+        96,
+        43
+      ],
+      [
+        86,
+        47
+      ],
+      [
+        74,
+        46
+      ]
+    ],
+    [
+      [
+        33,
+        45
+      ],
+      [
+        39,
+        46
+      ],
+      [
+        41,
+        54
+      ],
+      [
+        38,
+        57
+      ],
+      [
+        32,
+        54
+      ]
+    ],
+    [
+      [
+        31,
+        71
+      ],
+      [
+        37,
+        68
+      ],
+      [
+        41,
+        75
+      ],
+      [
+        41,
+        84
+      ],
+      [
+        33,
+        84
+      ],
+      [
+        30,
+        78
+      ]
+    ],
+    [
+      [
+        87,
+        45
+      ],
+      [
+        94,
+        46
+      ],
+      [
+        95,
+        54
+      ],
+      [
+        90,
+        58
+      ],
+      [
+        85,
+        54
+      ]
+    ],
+    [
+      [
+        88,
+        72
+      ],
+      [
+        94,
+        70
+      ],
+      [
+        98,
+        77
+      ],
+      [
+        96,
+        84
+      ],
+      [
+        90,
+        85
+      ],
+      [
+        85,
+        79
+      ]
+    ],
+    [
+      [
+        36,
+        83
+      ],
+      [
+        43,
+        80
+      ],
+      [
+        53,
+        82
+      ],
+      [
+        57,
+        87
+      ],
+      [
+        51,
+        91
+      ],
+      [
+        40,
+        89
+      ]
+    ],
+    [
+      [
+        73,
+        84
+      ],
+      [
+        82,
+        81
+      ],
+      [
+        90,
+        85
+      ],
+      [
+        86,
+        91
+      ],
+      [
+        74,
+        91
+      ]
+    ],
+    [
+      [
+        9,
+        20
+      ],
+      [
+        16,
+        16
+      ],
+      [
+        28,
+        18
+      ],
+      [
+        30,
+        22
+      ],
+      [
+        24,
+        27
+      ],
+      [
+        12,
+        27
+      ]
+    ],
+    [
+      [
+        37,
+        13
+      ],
+      [
+        44,
+        11
+      ],
+      [
+        50,
+        17
+      ],
+      [
+        49,
+        23
+      ],
+      [
+        40,
+        25
+      ],
+      [
+        35,
+        20
+      ]
+    ],
+    [
+      [
+        64,
+        12
+      ],
+      [
+        77,
+        10
+      ],
+      [
+        82,
+        16
+      ],
+      [
+        78,
+        23
+      ],
+      [
+        67,
+        25
+      ],
+      [
+        62,
+        20
+      ]
+    ],
+    [
+      [
+        96,
+        10
+      ],
+      [
+        108,
+        8
+      ],
+      [
+        116,
+        14
+      ],
+      [
+        113,
+        23
+      ],
+      [
+        105,
+        27
+      ],
+      [
+        96,
+        23
+      ],
+      [
+        92,
+        16
+      ]
+    ],
+    [
+      [
+        11,
+        42
+      ],
+      [
+        17,
+        37
+      ],
+      [
+        25,
+        38
+      ],
+      [
+        29,
+        44
+      ],
+      [
+        26,
+        48
+      ],
+      [
+        17,
+        50
+      ]
+    ],
+    [
+      [
+        12,
+        57
+      ],
+      [
+        18,
+        54
+      ],
+      [
+        25,
+        56
+      ],
+      [
+        27,
+        65
+      ],
+      [
+        23,
+        73
+      ],
+      [
+        15,
+        75
+      ],
+      [
+        10,
+        68
+      ]
+    ],
+    [
+      [
+        105,
+        40
+      ],
+      [
+        114,
+        37
+      ],
+      [
+        120,
+        43
+      ],
+      [
+        118,
+        52
+      ],
+      [
+        111,
+        54
+      ],
+      [
+        104,
+        49
+      ]
+    ],
+    [
+      [
+        102,
+        62
+      ],
+      [
+        111,
+        58
+      ],
+      [
+        119,
+        62
+      ],
+      [
+        121,
+        69
+      ],
+      [
+        116,
+        75
+      ],
+      [
+        106,
+        72
+      ]
+    ],
+    [
+      [
+        8,
+        88
+      ],
+      [
+        16,
+        83
+      ],
+      [
+        25,
+        85
+      ],
+      [
+        28,
+        92
+      ],
+      [
+        24,
+        99
+      ],
+      [
+        13,
+        98
+      ],
+      [
+        7,
+        94
+      ]
+    ],
+    [
+      [
+        37,
+        101
+      ],
+      [
+        44,
+        97
+      ],
+      [
+        53,
+        101
+      ],
+      [
+        55,
+        108
+      ],
+      [
+        49,
+        113
+      ],
+      [
+        39,
+        112
+      ]
+    ],
+    [
+      [
+        68,
+        99
+      ],
+      [
+        76,
+        96
+      ],
+      [
+        82,
+        102
+      ],
+      [
+        80,
+        109
+      ],
+      [
+        72,
+        112
+      ],
+      [
+        66,
+        108
+      ]
+    ],
+    [
+      [
+        96,
+        97
+      ],
+      [
+        105,
+        93
+      ],
+      [
+        114,
+        99
+      ],
+      [
+        117,
+        108
+      ],
+      [
+        111,
+        116
+      ],
+      [
+        101,
+        117
+      ],
+      [
+        94,
+        111
+      ],
+      [
+        92,
+        104
+      ]
+    ],
+    [
+      [
+        13,
+        115
+      ],
+      [
+        22,
+        113
+      ],
+      [
+        27,
+        119
+      ],
+      [
+        24,
+        124
+      ],
+      [
+        16,
+        124
+      ]
+    ],
+    [
+      [
+        48,
+        119
+      ],
+      [
+        57,
+        116
+      ],
+      [
+        62,
+        120
+      ],
+      [
+        60,
+        126
+      ],
+      [
+        51,
+        126
+      ]
+    ],
+    [
+      [
+        89,
+        120
+      ],
+      [
+        95,
+        118
+      ],
+      [
+        101,
+        123
+      ],
+      [
+        98,
+        127
+      ],
+      [
+        90,
+        127
+      ]
+    ],
+    [
+      [
+        4,
+        5
+      ],
+      [
+        12,
+        4
+      ],
+      [
+        16,
+        10
+      ],
+      [
+        12,
+        14
+      ],
+      [
+        5,
+        13
+      ]
+    ],
+    [
+      [
+        118,
+        18
+      ],
+      [
+        125,
+        17
+      ],
+      [
+        127,
+        25
+      ],
+      [
+        123,
+        31
+      ],
+      [
+        118,
+        27
+      ]
+    ]
+  ],
+  "rough_polygons": [
+    [
+      [
+        57,
+        35
+      ],
+      [
+        69,
+        34
+      ],
+      [
+        72,
+        43
+      ],
+      [
+        69,
+        51
+      ],
+      [
+        58,
+        51
+      ],
+      [
+        55,
+        44
+      ]
+    ],
+    [
+      [
+        27,
+        57
+      ],
+      [
+        37,
+        56
+      ],
+      [
+        44,
+        60
+      ],
+      [
+        44,
+        66
+      ],
+      [
+        35,
+        70
+      ],
+      [
+        27,
+        66
+      ]
+    ],
+    [
+      [
+        82,
+        57
+      ],
+      [
+        95,
+        58
+      ],
+      [
+        100,
+        64
+      ],
+      [
+        96,
+        69
+      ],
+      [
+        84,
+        69
+      ]
+    ],
+    [
+      [
+        56,
+        79
+      ],
+      [
+        67,
+        78
+      ],
+      [
+        72,
+        85
+      ],
+      [
+        69,
+        95
+      ],
+      [
+        58,
+        96
+      ],
+      [
+        53,
+        88
+      ]
+    ],
+    [
+      [
+        52,
+        53
+      ],
+      [
+        59,
+        52
+      ],
+      [
+        60,
+        57
+      ],
+      [
+        55,
+        59
+      ],
+      [
+        51,
+        57
+      ]
+    ],
+    [
+      [
+        17,
+        29
+      ],
+      [
+        30,
+        28
+      ],
+      [
+        34,
+        33
+      ],
+      [
+        28,
+        36
+      ],
+      [
+        18,
+        35
+      ]
+    ],
+    [
+      [
+        82,
+        24
+      ],
+      [
+        97,
+        26
+      ],
+      [
+        100,
+        32
+      ],
+      [
+        92,
+        36
+      ],
+      [
+        82,
+        32
+      ]
+    ],
+    [
+      [
+        29,
+        91
+      ],
+      [
+        35,
+        88
+      ],
+      [
+        41,
+        94
+      ],
+      [
+        38,
+        100
+      ],
+      [
+        30,
+        100
+      ]
+    ],
+    [
+      [
+        80,
+        108
+      ],
+      [
+        87,
+        104
+      ],
+      [
+        93,
+        110
+      ],
+      [
+        89,
+        116
+      ],
+      [
+        80,
+        115
+      ]
+    ],
+    [
+      [
+        54,
+        14
+      ],
+      [
+        61,
+        13
+      ],
+      [
+        65,
+        20
+      ],
+      [
+        61,
+        28
+      ],
+      [
+        55,
+        27
+      ]
+    ]
+  ],
+  "water_reservations": [
+    {
+      "id": "west_lake",
+      "polygon_index": 13,
+      "shore_test_cell": [
+        28,
+        63
+      ],
+      "runtime_status": "obstacle placeholder until water terrain support"
+    },
+    {
+      "id": "north_east_lake",
+      "polygon_index": 11,
+      "shore_test_cell": [
+        111,
+        28
+      ],
+      "runtime_status": "obstacle placeholder until water terrain support"
+    },
+    {
+      "id": "south_east_lake",
+      "polygon_index": 19,
+      "shore_test_cell": [
+        93,
+        114
+      ],
+      "runtime_status": "obstacle placeholder until water terrain support"
+    }
+  ],
+  "development_sites": [
+    {
+      "id": "wind_start",
+      "building": "wind",
+      "origin": [
+        57,
+        60
+      ],
+      "footprint": [
+        1,
+        1
+      ],
+      "minimum_score": 24
+    },
+    {
+      "id": "solar_start",
+      "building": "solar",
+      "origin": [
+        68,
+        59
+      ],
+      "footprint": [
+        2,
+        2
+      ],
+      "minimum_score": 28
+    },
+    {
+      "id": "wind_expansion",
+      "building": "wind",
+      "origin": [
+        77,
+        77
+      ],
+      "footprint": [
+        1,
+        1
+      ],
+      "minimum_score": 24
+    },
+    {
+      "id": "solar_expansion",
+      "building": "solar",
+      "origin": [
+        49,
+        70
+      ],
+      "footprint": [
+        2,
+        2
+      ],
+      "minimum_score": 28
+    },
+    {
+      "id": "assembly_yard",
+      "origin": [
+        69,
+        69
+      ],
+      "footprint": [
+        3,
+        3
+      ]
+    },
+    {
+      "id": "industry_yard",
+      "origin": [
+        48,
+        63
+      ],
+      "footprint": [
+        3,
+        3
+      ]
+    },
+    {
+      "id": "relay_fuel",
+      "origin": [
+        56,
+        62
+      ],
+      "footprint": [
+        1,
+        1
+      ]
+    }
+  ],
+  "resource_sites": [
+    {
+      "id": "metal_start_west",
+      "kind": "metal_ore",
+      "cell": [
+        59,
+        65
+      ],
+      "amount": 720,
+      "runtime_kind": "metal_ore"
+    },
+    {
+      "id": "metal_start_east",
+      "kind": "metal_ore",
+      "cell": [
+        71,
+        65
+      ],
+      "amount": 720,
+      "runtime_kind": "metal_ore"
+    },
+    {
+      "id": "metal_inner_north",
+      "kind": "metal_ore",
+      "cell": [
+        49,
+        52
+      ],
+      "amount": 720,
+      "runtime_kind": "metal_ore"
+    },
+    {
+      "id": "metal_inner_south",
+      "kind": "metal_ore",
+      "cell": [
+        78,
+        74
+      ],
+      "amount": 720,
+      "runtime_kind": "metal_ore"
+    },
+    {
+      "id": "metal_west",
+      "kind": "metal_ore",
+      "cell": [
+        28,
+        52
+      ],
+      "amount": 720,
+      "runtime_kind": "metal_ore"
+    },
+    {
+      "id": "metal_east",
+      "kind": "metal_ore",
+      "cell": [
+        103,
+        77
+      ],
+      "amount": 720,
+      "runtime_kind": "metal_ore"
+    },
+    {
+      "id": "metal_south",
+      "kind": "metal_ore",
+      "cell": [
+        60,
+        105
+      ],
+      "amount": 720,
+      "runtime_kind": "metal_ore"
+    },
+    {
+      "id": "metal_north",
+      "kind": "metal_ore",
+      "cell": [
+        87,
+        18
+      ],
+      "amount": 720,
+      "runtime_kind": "metal_ore"
+    },
+    {
+      "id": "fuel_start_west",
+      "kind": "fuel",
+      "cell": [
+        52,
+        60
+      ],
+      "amount": 480,
+      "runtime_kind": null
+    },
+    {
+      "id": "fuel_inner_east",
+      "kind": "fuel",
+      "cell": [
+        76,
+        65
+      ],
+      "amount": 480,
+      "runtime_kind": null
+    },
+    {
+      "id": "fuel_north_west",
+      "kind": "fuel",
+      "cell": [
+        33,
+        30
+      ],
+      "amount": 480,
+      "runtime_kind": null
+    },
+    {
+      "id": "fuel_east",
+      "kind": "fuel",
+      "cell": [
+        98,
+        54
+      ],
+      "amount": 480,
+      "runtime_kind": null
+    },
+    {
+      "id": "fuel_south_west",
+      "kind": "fuel",
+      "cell": [
+        28,
+        101
+      ],
+      "amount": 480,
+      "runtime_kind": null
+    },
+    {
+      "id": "fuel_south",
+      "kind": "fuel",
+      "cell": [
+        88,
+        102
+      ],
+      "amount": 480,
+      "runtime_kind": null
+    },
+    {
+      "id": "crystal_north_west",
+      "kind": "crystal",
+      "cell": [
+        20,
+        14
+      ],
+      "amount": 180,
+      "runtime_kind": "crystals"
+    },
+    {
+      "id": "crystal_north_east",
+      "kind": "crystal",
+      "cell": [
+        112,
+        31
+      ],
+      "amount": 180,
+      "runtime_kind": "crystals"
+    },
+    {
+      "id": "crystal_south_east",
+      "kind": "crystal",
+      "cell": [
+        117,
+        116
+      ],
+      "amount": 180,
+      "runtime_kind": "crystals"
+    },
+    {
+      "id": "crystal_south_west",
+      "kind": "crystal",
+      "cell": [
+        30,
+        111
+      ],
+      "amount": 180,
+      "runtime_kind": "crystals"
+    },
+    {
+      "id": "crystal_far_south",
+      "kind": "crystal",
+      "cell": [
+        68,
+        119
+      ],
+      "amount": 180,
+      "runtime_kind": "crystals"
+    }
+  ],
+  "edge_routes": {
+    "north": [
+      64,
+      1
+    ],
+    "east": [
+      126,
+      64
+    ],
+    "south": [
+      64,
+      126
+    ],
+    "west": [
+      1,
+      64
+    ]
+  },
+  "runtime_economy": "Five-resource Dictionary ledger; balance values retained until the new power/cooling launch.",
+  "notes": "Fuel and water remain reserved. Metal ore and crystals use their stable resource IDs. Four gates are landmarks, not fixed enemy spawn points."
+}

@@ -9,25 +9,26 @@ signal fit_requested
 signal build_requested(id: StringName)
 signal build_cancelled
 signal building_action_requested(action: int, entity_id: int)
-signal production_requested(factory_id: int)
+signal production_requested(factory_id: int, unit_id: StringName)
 signal production_cancelled(factory_id: int, ticket: int)
-signal scenario_requested
 signal settings_requested
 signal minimap_focus_requested(world_position: Vector2)
 signal repair_all_requested
 
-const INK := Color("d5e6eb")
-const MUTED := Color("819ca9")
-const ACCENT := Color("72e9d0")
+const INK := Color("dedfd0")
+const MUTED := Color("94a49a")
+const ACCENT := Color("d9bd81")
 const WIN := Color("8fe08f")
-const BUILD_IDS: Array[StringName] = [&"compute_node", &"armored_wall", &"sentry_tower", &"mining_station", &"assembly_plant"]
-const SHORTCUTS: Array[String] = ["Q", "W", "E", "", ""]
 
 var _clock_label: Label
 var _map_label: Label
 var _state_label: Label
 var _coins_label: Label
 var _ore_label: Label
+var _fuel_label: Label
+var _alloy_label: Label
+var _crystals_label: Label
+var _cooling_label: Label
 var _capacity_label: Label
 var _power_label: Label
 var _cell_label: Label
@@ -36,7 +37,7 @@ var _feedback_label: Label
 var _zoom_label: Label
 var _pause_button: Button
 var _repair_all_button: Button
-var _build_buttons: Dictionary[StringName, Button] = {}
+var _build_menu: MechBuildMenu
 var _selection_title: Label
 var _status_label: Label
 var _build_label: Label
@@ -53,7 +54,7 @@ var _pending_demolish: int = 0
 var _generation: int = -1
 var _panels: Array[Control] = []
 var _building_widgets: Array[Control] = []
-var _unit_catalog: Dictionary = {}
+var _product_menu_key: String = ""
 var _production_widgets: Array[Control] = []
 var _session_ended: bool = false
 var _minimap_panel: Panel
@@ -61,19 +62,24 @@ var _minimap_view: MechMinimapView
 var _expand_button: Button
 var _minimap_fullscreen: bool = false
 var _minimap_layout: Dictionary = {}
+var _portrait_key: String = ""
 
 
 func _ready() -> void:
 	_clock_label = $Root/Header/Clock
-	_map_label = $Root/Header/MapName
+	_map_label = $Root/WorldInfo/MapName
 	_state_label = $Root/Header/State
-	_coins_label = $Root/Header/Coins
-	_ore_label = $Root/Header/Ore
-	_capacity_label = $Root/Header/Capacity
-	_power_label = $Root/Header/Power
+	_coins_label = $Root/Resources/Coins
+	_ore_label = $Root/Resources/Ore
+	_fuel_label = $Root/Resources/Fuel
+	_alloy_label = $Root/Resources/Alloy
+	_crystals_label = $Root/Resources/Crystals
+	_cooling_label = $Root/Resources/Cooling
+	_capacity_label = $Root/Resources/Capacity
+	_power_label = $Root/Resources/Power
 	_cell_label = $Root/Inspector/CellInfo
-	_space_label = $Root/Toolbar/PlacementInfo
-	_feedback_label = $Root/Feedback
+	_space_label = $Root/StatusStrip/PlacementInfo
+	_feedback_label = $Root/StatusStrip/Feedback
 	_zoom_label = $Root/Toolbar/Zoom
 	_pause_button = $Root/Header/Pause
 	_selection_title = $Root/Inspector/Title
@@ -86,7 +92,7 @@ func _ready() -> void:
 	_primary = $Root/Inspector/Primary
 	_demolish = $Root/Inspector/Demolish
 	_dialog = $DemolitionDialog
-	_panels = [$Root/Header, $Root/Inspector, $Root/Toolbar, $Root/SessionResult, $Root/Minimap]
+	_panels = [$Root/Header, $Root/Inspector, $Root/Toolbar, $Root/Resources, $Root/System, $Root/WorldInfo, $Root/StatusStrip, $Root/SessionResult, $Root/Minimap]
 	_minimap_panel = $Root/Minimap
 	_minimap_view = $Root/Minimap/View
 	_expand_button = $Root/Minimap/Expand
@@ -98,27 +104,33 @@ func _ready() -> void:
 		"anchor_right": _minimap_panel.anchor_right, "anchor_bottom": _minimap_panel.anchor_bottom,
 		"offset_left": _minimap_panel.offset_left, "offset_top": _minimap_panel.offset_top,
 		"offset_right": _minimap_panel.offset_right, "offset_bottom": _minimap_panel.offset_bottom}
-	_build_buttons = {&"compute_node": $Root/Toolbar/ComputeNode, &"armored_wall": $Root/Toolbar/ArmoredWall,
-		&"sentry_tower": $Root/Toolbar/SentryTower, &"mining_station": $Root/Toolbar/MiningStation,
-		&"assembly_plant": $Root/Toolbar/AssemblyPlant}
-	for id: StringName in _build_buttons:
-		_build_buttons[id].pressed.connect(build_requested.emit.bind(id))
+	_build_menu = $Root/Toolbar
+	_build_menu.build_requested.connect(build_requested.emit)
+	_build_menu.cancel_requested.connect(build_cancelled.emit)
+	_build_menu.focus_requested.connect(focus_requested.emit)
 	_pause_button.pressed.connect(pause_requested.emit)
-	$Root/Toolbar/CancelBuild.pressed.connect(build_cancelled.emit)
 	$Root/Toolbar/FitMap.pressed.connect(fit_requested.emit)
 	$Root/Toolbar/FocusCore.pressed.connect(focus_requested.emit)
-	$Root/Toolbar/Restart.pressed.connect(restart_requested.emit)
-	$Root/Header/Scenario.pressed.connect(scenario_requested.emit)
-	$Root/Header/Settings.pressed.connect(settings_requested.emit)
+	$Root/System/Restart.pressed.connect(restart_requested.emit)
+	$Root/System/Settings.pressed.connect(settings_requested.emit)
 	$Root/SessionResult/Restart.pressed.connect(restart_requested.emit)
-	$Root/SessionResult/Scenario.pressed.connect(scenario_requested.emit)
 	$Root/Inspector/Produce.pressed.connect(_produce_pressed)
+	$Root/Inspector/Produce.get_popup().id_pressed.connect(_produce_choice)
 	$Root/Inspector/CancelProduction.pressed.connect(_cancel_production_pressed)
 	_production_widgets = [$Root/Inspector/Produce, $Root/Inspector/Queue, $Root/Inspector/CancelProduction]
 	_primary.pressed.connect(_primary_pressed)
 	_demolish.pressed.connect(request_demolition)
 	_dialog.confirmed.connect(_confirm_demolition)
 	_building_widgets = [_status_label, _build_label, _build_bar, _hp_label, _hp_bar, _details, _primary, _demolish]
+	$Root/Inspector/Portrait/Viewport.world_2d = World2D.new()
+	$Root.resized.connect(_layout_fullscreen_minimap)
+	_status_label.clip_text = true
+	for label: Label in [_status_label, _space_label, _feedback_label, _capacity_label]:
+		label.mouse_filter = Control.MOUSE_FILTER_PASS
+	for child: Node in $Root.find_children("*", "Button", true, false):
+		var button: Button = child as Button
+		button.clip_text = true
+		button.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	present_selection({}, {})
 
 
@@ -137,25 +149,22 @@ func dismiss_dialogs() -> void:
 
 
 func present_map(map_state: Dictionary) -> void:
-	var dimensions: Vector2i = map_state["dimensions"]
-	var bounds: Rect2 = MechIsoGeometry.map_bounds(dimensions, map_state["outline"])
-	_map_label.text = "%s   /   正方形地图" % map_state["name"] if is_equal_approx(bounds.size.x, bounds.size.y) else "%s   /   %d × %d" % [map_state["name"], dimensions.x, dimensions.y]
+	_map_label.text = map_state["name"]
 	_minimap_view.present_map(map_state)
 
 
 func present_state(state: Dictionary) -> void:
-	_unit_catalog = state["unit_catalog"]
 	_session_ended = state["session"]["ended"]
 	$Root/SessionResult.visible = _session_ended
-	$Root/Header/Subtitle.text = "白模开发  /  %s" % state["scenario"]
-	$Root/Header/Scenario.text = "单位训练场" if state["scenario"] == "标准开局" else "返回标准开局"
+	$Root/WorldInfo/Subtitle.text = "%s  /  战术视图" % state["scenario"]
 	if _generation != state["generation"]:
 		_pending_demolish = 0
 		_dialog.hide()
 		_generation = state["generation"]
+		_build_menu.reset_menu()
 	var clock: Dictionary = state["clock"]
 	var seconds: float = clock["elapsed_seconds"]
-	_clock_label.text = "%02d:%05.2f" % [int(seconds / 60.0), fmod(seconds, 60.0)]
+	_clock_label.text = "%02d:%02d" % [int(seconds / 60.0), int(fmod(seconds, 60.0))]
 	_state_label.text = "已暂停 · 可规划" if clock["paused"] else "运行中"
 	_state_label.modulate = Color("f0bc79") if clock["paused"] else ACCENT
 	_pause_button.text = "继续 [空格]" if clock["paused"] else "暂停 [空格]"
@@ -171,24 +180,23 @@ func present_state(state: Dictionary) -> void:
 		$Root/SessionResult/Title.add_theme_color_override("font_color", WIN if victory else Color("f27c78"))
 		var summary: String = "威胁已清除，幕一防线守住了" if victory else "%s" % state["session"]["reason"]
 		$Root/SessionResult/Details.text = "%s\n坚守了 %02d:%02d · 战场已停止\n可继续查看战场，或开始新的一局。" % [summary, int(seconds / 60.0), int(fmod(seconds, 60.0))]
-		$Root/SessionResult/Scenario.text = "进入训练场" if state["scenario"] == "标准开局" else "返回标准开局"
 	var economy: Dictionary = state["economy"]
 	_coins_label.text = "算力币  %d   +%d/分钟" % [economy["coins"], economy["income_rate"]]
-	_ore_label.text = "矿石  %d   +%d/分钟" % [economy["ore"], economy["production_per_minute"].y]
-	_capacity_label.text = "算力容量  %d / %d%s" % [economy["capacity_used"], economy["capacity_supply"], "  超载" if economy["overloaded"] else ""]
+	var balances: Dictionary = economy["resources"]
+	var rates: Dictionary = economy["production_per_minute"]
+	_ore_label.text = "金属矿  %d   +%d/分钟" % [balances[&"metal_ore"], rates[&"metal_ore"]]
+	_fuel_label.text = "燃料  %d   +%d/分钟" % [balances[&"fuel"], rates[&"fuel"]]
+	_alloy_label.text = "合金  %d   +%d/分钟" % [balances[&"alloy"], rates[&"alloy"]]
+	_crystals_label.text = "稀有晶体  %d   +%d/分钟" % [balances[&"crystals"], rates[&"crystals"]]
+	_capacity_label.text = "调度  %d / %d%s" % [economy["capacity_used"], economy["capacity_supply"], "  超载" if economy["overloaded"] else ""]
 	_capacity_label.modulate = Color("f27c78") if economy["overloaded"] else INK
-	_capacity_label.tooltip_text = "单位占容 %d，队列预留 %d；出厂仅转移预留，不重复占用" % [economy["unit_capacity"], economy["queued_capacity"]]
+	_capacity_label.tooltip_text = "总算力 %d，系统预留 %d，可调度 %d\n单位占用 %d，队列预留 %d；出厂不重复占用" % [economy["capacity_total"], economy["capacity_system_reserved"], economy["capacity_supply"], economy["unit_capacity"], economy["queued_capacity"]]
 	_power_label.text = "电力余量  %d / %d%s" % [economy["power_free"], economy["power_supply"], "  赤字" if economy["power_deficit"] else ""]
 	_power_label.modulate = Color("f27c78") if economy["power_deficit"] else INK
-	for entry: Dictionary in state["catalog"]:
-		var id: StringName = entry["building_id"]
-		if not _build_buttons.has(id):
-			continue
-		var button: Button = _build_buttons[id]
-		var index: int = BUILD_IDS.find(id)
-		button.text = "%s %s\n%s" % [SHORTCUTS[index], entry["name"], MechResources.text(entry["cost"])]
-		button.disabled = _session_ended or not entry["unavailable_reason"].is_empty()
-		button.tooltip_text = "本局已结束" if _session_ended else (entry["unavailable_reason"] if button.disabled else "占地 %d×%d；施工 %.1f 秒；预留电力 %d、容量 %d" % [entry["footprint"].x, entry["footprint"].y, entry["construction_seconds"], entry["power_cost"], entry["capacity_cost"]])
+	_cooling_label.visible = economy["cooling_supply"] > 0 or economy["cooling_reserved"] > 0
+	_cooling_label.text = "冷却  %.1f / %.1f%s" % [economy["cooling_reserved"] / 10.0, economy["cooling_supply"] / 10.0, "  赤字" if economy["cooling_deficit"] else ""]
+	_cooling_label.modulate = Color("f27c78") if economy["cooling_deficit"] else INK
+	_build_menu.present_catalog(state["catalog"], _session_ended)
 	var repair_all: Dictionary = state.get("repair_all", {})
 	_repair_all_button.disabled = _session_ended or not repair_all.get("ok", false)
 	_repair_all_button.tooltip_text = repair_all.get("reason", "") if _repair_all_button.disabled \
@@ -213,16 +221,7 @@ func set_minimap_fullscreen(active: bool) -> void:
 		return
 	_minimap_fullscreen = active
 	if active:
-		var base: Vector2 = $Root.size
-		var side: float = minf(floor(base.x * 0.6), base.y - 330.0)
-		_minimap_panel.anchor_left = 0.5
-		_minimap_panel.anchor_right = 0.5
-		_minimap_panel.anchor_top = 0.0
-		_minimap_panel.anchor_bottom = 1.0
-		_minimap_panel.offset_left = -side * 0.5
-		_minimap_panel.offset_right = side * 0.5
-		_minimap_panel.offset_top = 150.0
-		_minimap_panel.offset_bottom = -180.0
+		_layout_fullscreen_minimap()
 		feedback("小地图全屏：左键点击/拖动跳转镜头；M 或 Esc 返回。")
 	else:
 		_minimap_panel.anchor_left = _minimap_layout["anchor_left"]
@@ -237,13 +236,24 @@ func set_minimap_fullscreen(active: bool) -> void:
 	_expand_button.text = "还原 [M]" if active else "全屏 [M]"
 
 
+func _layout_fullscreen_minimap() -> void:
+	if not _minimap_fullscreen:
+		return
+	var base: Vector2 = $Root.size
+	var side: float = minf(floor(base.x * 0.60), base.y - 368.0)
+	_minimap_panel.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	_minimap_panel.offset_left = -side * 0.5
+	_minimap_panel.offset_right = side * 0.5
+	_minimap_panel.offset_top = 80.0
+	_minimap_panel.offset_bottom = 80.0 + side
+
+
 func present_zoom(factor: float) -> void:
-	_zoom_label.text = "%d%%" % roundi(factor * 100.0)
+	_zoom_label.text = "%d%% · %s" % [roundi(factor * 100.0), "全图" if factor < MechMapCamera.MIN_ZOOM else "战术"]
 
 
 func present_build(id: StringName) -> void:
-	for value: StringName in _build_buttons:
-		_build_buttons[value].set_pressed_no_signal(value == id)
+	_build_menu.present_build(id)
 
 
 func present_cell(info: Dictionary, preview: Dictionary) -> void:
@@ -269,25 +279,33 @@ func present_cell(info: Dictionary, preview: Dictionary) -> void:
 		_space_label.modulate = ACCENT if preview["ok"] else Color("f27c78")
 	else:
 		var footprint: Vector2i = preview["footprint"]
-		_space_label.text = "%d×%d  ·  %s  ·  %s" % [footprint.x, footprint.y, MechResources.text(preview.get("cost", Vector4i.ZERO)), "可下单；左键轻点确认" if preview["ok"] else preview["reason"]]
+		_space_label.text = "%d×%d  ·  %s  ·  %s" % [footprint.x, footprint.y, MechResources.text(preview.get("cost", {})), "可下单；左键轻点确认" if preview["ok"] else preview["reason"]]
 		_space_label.modulate = ACCENT if preview["ok"] else Color("f27c78")
+
+	_space_label.tooltip_text = _space_label.text
 
 
 func present_selection(building: Dictionary, errors: Dictionary) -> void:
 	_selection = building.duplicate(true)
+	_cell_label.visible = building.is_empty()
+	_present_portrait(building)
 	for widget: Control in _production_widgets:
 		widget.hide()
 	for widget: Control in _building_widgets:
 		widget.visible = not building.is_empty()
 	if building.is_empty():
-		_selection_title.text = "空间信息"
+		_selection_title.text = "区域信息"
 		return
 	var footprint: Vector2i = building["footprint"]
 	_selection_title.text = "%s · %d×%d" % [building["name"], footprint.x, footprint.y]
 	_status_label.text = building["status"]
+	_status_label.tooltip_text = _status_label.text
 	_status_label.modulate = Color("f27c78") if building["phase"] == MechBuildingState.Phase.RUINED else (ACCENT if building["phase"] == MechBuildingState.Phase.OPERATING else Color("f0bc79"))
 	_build_bar.value = 100.0 * float(building["demolition_progress"] if building["phase"] == MechBuildingState.Phase.DEMOLISHING else building["build_progress"])
 	_build_label.text = "%s  %d%%" % ["清除基座进度" if building["phase"] == MechBuildingState.Phase.DEMOLISHING and building["hp"] <= 0 else ("拆除进度" if building["phase"] == MechBuildingState.Phase.DEMOLISHING else "施工进度"), roundi(_build_bar.value)]
+	var show_progress: bool = building["phase"] in [MechBuildingState.Phase.CONSTRUCTING, MechBuildingState.Phase.DEMOLISHING]
+	_build_label.visible = show_progress
+	_build_bar.visible = show_progress
 	_hp_bar.value = 100.0 * float(building["hp"]) / float(building["max_hp"])
 	_hp_label.text = "血量  %d / %d" % [building["hp"], building["max_hp"]]
 	_details.text = "预留  电力 %d · 容量 %d\n供给  电力 +%d · 容量 +%d\n运行收入  +%d 币/分钟" % [building["power_cost"], building["capacity_cost"], building["power_provided"], building["capacity_provided"], building["income_per_minute"]]
@@ -299,7 +317,7 @@ func present_selection(building: Dictionary, errors: Dictionary) -> void:
 		if not mineral.is_empty():
 			_details.text += "\n矿点绑定保留 · 剩余 %d / %d" % [mineral["remaining"], mineral["initial_amount"]]
 	elif not mineral.is_empty():
-		_details.text = "预留  电力 %d · 容量 %d\n采集产率  %d 矿石/分钟\n剩余储量  %d / %d\n%s" % [building["power_cost"], building["capacity_cost"], building["extraction_per_minute"], mineral["remaining"], mineral["initial_amount"], "矿点耗竭，可拆除" if mineral["remaining"] == 0 else "完工且供电后采集"]
+		_details.text = "预留  电力 %d · 容量 %d\n采集产率  %d 金属矿/分钟\n剩余储量  %d / %d\n%s" % [building["power_cost"], building["capacity_cost"], building["extraction_per_minute"], mineral["remaining"], mineral["initial_amount"], "矿点耗竭，可拆除" if mineral["remaining"] == 0 else "完工且供电后采集"]
 	if building["phase"] == MechBuildingState.Phase.CONSTRUCTING:
 		_primary_action = MechCommand.Type.CANCEL_CONSTRUCTION
 		_primary.text = "取消施工 · 全退 %s" % MechResources.text(building["paid_cost"])
@@ -320,26 +338,54 @@ func present_selection(building: Dictionary, errors: Dictionary) -> void:
 	_demolish.text = "清除基座 [X] · 无退款" if building["phase"] == MechBuildingState.Phase.RUINED else "拆除 [X] · 返还 %s" % MechResources.text(building["refund"])
 	_demolish.tooltip_text = errors.get("demolish", "")
 	_demolish.disabled = not _demolish.tooltip_text.is_empty()
+	if not _primary.disabled:
+		_primary.tooltip_text = _primary.text
+	if not _demolish.disabled:
+		_demolish.tooltip_text = _demolish.text
 	var production: Dictionary = building.get("production", {})
 	if not production.is_empty():
 		for widget: Control in _production_widgets:
 			widget.show()
 		var queue: Array = production["queue"]
-		$Root/Inspector/Produce.text = "生产%s · %s" % [_unit_catalog["name"], MechResources.text(_unit_catalog["cost"])]
-		$Root/Inspector/Produce.disabled = not building["production_error"].is_empty()
-		$Root/Inspector/Produce.tooltip_text = building["production_error"]
+		var options: Array = building["unit_options"]
+		var product: Dictionary = options[0]
+		var choices: MenuButton = $Root/Inspector/Produce
+		choices.text = "选择生产单位" if options.size() > 1 else "生产%s · %s" % [product["name"], MechResources.text(product["cost"])]
+		var unavailable: bool = true
+		var names := PackedStringArray()
+		for option: Dictionary in options:
+			unavailable = unavailable and not option["production_error"].is_empty()
+			names.append(option["name"])
+		choices.disabled = unavailable
+		choices.tooltip_text = product["production_error"] if options.size() == 1 else "选择兵种；下单即支付资源并预留调度"
+		var menu_key: String = str(building["entity_id"]) + str(options)
+		if menu_key != _product_menu_key:
+			_product_menu_key = menu_key
+			var popup: PopupMenu = choices.get_popup()
+			popup.clear()
+			if options.size() > 1:
+				for index: int in range(options.size()):
+					var option: Dictionary = options[index]
+					popup.add_item("%s · %s" % [option["name"], MechResources.text(option["cost"])], index)
+					popup.set_item_metadata(index, option["unit_id"])
+					popup.set_item_disabled(index, not option["production_error"].is_empty())
 		$Root/Inspector/CancelProduction.disabled = _session_ended or queue.is_empty()
-		$Root/Inspector/Queue.text = "队列 %d / %d · %d%%\n%s" % [queue.size(), building["queue_limit"], roundi(production["progress"] * 100), "出口受阻，订单保留" if production["blocked"] else "选厂后右键设置集结点"]
+		$Root/Inspector/Queue.text = "队列 %d / %d · %d%%" % [queue.size(), building["queue_limit"], roundi(production["progress"] * 100)]
+		$Root/Inspector/Queue.tooltip_text = "出口受阻，订单保留" if production["blocked"] else "选厂后右键设置集结点"
 		if building["phase"] == MechBuildingState.Phase.OPERATING:
+			_build_label.show()
+			_build_bar.show()
 			_build_label.text = "生产进度  %d%%" % roundi(production["progress"] * 100)
 			_build_bar.value = production["progress"] * 100
 			if production["blocked"]:
 				_status_label.text = "出口受阻 · 等待空位"
 		var rally: Vector2i = production["rally"]
-		_details.text = "预留 电力 %d · 容量 %d\n集结点 (%d, %d)\n每名卫兵占容 %d，生产 %.0f 秒\n取消队首全额退资源并释放容量" % [building["power_cost"], building["capacity_cost"], rally.x, rally.y, _unit_catalog["capacity_cost"], _unit_catalog["production_seconds"]]
+		_details.text = "预留 电力 %d · 调度 %d\n集结点 (%d, %d)\n可生产：%s\n取消队首全额退资源并释放调度" % [building["power_cost"], building["capacity_cost"], rally.x, rally.y, " / ".join(names)]
 
 
 func present_units(units: Array[Dictionary]) -> void:
+	_cell_label.hide()
+	_present_portrait(units[0])
 	var hp: int = 0
 	var max_hp: int = 0
 	var capacity: int = 0
@@ -349,16 +395,45 @@ func present_units(units: Array[Dictionary]) -> void:
 		max_hp += unit["max_hp"]
 		capacity += unit["capacity_cost"]
 		orders[unit["order"]] = true
-	_selection_title.text = "卫兵 × %d" % units.size()
+	var same_type: bool = true
+	for unit: Dictionary in units:
+		same_type = same_type and unit["name"] == units[0]["name"]
+	_selection_title.text = "%s × %d" % [units[0]["name"] if same_type else "混合部队", units.size()]
 	_status_label.show()
 	_status_label.text = {&"idle": "待命 / 射程内开火 · 不追击", &"move": "移动中", &"attack_move": "攻击移动中", &"attack": "攻击指定目标"}.get(orders.keys()[0], "待命") if orders.size() == 1 else "多种指令执行中"
 	_status_label.modulate = ACCENT
+	_status_label.tooltip_text = _status_label.text
 	_hp_label.show()
 	_hp_label.text = "总血量 %d / %d · 占容 %d" % [hp, max_hp, capacity]
 	_hp_bar.show()
 	_hp_bar.value = 100.0 * hp / maxi(1, max_hp)
 	_details.show()
 	_details.text = "右键：移动 / 攻击目标\n移动抵达后：射程内开火，不追击\nA＋左键：沿途索敌追击后继续前进\nCtrl＋数字：编队，数字：召回\nShift 追加，Ctrl 点击切换选择"
+
+
+func _present_portrait(entity: Dictionary) -> void:
+	var portrait: SubViewportContainer = $Root/Inspector/Portrait
+	portrait.visible = not entity.is_empty()
+	if entity.is_empty():
+		return
+	var key: String = "%s_%s_%d_%d_%s" % [entity["kind"], entity["footprint"], entity.get("phase", -1), int(entity.get("build_progress", 1.0) * 10), entity.get("hp", 1) <= 0]
+	if key == _portrait_key:
+		return
+	_portrait_key = key
+	var model: MechFoundationView = $Root/Inspector/Portrait/Viewport/Model
+	var copy: Dictionary = entity.duplicate(true)
+	copy["position"] = Vector2(copy["footprint"]) * 0.5 if copy.get("is_building", false) else Vector2.ZERO
+	copy["origin"] = Vector2i.ZERO
+	copy["has_order"] = false
+	copy["order"] = &"idle"
+	copy["shot_ticks"] = 0
+	copy["hp"] = 0 if copy.get("hp", 1) <= 0 else copy.get("max_hp", 1)
+	var factor: float = 0.75 if copy["kind"] == &"mainbrain" else (1.1 if copy.get("is_building", false) else 2.7)
+	factor *= portrait.size.x / 160.0
+	model.scale = Vector2.ONE * factor
+	model.position = portrait.size * Vector2(0.5, 0.725) - MechIsoGeometry.project(copy["position"]) * factor
+	model.present({"entities": [copy], "minerals": []})
+	$Root/Inspector/Portrait/Viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
 
 
 func present_drag(rect: Rect2, active: bool) -> void:
@@ -368,8 +443,14 @@ func present_drag(rect: Rect2, active: bool) -> void:
 
 
 func _produce_pressed() -> void:
+	var options: Array = _selection.get("unit_options", [])
+	if options.size() == 1:
+		production_requested.emit(_selection["entity_id"], options[0]["unit_id"])
+
+
+func _produce_choice(index: int) -> void:
 	if not _selection.is_empty():
-		production_requested.emit(_selection["entity_id"])
+		production_requested.emit(_selection["entity_id"], $Root/Inspector/Produce.get_popup().get_item_metadata(index))
 
 
 func _cancel_production_pressed() -> void:
@@ -383,6 +464,7 @@ func _cancel_production_pressed() -> void:
 func feedback(message: String, failed: bool = false) -> void:
 	_feedback_label.text = message
 	_feedback_label.modulate = Color("f0bc79") if failed else ACCENT
+	_feedback_label.tooltip_text = message
 
 
 func request_demolition() -> void:
@@ -393,7 +475,7 @@ func request_demolition() -> void:
 	if _selection.get("phase", MechBuildingState.Phase.OPERATING) == MechBuildingState.Phase.RUINED:
 		_dialog.dialog_text = "清除「%s」基座需要 %.1f 游戏秒，完成时不退款。\n占地与矿点绑定在清除完成时释放；可取消清除保留基座。" % [_selection["name"], _selection["demolition_seconds"]]
 	else:
-		_dialog.dialog_text = "拆除「%s」需要 %.1f 游戏秒，完成后返还 %s。\n期间建筑停机，占用与矿点绑定在拆除完成时释放。" % [_selection["name"], _selection["demolition_seconds"], MechResources.text(_selection["refund"])]
+		_dialog.dialog_text = "拆除「%s」需要 %.1f 游戏秒，完成后返还 %s。\n期间建筑停机，运营预留在拆除完成时释放；基座清除后释放土地与矿点绑定。" % [_selection["name"], _selection["demolition_seconds"], MechResources.text(_selection["refund"])]
 	_dialog.popup_centered(Vector2i(540, 210))
 
 

@@ -119,12 +119,12 @@ func noises() -> Array[Dictionary]:
 ## 感疫转化 (waves-enemies.md §8.1, values.md §14): wreck value → builders at
 ## the wreck, plus one combat-level pulse. Act-one composition is builders only;
 ## act two/three mixing lands with those acts.
-func infect(cost: Vector4i, position: Vector2) -> Array[Dictionary]:
+func infect(cost: Dictionary, position: Vector2) -> Array[Dictionary]:
 	var requests: Array[Dictionary] = []
 	if not _active or _builder == null or not MechResources.valid(cost):
 		return requests
 	note_combat(position)
-	var worth: int = cost.x + cost.y * 2 + cost.z * 3 + cost.w * 10
+	var worth: int = MechResources.worth(cost)
 	var count: int = maxi(1, floori(float(worth) / _infection_divisor))
 	for index: int in range(count):
 		requests.append({"enemy_id": _builder.enemy_id, "position": position})

@@ -1,8 +1,7 @@
 extends Node2D
 ## Composition root. Only commands may change simulation state.
 
-const SETTINGS: MechFoundationSettings = preload("res://content/foundation.tres")
-const TRAINING_SETTINGS: MechFoundationSettings = preload("res://content/training.tres")
+const SETTINGS: MechFoundationSettings = preload("res://content/development_128.tres")
 
 var _sim := MechSimCore.new()
 var _commands := MechCommandQueue.new()
@@ -51,7 +50,7 @@ var _perf_frame_peak: float = 0.0
 func _ready() -> void:
 	_perf_enabled = OS.get_cmdline_user_args().has("--perf")
 	_sim.profiling_enabled = _perf_enabled
-	var initial_settings: MechFoundationSettings = TRAINING_SETTINGS if OS.get_cmdline_user_args().has("--training") else SETTINGS
+	var initial_settings: MechFoundationSettings = SETTINGS
 	Engine.physics_ticks_per_second = initial_settings.simulation_hz
 	if not _sim.configure(initial_settings):
 		get_tree().quit(1)
@@ -68,7 +67,6 @@ func _ready() -> void:
 	_hud.building_action_requested.connect(_building_action)
 	_hud.production_requested.connect(_queue_unit)
 	_hud.production_cancelled.connect(_cancel_production)
-	_hud.scenario_requested.connect(_toggle_scenario)
 	_hud.settings_requested.connect(_open_settings)
 	_hud.minimap_focus_requested.connect(_focus_minimap)
 	_hud.repair_all_requested.connect(_repair_all)
@@ -402,19 +400,15 @@ func _repair_all() -> void:
 	_commands.submit(MechCommand.new(MechCommand.Type.REPAIR_ALL, {}))
 
 
-func _queue_unit(factory_id: int) -> void:
-	_commands.submit(MechCommand.new(MechCommand.Type.QUEUE_UNIT, {"factory_id": factory_id}))
+func _queue_unit(factory_id: int, unit_id: StringName = &"") -> void:
+	var payload: Dictionary = {"factory_id": factory_id}
+	if unit_id != &"":
+		payload["unit_id"] = unit_id
+	_commands.submit(MechCommand.new(MechCommand.Type.QUEUE_UNIT, payload))
 
 
 func _cancel_production(factory_id: int, ticket: int) -> void:
 	_commands.submit(MechCommand.new(MechCommand.Type.CANCEL_PRODUCTION, {"factory_id": factory_id, "ticket": ticket}))
-
-
-func _toggle_scenario() -> void:
-	_cancel_selection_drag()
-	_cancel_build()
-	var settings: MechFoundationSettings = TRAINING_SETTINGS if _sim.scenario_name() != TRAINING_SETTINGS.scenario_name else SETTINGS
-	_commands.submit(MechCommand.new(MechCommand.Type.LOAD_SCENARIO, {"settings": settings}))
 
 
 func _select_starting_units() -> void:
@@ -422,9 +416,12 @@ func _select_starting_units() -> void:
 	for entity: Dictionary in _state["entities"]:
 		if entity.get("is_unit", false) and entity["team"] == 1:
 			ids.append(entity["id"])
+	var has_units: bool = not ids.is_empty()
+	if ids.is_empty():
+		ids.append(_state["mainbrain_id"])
 	_selection.select(ids)
 	_refresh_selection()
-	if not ids.is_empty():
+	if has_units:
 		_hud.feedback("训练场：已选择 %d 名卫兵。右键移动/攻击红叉训练靶；选工厂可生产卫兵。" % ids.size())
 
 
@@ -501,7 +498,7 @@ func _issue_unit_order(attack_move: bool) -> void:
 		for entity: Dictionary in _state["entities"]:
 			if not entity["id"] in _selection.ids:
 				continue
-			if entity.get("produced_unit", &"") != &"":
+			if not entity.get("produced_units", []).is_empty():
 				_commands.submit(MechCommand.new(MechCommand.Type.SET_RALLY, {"factory_id": entity["id"], "cell": cell}))
 				break
 			elif entity["kind"] == &"probe":

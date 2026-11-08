@@ -1,0 +1,661 @@
+{
+  "schema": "generate2dmap.nav_report.v1",
+  "status": "pass",
+  "method": "plan Appendix C validity (centre + 8 footprint samples against walk regions, solids, object footprints scaled once, tile collision and material classes) on a grid of cell max(1, round(r/2)) px; 4-neighbour moves open when segmentClear holds between node centres (samples every cell/2, plus the exact thin-gap centre path and one_way direction); BFS from every spawn and portal arrival to every interaction, exit, anchor slot and approach point",
+  "notProven": [
+    "that the collision data matches the painted art",
+    "positions closer than one grid cell to a blocker (the grid samples cell centres)",
+    "runtime movement code: map-runtime.mjs parity is tested during integration",
+    "links to maps not passed with --link"
+  ],
+  "checks": [
+    {
+      "id": "starts_valid",
+      "status": "pass",
+      "value": {
+        "starts": 1,
+        "blocked": []
+      },
+      "threshold": {
+        "blocked": 0
+      }
+    },
+    {
+      "id": "targets_reachable",
+      "status": "pass",
+      "value": {
+        "reachable": 34,
+        "total": 34,
+        "unreachable": []
+      },
+      "threshold": {
+        "unreachable": 0
+      }
+    },
+    {
+      "id": "portals_inside_world",
+      "status": "pass",
+      "value": {
+        "outside": []
+      },
+      "threshold": {
+        "outside": 0
+      }
+    },
+    {
+      "id": "arrivals_outside_triggers",
+      "status": "pass",
+      "value": {
+        "problems": 0
+      },
+      "threshold": {
+        "problems": 0
+      }
+    },
+    {
+      "id": "reciprocal_links",
+      "status": "pass",
+      "value": {
+        "links": [],
+        "notChecked": []
+      },
+      "threshold": {
+        "errors": 0
+      }
+    },
+    {
+      "id": "thin_gaps",
+      "status": "pass",
+      "value": 0,
+      "threshold": "reported: moves the thin-gap rule closed although every footprint sample was valid"
+    },
+    {
+      "id": "unreachable_walkable_area",
+      "status": "pass",
+      "value": {
+        "pockets": 0,
+        "cells": 0
+      },
+      "threshold": "reported"
+    },
+    {
+      "id": "blocked_rects_union",
+      "status": "pass",
+      "value": {
+        "rects": 324,
+        "blockedCells": 83156
+      },
+      "threshold": "union == blocked cells"
+    },
+    {
+      "id": "footprints_scaled_once",
+      "status": "pass",
+      "value": {
+        "objectSolids": 0
+      },
+      "threshold": "object footprint x scale, never inflated by the actor radius"
+    }
+  ],
+  "inputs": [
+    {
+      "path": "../map-bundle.json",
+      "sha256": "37e6ae52b527b6d82dd5635b2613b9416f984d79144c88d547273361bf6aa45d",
+      "bytes": 27643
+    }
+  ],
+  "outputs": [
+    {
+      "path": "nav-grid.json",
+      "sha256": "de848f81a93c4d0af1327d85c322f324efdf753c3e6cbe3f881ffdc6f50b542b",
+      "bytes": 550702
+    },
+    {
+      "path": "nav-debug.png",
+      "sha256": "a15e44a71587dcb0d0be26ee2b7dea1317512ab5cb30c92d388fa53c3d497076",
+      "bytes": 14063
+    }
+  ],
+  "tool": {
+    "name": "map_nav.py",
+    "version": "0.4.0"
+  },
+  "map": "development_basin_128",
+  "cell": 1,
+  "starts": [
+    {
+      "kind": "spawn",
+      "id": "base",
+      "point": [
+        242.0,
+        274.0
+      ],
+      "reachable": true,
+      "steps": 0,
+      "node": [
+        241.5,
+        273.5
+      ],
+      "reason": null
+    }
+  ],
+  "targets": [
+    {
+      "kind": "approach",
+      "id": "north/approach[0]",
+      "point": [
+        258.0,
+        174.0
+      ],
+      "reachable": true,
+      "steps": 110,
+      "node": [
+        256.5,
+        176.5
+      ],
+      "reason": null
+    },
+    {
+      "kind": "approach",
+      "id": "east/approach[0]",
+      "point": [
+        358.0,
+        258.0
+      ],
+      "reachable": true,
+      "steps": 124,
+      "node": [
+        356.5,
+        260.5
+      ],
+      "reason": null
+    },
+    {
+      "kind": "approach",
+      "id": "south/approach[0]",
+      "point": [
+        258.0,
+        346.0
+      ],
+      "reachable": true,
+      "steps": 80,
+      "node": [
+        256.5,
+        344.5
+      ],
+      "reason": null
+    },
+    {
+      "kind": "approach",
+      "id": "west/approach[0]",
+      "point": [
+        146.0,
+        254.0
+      ],
+      "reachable": true,
+      "steps": 108,
+      "node": [
+        148.5,
+        256.5
+      ],
+      "reason": null
+    },
+    {
+      "kind": "approach",
+      "id": "edge_north/approach[0]",
+      "point": [
+        258.0,
+        6.0
+      ],
+      "reachable": true,
+      "steps": 278,
+      "node": [
+        256.5,
+        8.5
+      ],
+      "reason": null
+    },
+    {
+      "kind": "approach",
+      "id": "edge_east/approach[0]",
+      "point": [
+        506.0,
+        258.0
+      ],
+      "reachable": true,
+      "steps": 328,
+      "node": [
+        504.5,
+        256.5
+      ],
+      "reason": null
+    },
+    {
+      "kind": "approach",
+      "id": "edge_south/approach[0]",
+      "point": [
+        258.0,
+        506.0
+      ],
+      "reachable": true,
+      "steps": 240,
+      "node": [
+        256.5,
+        504.5
+      ],
+      "reason": null
+    },
+    {
+      "kind": "approach",
+      "id": "edge_west/approach[0]",
+      "point": [
+        6.0,
+        258.0
+      ],
+      "reachable": true,
+      "steps": 314,
+      "node": [
+        8.5,
+        260.5
+      ],
+      "reason": null
+    },
+    {
+      "kind": "approach",
+      "id": "metal_start_west/approach[0]",
+      "point": [
+        234.0,
+        258.0
+      ],
+      "reachable": true,
+      "steps": 16,
+      "node": [
+        236.5,
+        260.5
+      ],
+      "reason": null
+    },
+    {
+      "kind": "approach",
+      "id": "metal_start_east/approach[0]",
+      "point": [
+        282.0,
+        258.0
+      ],
+      "reachable": true,
+      "steps": 48,
+      "node": [
+        280.5,
+        260.5
+      ],
+      "reason": null
+    },
+    {
+      "kind": "approach",
+      "id": "metal_inner_north/approach[0]",
+      "point": [
+        194.0,
+        206.0
+      ],
+      "reachable": true,
+      "steps": 108,
+      "node": [
+        196.5,
+        208.5
+      ],
+      "reason": null
+    },
+    {
+      "kind": "approach",
+      "id": "metal_inner_south/approach[0]",
+      "point": [
+        310.0,
+        294.0
+      ],
+      "reachable": true,
+      "steps": 80,
+      "node": [
+        308.5,
+        292.5
+      ],
+      "reason": null
+    },
+    {
+      "kind": "approach",
+      "id": "metal_west/approach[0]",
+      "point": [
+        110.0,
+        206.0
+      ],
+      "reachable": true,
+      "steps": 192,
+      "node": [
+        112.5,
+        208.5
+      ],
+      "reason": null
+    },
+    {
+      "kind": "approach",
+      "id": "metal_east/approach[0]",
+      "point": [
+        410.0,
+        306.0
+      ],
+      "reachable": true,
+      "steps": 192,
+      "node": [
+        408.5,
+        304.5
+      ],
+      "reason": null
+    },
+    {
+      "kind": "approach",
+      "id": "metal_south/approach[0]",
+      "point": [
+        238.0,
+        418.0
+      ],
+      "reachable": true,
+      "steps": 140,
+      "node": [
+        240.5,
+        416.5
+      ],
+      "reason": null
+    },
+    {
+      "kind": "approach",
+      "id": "metal_north/approach[0]",
+      "point": [
+        346.0,
+        70.0
+      ],
+      "reachable": true,
+      "steps": 300,
+      "node": [
+        344.5,
+        72.5
+      ],
+      "reason": null
+    },
+    {
+      "kind": "approach",
+      "id": "fuel_start_west/approach[0]",
+      "point": [
+        206.0,
+        238.0
+      ],
+      "reachable": true,
+      "steps": 64,
+      "node": [
+        208.5,
+        240.5
+      ],
+      "reason": null
+    },
+    {
+      "kind": "approach",
+      "id": "fuel_inner_east/approach[0]",
+      "point": [
+        302.0,
+        258.0
+      ],
+      "reachable": true,
+      "steps": 68,
+      "node": [
+        300.5,
+        260.5
+      ],
+      "reason": null
+    },
+    {
+      "kind": "approach",
+      "id": "fuel_north_west/approach[0]",
+      "point": [
+        134.0,
+        118.0
+      ],
+      "reachable": true,
+      "steps": 256,
+      "node": [
+        136.5,
+        120.5
+      ],
+      "reason": null
+    },
+    {
+      "kind": "approach",
+      "id": "fuel_east/approach[0]",
+      "point": [
+        390.0,
+        214.0
+      ],
+      "reachable": true,
+      "steps": 200,
+      "node": [
+        388.5,
+        216.5
+      ],
+      "reason": null
+    },
+    {
+      "kind": "approach",
+      "id": "fuel_south_west/approach[0]",
+      "point": [
+        110.0,
+        402.0
+      ],
+      "reachable": true,
+      "steps": 252,
+      "node": [
+        112.5,
+        400.5
+      ],
+      "reason": null
+    },
+    {
+      "kind": "approach",
+      "id": "fuel_south/approach[0]",
+      "point": [
+        350.0,
+        406.0
+      ],
+      "reachable": true,
+      "steps": 232,
+      "node": [
+        348.5,
+        404.5
+      ],
+      "reason": null
+    },
+    {
+      "kind": "approach",
+      "id": "crystal_north_west/approach[0]",
+      "point": [
+        78.0,
+        54.0
+      ],
+      "reachable": true,
+      "steps": 376,
+      "node": [
+        80.5,
+        56.5
+      ],
+      "reason": null
+    },
+    {
+      "kind": "approach",
+      "id": "crystal_north_east/approach[0]",
+      "point": [
+        446.0,
+        122.0
+      ],
+      "reachable": true,
+      "steps": 348,
+      "node": [
+        444.5,
+        124.5
+      ],
+      "reason": null
+    },
+    {
+      "kind": "approach",
+      "id": "crystal_south_east/approach[0]",
+      "point": [
+        466.0,
+        462.0
+      ],
+      "reachable": true,
+      "steps": 418,
+      "node": [
+        468.5,
+        460.5
+      ],
+      "reason": null
+    },
+    {
+      "kind": "approach",
+      "id": "crystal_south_west/approach[0]",
+      "point": [
+        118.0,
+        442.0
+      ],
+      "reachable": true,
+      "steps": 284,
+      "node": [
+        120.5,
+        440.5
+      ],
+      "reason": null
+    },
+    {
+      "kind": "approach",
+      "id": "crystal_far_south/approach[0]",
+      "point": [
+        270.0,
+        474.0
+      ],
+      "reachable": true,
+      "steps": 220,
+      "node": [
+        268.5,
+        472.5
+      ],
+      "reason": null
+    },
+    {
+      "kind": "approach",
+      "id": "wind_start/approach[0]",
+      "point": [
+        230.0,
+        242.0
+      ],
+      "reachable": true,
+      "steps": 36,
+      "node": [
+        232.5,
+        244.5
+      ],
+      "reason": null
+    },
+    {
+      "kind": "approach",
+      "id": "solar_start/approach[0]",
+      "point": [
+        274.0,
+        238.0
+      ],
+      "reachable": true,
+      "steps": 60,
+      "node": [
+        272.5,
+        240.5
+      ],
+      "reason": null
+    },
+    {
+      "kind": "approach",
+      "id": "wind_expansion/approach[0]",
+      "point": [
+        310.0,
+        310.0
+      ],
+      "reachable": true,
+      "steps": 96,
+      "node": [
+        308.5,
+        308.5
+      ],
+      "reason": null
+    },
+    {
+      "kind": "approach",
+      "id": "solar_expansion/approach[0]",
+      "point": [
+        198.0,
+        282.0
+      ],
+      "reachable": true,
+      "steps": 44,
+      "node": [
+        200.5,
+        280.5
+      ],
+      "reason": null
+    },
+    {
+      "kind": "approach",
+      "id": "assembly_yard/approach[0]",
+      "point": [
+        278.0,
+        278.0
+      ],
+      "reachable": true,
+      "steps": 32,
+      "node": [
+        276.5,
+        276.5
+      ],
+      "reason": null
+    },
+    {
+      "kind": "approach",
+      "id": "industry_yard/approach[0]",
+      "point": [
+        194.0,
+        254.0
+      ],
+      "reachable": true,
+      "steps": 60,
+      "node": [
+        196.5,
+        256.5
+      ],
+      "reason": null
+    },
+    {
+      "kind": "approach",
+      "id": "relay_fuel/approach[0]",
+      "point": [
+        226.0,
+        250.0
+      ],
+      "reachable": true,
+      "steps": 32,
+      "node": [
+        228.5,
+        252.5
+      ],
+      "reason": null
+    }
+  ],
+  "links": [],
+  "thinGaps": [],
+  "unreachablePockets": [],
+  "bundleNav": {
+    "cell": 1,
+    "grid": "nav-grid.json"
+  },
+  "problems": []
+}

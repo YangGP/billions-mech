@@ -16,7 +16,7 @@ func clear() -> void:
 
 
 func register_factory(building: MechBuildingState) -> void:
-	if building.definition.produced_unit == &"":
+	if building.definition.produced_units.is_empty():
 		return
 	_queues[building.entity_id] = []
 	_rallies[building.entity_id] = building.origin + Vector2i(0, building.definition.footprint.y)
@@ -31,7 +31,7 @@ func reserved_capacity() -> int:
 
 
 func order_error(building: MechBuildingState, rules: MechUnitDefinition, economy: MechEconomySystem) -> String:
-	if building == null or building.definition.produced_unit != rules.unit_id:
+	if building == null or rules == null or rules.unit_id not in building.definition.produced_units:
 		return "请选择组装厂"
 	if not building.operating():
 		return "工厂须已完工且正常供电"
@@ -43,7 +43,7 @@ func order_error(building: MechBuildingState, rules: MechUnitDefinition, economy
 func enqueue(factory_id: int, rules: MechUnitDefinition, hz: int) -> int:
 	var ticket: int = _next_ticket
 	_next_ticket += 1
-	_queues[factory_id].append({"ticket": ticket, "paid_cost": rules.cost,
+	_queues[factory_id].append({"ticket": ticket, "unit_id": rules.unit_id, "paid_cost": MechResources.copy(rules.cost),
 		"capacity_cost": rules.capacity_cost, "elapsed": 0,
 		"total": maxi(1, ceili(rules.production_seconds * hz))})
 	return ticket
@@ -56,7 +56,7 @@ func has_ticket(factory_id: int, ticket: int) -> bool:
 	return false
 
 
-func cancel(factory_id: int, ticket: int) -> Vector4i:
+func cancel(factory_id: int, ticket: int) -> Dictionary:
 	var queue: Array = _queues[factory_id]
 	for index: int in range(queue.size()):
 		var item: Dictionary = queue[index]
@@ -64,14 +64,14 @@ func cancel(factory_id: int, ticket: int) -> Vector4i:
 			queue.remove_at(index)
 			_blocked.erase(factory_id)
 			return item["paid_cost"]
-	return Vector4i.ZERO
+	return MechResources.empty()
 
 
-func remove_factory(factory_id: int, refund_orders: bool) -> Vector4i:
-	var refund := Vector4i.ZERO
+func remove_factory(factory_id: int, refund_orders: bool) -> Dictionary:
+	var refund := MechResources.empty()
 	if refund_orders:
 		for item: Dictionary in _queues.get(factory_id, []):
-			refund += item["paid_cost"]
+			refund = MechResources.add(refund, item["paid_cost"])
 	_queues.erase(factory_id)
 	_rallies.erase(factory_id)
 	_blocked.erase(factory_id)
@@ -104,7 +104,7 @@ func advance(construction: MechConstructionSystem, spawn: Callable) -> bool:
 		item["elapsed"] = mini(item["elapsed"] + 1, item["total"])
 		if item["elapsed"] < item["total"]:
 			continue
-		if spawn.call(building, _rallies[factory_id]):
+		if spawn.call(building, _rallies[factory_id], item["unit_id"]):
 			queue.pop_front()
 			_blocked.erase(factory_id)
 			changed = true

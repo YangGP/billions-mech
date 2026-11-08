@@ -5,7 +5,7 @@ extends Resource
 
 @export var mineral_id: StringName
 @export var cell: Vector2i
-@export_enum("ore", "metal", "rare") var resource_kind: String = "ore"
+@export_enum("metal_ore", "fuel", "crystals") var resource_kind: String = "metal_ore"
 @export_range(1, 1000000, 1) var amount: int = 400
 
 

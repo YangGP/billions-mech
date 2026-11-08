@@ -20,6 +20,7 @@ var _goal: Vector2i = Vector2i.ZERO
 var _bounds := Rect2i()
 var _cost := PackedFloat32Array()
 var _dist := PackedFloat32Array()
+var _source := PackedInt32Array()
 
 
 func rebuild(grid: MechGridState, goal: Vector2i) -> void:
@@ -29,28 +30,46 @@ func rebuild(grid: MechGridState, goal: Vector2i) -> void:
 	var count: int = _dimensions.x * _dimensions.y
 	_cost.resize(count)
 	_dist.resize(count)
+	_source.resize(count)
 	_fill_costs(grid)
 	var sources: Array[Vector2i] = [goal]
 	_integrate_sources(sources)
 
 
-## Local tactical field: multiple building footprint cells are sources, and
-## integration is confined to `bounds`. Used by the assault field only.
-func rebuild_local(grid: MechGridState, bounds: Rect2i, sources: Array[Vector2i]) -> void:
-	_dimensions = grid.dimensions()
-	_bounds = bounds.intersection(Rect2i(Vector2i.ZERO, _dimensions))
+## Local fields respect live occupancy and allocate only their own bounds.
+## Optional source values connect boundary exits to the static global field.
+func rebuild_local(grid: MechGridState, bounds: Rect2i, sources: Array[Vector2i], source_values: Dictionary = {}, ignored_occupants: Dictionary = {}) -> void:
+	_bounds = bounds.intersection(Rect2i(Vector2i.ZERO, grid.dimensions()))
+	_dimensions = _bounds.size
 	var count: int = _dimensions.x * _dimensions.y
 	_cost.resize(count)
 	_dist.resize(count)
-	_fill_costs(grid)
-	_integrate_sources(sources)
+	_source.resize(count)
+	_fill_costs(grid, true, ignored_occupants)
+	_integrate_sources(sources, source_values)
 
 
 ## Integration distance to the goal; INF for unreachable/off-map cells.
 func cost_at(cell: Vector2i) -> float:
 	if not _contains(cell):
 		return INF
-	return _dist[cell.y * _dimensions.x + cell.x]
+	return _dist[_index(cell)]
+
+
+func source_at(cell: Vector2i) -> Vector2i:
+	if not _contains(cell) or not is_reachable(cell):
+		return Vector2i(-1, -1)
+	var index: int = _source[_index(cell)]
+	return _bounds.position + Vector2i(index % _dimensions.x, index / _dimensions.x)
+
+
+func blocks_at(cell: Vector2i) -> bool:
+	return not _contains(cell) or not is_finite(_cost[_index(cell)])
+
+
+func _index(cell: Vector2i) -> int:
+	var local: Vector2i = cell - _bounds.position
+	return local.y * _dimensions.x + local.x
 
 
 func is_reachable(cell: Vector2i) -> bool:
@@ -66,6 +85,10 @@ func flow_at(cell: Vector2i) -> Vector2:
 	var best: float = here
 	var best_dir: Vector2i = Vector2i.ZERO
 	for direction: Vector2i in _DIRS_8:
+		if direction.x != 0 and direction.y != 0 and (
+			blocks_at(cell + Vector2i(direction.x, 0)) or blocks_at(cell + Vector2i(0, direction.y))
+		):
+			continue
 		var distance: float = cost_at(cell + direction)
 		if is_finite(distance) and distance < best:
 			best = distance
@@ -79,15 +102,14 @@ func _contains(cell: Vector2i) -> bool:
 	return _bounds.has_point(cell)
 
 
-## Enter cost per cell is only the terrain weight. Buildings, walls and their
-## HP are intentionally absent: they are local movement blockers handled by the
-## enemy step, not route-cost inputs.
-func _fill_costs(grid: MechGridState) -> void:
+## Global enter costs use terrain alone. Local fields also mark blocked cells
+## according to the movement class; neither mode reads building HP.
+func _fill_costs(grid: MechGridState, include_buildings: bool = false, ignored_occupants: Dictionary = {}) -> void:
 	for y: int in range(_bounds.position.y, _bounds.end.y):
 		for x: int in range(_bounds.position.x, _bounds.end.x):
 			var cell := Vector2i(x, y)
-			var index: int = y * _dimensions.x + x
-			if grid.terrain_at(cell) == MechGridState.Terrain.OBSTACLE:
+			var index: int = _index(cell)
+			if not grid.is_walkable(cell, include_buildings, ignored_occupants):
 				_cost[index] = INF
 			else:
 				_cost[index] = grid.movement_weight(cell)
@@ -95,40 +117,44 @@ func _fill_costs(grid: MechGridState) -> void:
 
 ## Dijkstra wavefront from all sources over enter costs, with a flat binary heap
 ## and lazy stale-entry deletion. 4-connected integration; flow_at adds diagonals.
-func _integrate_sources(sources: Array[Vector2i]) -> void:
+func _integrate_sources(sources: Array[Vector2i], source_values: Dictionary = {}) -> void:
 	if _bounds.size.x <= 0 or _bounds.size.y <= 0:
 		return
 	for y: int in range(_bounds.position.y, _bounds.end.y):
 		for x: int in range(_bounds.position.x, _bounds.end.x):
-			_dist[y * _dimensions.x + x] = INF
+			_dist[_index(Vector2i(x, y))] = INF
+	_source.fill(-1)
 	var heap_key := PackedFloat32Array()
 	var heap_value := PackedInt32Array()
 	for source: Vector2i in sources:
 		if not _contains(source):
 			continue
-		var index: int = source.y * _dimensions.x + source.x
-		if not is_finite(_cost[index]) or _dist[index] <= 0.0:
+		var index: int = _index(source)
+		var initial: float = source_values.get(source, 0.0)
+		if not is_finite(_cost[index]) or not is_finite(initial) or _dist[index] <= initial:
 			continue
-		_dist[index] = 0.0
-		_heap_push(heap_key, heap_value, 0.0, index)
+		_dist[index] = initial
+		_source[index] = index
+		_heap_push(heap_key, heap_value, initial, index)
 	while heap_key.size() > 0:
 		var distance: float = heap_key[0]
 		var index: int = heap_value[0]
 		_heap_pop(heap_key, heap_value)
 		if distance > _dist[index]:
 			continue
-		var cell := Vector2i(index % _dimensions.x, index / _dimensions.x)
+		var cell: Vector2i = _bounds.position + Vector2i(index % _dimensions.x, index / _dimensions.x)
 		for direction: Vector2i in _DIRS_4:
 			var neighbour := Vector2i(cell.x + direction.x, cell.y + direction.y)
 			if not _contains(neighbour):
 				continue
-			var neighbour_index: int = neighbour.y * _dimensions.x + neighbour.x
+			var neighbour_index: int = _index(neighbour)
 			var enter: float = _cost[neighbour_index]
 			if not is_finite(enter):
 				continue
 			var candidate: float = distance + enter
 			if candidate < _dist[neighbour_index]:
 				_dist[neighbour_index] = candidate
+				_source[neighbour_index] = _source[index]
 				_heap_push(heap_key, heap_value, candidate, neighbour_index)
 
 

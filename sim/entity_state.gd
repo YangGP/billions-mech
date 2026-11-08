@@ -31,6 +31,8 @@ var blocked_ticks: int = 0
 var shot_ticks: int = 0
 var shot_target: Vector2 = Vector2.ZERO
 var fog_coarse: bool = false
+## Stable local navigation region; z distinguishes normal/wall-pass rules.
+var march_zone := Vector3i(-1, -1, -1)
 var facing: Vector2 = Vector2.UP
 var arrival_facing: Vector2 = Vector2.UP
 var has_arrival_facing: bool = false

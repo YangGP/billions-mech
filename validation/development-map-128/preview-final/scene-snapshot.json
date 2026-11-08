@@ -1,0 +1,661 @@
+{
+  "schema": "generate2dmap.scene_snapshot.v1",
+  "runtime": {
+    "name": "map-runtime",
+    "version": "1.1.2"
+  },
+  "world": {
+    "width": 512,
+    "height": 512,
+    "actorRadius": 0.88,
+    "ySquash": 1,
+    "cell": 1,
+    "tickHz": 60,
+    "solids": 301,
+    "portals": 0,
+    "oneWay": false
+  },
+  "actor": {
+    "x": 242,
+    "y": 274,
+    "valid": true,
+    "facing": [
+      0,
+      1
+    ],
+    "latched": [],
+    "travelled": 0,
+    "pathLength": 0
+  },
+  "ready": true,
+  "routes": {
+    "ok": true,
+    "speed": 60,
+    "budget": 1,
+    "tickHz": 60,
+    "cell": 1,
+    "spawns": [
+      {
+        "id": "base",
+        "valid": true,
+        "reachableCells": 178988
+      }
+    ],
+    "results": [
+      {
+        "target": "north.approach[0]",
+        "kind": "approach",
+        "from": "base",
+        "ok": true,
+        "reachable": true,
+        "reason": null,
+        "ticks": 102,
+        "distance": 101.955,
+        "maxStep": 1,
+        "zeroMotionTicks": 0,
+        "blocked": false,
+        "firedEnRoute": [],
+        "end": [
+          258,
+          174
+        ]
+      },
+      {
+        "target": "east.approach[0]",
+        "kind": "approach",
+        "from": "base",
+        "ok": true,
+        "reachable": true,
+        "reason": null,
+        "ticks": 119,
+        "distance": 118.097,
+        "maxStep": 1,
+        "zeroMotionTicks": 0,
+        "blocked": false,
+        "firedEnRoute": [],
+        "end": [
+          358,
+          258
+        ]
+      },
+      {
+        "target": "south.approach[0]",
+        "kind": "approach",
+        "from": "base",
+        "ok": true,
+        "reachable": true,
+        "reason": null,
+        "ticks": 74,
+        "distance": 73.96,
+        "maxStep": 1,
+        "zeroMotionTicks": 0,
+        "blocked": false,
+        "firedEnRoute": [],
+        "end": [
+          258,
+          346
+        ]
+      },
+      {
+        "target": "west.approach[0]",
+        "kind": "approach",
+        "from": "base",
+        "ok": true,
+        "reachable": true,
+        "reason": null,
+        "ticks": 102,
+        "distance": 101.189,
+        "maxStep": 1,
+        "zeroMotionTicks": 0,
+        "blocked": false,
+        "firedEnRoute": [],
+        "end": [
+          146,
+          254
+        ]
+      },
+      {
+        "target": "edge_north.approach[0]",
+        "kind": "approach",
+        "from": "base",
+        "ok": true,
+        "reachable": true,
+        "reason": null,
+        "ticks": 270,
+        "distance": 269.624,
+        "maxStep": 1,
+        "zeroMotionTicks": 0,
+        "blocked": false,
+        "firedEnRoute": [],
+        "end": [
+          258,
+          6
+        ]
+      },
+      {
+        "target": "edge_east.approach[0]",
+        "kind": "approach",
+        "from": "base",
+        "ok": true,
+        "reachable": true,
+        "reason": null,
+        "ticks": 297,
+        "distance": 296.383,
+        "maxStep": 1,
+        "zeroMotionTicks": 0,
+        "blocked": false,
+        "firedEnRoute": [],
+        "end": [
+          506,
+          258
+        ]
+      },
+      {
+        "target": "edge_south.approach[0]",
+        "kind": "approach",
+        "from": "base",
+        "ok": true,
+        "reachable": true,
+        "reason": null,
+        "ticks": 234,
+        "distance": 233.92,
+        "maxStep": 1,
+        "zeroMotionTicks": 0,
+        "blocked": false,
+        "firedEnRoute": [],
+        "end": [
+          258,
+          506
+        ]
+      },
+      {
+        "target": "edge_west.approach[0]",
+        "kind": "approach",
+        "from": "base",
+        "ok": true,
+        "reachable": true,
+        "reason": null,
+        "ticks": 286,
+        "distance": 285.919,
+        "maxStep": 1,
+        "zeroMotionTicks": 0,
+        "blocked": false,
+        "firedEnRoute": [],
+        "end": [
+          6,
+          258
+        ]
+      },
+      {
+        "target": "metal_start_west.approach[0]",
+        "kind": "approach",
+        "from": "base",
+        "ok": true,
+        "reachable": true,
+        "reason": null,
+        "ticks": 18,
+        "distance": 17.889,
+        "maxStep": 1,
+        "zeroMotionTicks": 0,
+        "blocked": false,
+        "firedEnRoute": [],
+        "end": [
+          234,
+          258
+        ]
+      },
+      {
+        "target": "metal_start_east.approach[0]",
+        "kind": "approach",
+        "from": "base",
+        "ok": true,
+        "reachable": true,
+        "reason": null,
+        "ticks": 44,
+        "distance": 43.081,
+        "maxStep": 1,
+        "zeroMotionTicks": 0,
+        "blocked": false,
+        "firedEnRoute": [],
+        "end": [
+          282,
+          258
+        ]
+      },
+      {
+        "target": "metal_inner_north.approach[0]",
+        "kind": "approach",
+        "from": "base",
+        "ok": true,
+        "reachable": true,
+        "reason": null,
+        "ticks": 97,
+        "distance": 96.891,
+        "maxStep": 1,
+        "zeroMotionTicks": 0,
+        "blocked": false,
+        "firedEnRoute": [],
+        "end": [
+          194,
+          206
+        ]
+      },
+      {
+        "target": "metal_inner_south.approach[0]",
+        "kind": "approach",
+        "from": "base",
+        "ok": true,
+        "reachable": true,
+        "reason": null,
+        "ticks": 85,
+        "distance": 84.111,
+        "maxStep": 1,
+        "zeroMotionTicks": 0,
+        "blocked": false,
+        "firedEnRoute": [],
+        "end": [
+          310,
+          294
+        ]
+      },
+      {
+        "target": "metal_west.approach[0]",
+        "kind": "approach",
+        "from": "base",
+        "ok": true,
+        "reachable": true,
+        "reason": null,
+        "ticks": 176,
+        "distance": 175.411,
+        "maxStep": 1,
+        "zeroMotionTicks": 0,
+        "blocked": false,
+        "firedEnRoute": [],
+        "end": [
+          110,
+          206
+        ]
+      },
+      {
+        "target": "metal_east.approach[0]",
+        "kind": "approach",
+        "from": "base",
+        "ok": true,
+        "reachable": true,
+        "reason": null,
+        "ticks": 185,
+        "distance": 184.816,
+        "maxStep": 1,
+        "zeroMotionTicks": 0,
+        "blocked": false,
+        "firedEnRoute": [],
+        "end": [
+          410,
+          306
+        ]
+      },
+      {
+        "target": "metal_south.approach[0]",
+        "kind": "approach",
+        "from": "base",
+        "ok": true,
+        "reachable": true,
+        "reason": null,
+        "ticks": 145,
+        "distance": 144.264,
+        "maxStep": 1,
+        "zeroMotionTicks": 0,
+        "blocked": false,
+        "firedEnRoute": [],
+        "end": [
+          238,
+          418
+        ]
+      },
+      {
+        "target": "metal_north.approach[0]",
+        "kind": "approach",
+        "from": "base",
+        "ok": true,
+        "reachable": true,
+        "reason": null,
+        "ticks": 273,
+        "distance": 272.223,
+        "maxStep": 1,
+        "zeroMotionTicks": 0,
+        "blocked": false,
+        "firedEnRoute": [],
+        "end": [
+          346,
+          70
+        ]
+      },
+      {
+        "target": "fuel_start_west.approach[0]",
+        "kind": "approach",
+        "from": "base",
+        "ok": true,
+        "reachable": true,
+        "reason": null,
+        "ticks": 51,
+        "distance": 50.912,
+        "maxStep": 1,
+        "zeroMotionTicks": 0,
+        "blocked": false,
+        "firedEnRoute": [],
+        "end": [
+          206,
+          238
+        ]
+      },
+      {
+        "target": "fuel_inner_east.approach[0]",
+        "kind": "approach",
+        "from": "base",
+        "ok": true,
+        "reachable": true,
+        "reason": null,
+        "ticks": 66,
+        "distance": 65.937,
+        "maxStep": 1,
+        "zeroMotionTicks": 0,
+        "blocked": false,
+        "firedEnRoute": [],
+        "end": [
+          302,
+          258
+        ]
+      },
+      {
+        "target": "fuel_north_west.approach[0]",
+        "kind": "approach",
+        "from": "base",
+        "ok": true,
+        "reachable": true,
+        "reason": null,
+        "ticks": 234,
+        "distance": 233.437,
+        "maxStep": 1,
+        "zeroMotionTicks": 0,
+        "blocked": false,
+        "firedEnRoute": [],
+        "end": [
+          134,
+          118
+        ]
+      },
+      {
+        "target": "fuel_east.approach[0]",
+        "kind": "approach",
+        "from": "base",
+        "ok": true,
+        "reachable": true,
+        "reason": null,
+        "ticks": 193,
+        "distance": 192.35,
+        "maxStep": 1,
+        "zeroMotionTicks": 0,
+        "blocked": false,
+        "firedEnRoute": [],
+        "end": [
+          390,
+          214
+        ]
+      },
+      {
+        "target": "fuel_south_west.approach[0]",
+        "kind": "approach",
+        "from": "base",
+        "ok": true,
+        "reachable": true,
+        "reason": null,
+        "ticks": 233,
+        "distance": 232.238,
+        "maxStep": 1,
+        "zeroMotionTicks": 0,
+        "blocked": false,
+        "firedEnRoute": [],
+        "end": [
+          110,
+          402
+        ]
+      },
+      {
+        "target": "fuel_south.approach[0]",
+        "kind": "approach",
+        "from": "base",
+        "ok": true,
+        "reachable": true,
+        "reason": null,
+        "ticks": 208,
+        "distance": 207.305,
+        "maxStep": 1,
+        "zeroMotionTicks": 0,
+        "blocked": false,
+        "firedEnRoute": [],
+        "end": [
+          350,
+          406
+        ]
+      },
+      {
+        "target": "crystal_north_west.approach[0]",
+        "kind": "approach",
+        "from": "base",
+        "ok": true,
+        "reachable": true,
+        "reason": null,
+        "ticks": 342,
+        "distance": 341.834,
+        "maxStep": 1,
+        "zeroMotionTicks": 0,
+        "blocked": false,
+        "firedEnRoute": [],
+        "end": [
+          78,
+          54
+        ]
+      },
+      {
+        "target": "crystal_north_east.approach[0]",
+        "kind": "approach",
+        "from": "base",
+        "ok": true,
+        "reachable": true,
+        "reason": null,
+        "ticks": 314,
+        "distance": 313.418,
+        "maxStep": 1,
+        "zeroMotionTicks": 0,
+        "blocked": false,
+        "firedEnRoute": [],
+        "end": [
+          446,
+          122
+        ]
+      },
+      {
+        "target": "crystal_south_east.approach[0]",
+        "kind": "approach",
+        "from": "base",
+        "ok": true,
+        "reachable": true,
+        "reason": null,
+        "ticks": 390,
+        "distance": 389.41,
+        "maxStep": 1,
+        "zeroMotionTicks": 0,
+        "blocked": false,
+        "firedEnRoute": [],
+        "end": [
+          466,
+          462
+        ]
+      },
+      {
+        "target": "crystal_south_west.approach[0]",
+        "kind": "approach",
+        "from": "base",
+        "ok": true,
+        "reachable": true,
+        "reason": null,
+        "ticks": 245,
+        "distance": 244.513,
+        "maxStep": 1,
+        "zeroMotionTicks": 0,
+        "blocked": false,
+        "firedEnRoute": [],
+        "end": [
+          118,
+          442
+        ]
+      },
+      {
+        "target": "crystal_far_south.approach[0]",
+        "kind": "approach",
+        "from": "base",
+        "ok": true,
+        "reachable": true,
+        "reason": null,
+        "ticks": 205,
+        "distance": 204.917,
+        "maxStep": 1,
+        "zeroMotionTicks": 0,
+        "blocked": false,
+        "firedEnRoute": [],
+        "end": [
+          270,
+          474
+        ]
+      },
+      {
+        "target": "wind_start.approach[0]",
+        "kind": "approach",
+        "from": "base",
+        "ok": true,
+        "reachable": true,
+        "reason": null,
+        "ticks": 35,
+        "distance": 34.176,
+        "maxStep": 1,
+        "zeroMotionTicks": 0,
+        "blocked": false,
+        "firedEnRoute": [],
+        "end": [
+          230,
+          242
+        ]
+      },
+      {
+        "target": "solar_start.approach[0]",
+        "kind": "approach",
+        "from": "base",
+        "ok": true,
+        "reachable": true,
+        "reason": null,
+        "ticks": 57,
+        "distance": 56.51,
+        "maxStep": 1,
+        "zeroMotionTicks": 0,
+        "blocked": false,
+        "firedEnRoute": [],
+        "end": [
+          274,
+          238
+        ]
+      },
+      {
+        "target": "wind_expansion.approach[0]",
+        "kind": "approach",
+        "from": "base",
+        "ok": true,
+        "reachable": true,
+        "reason": null,
+        "ticks": 101,
+        "distance": 100.081,
+        "maxStep": 1,
+        "zeroMotionTicks": 0,
+        "blocked": false,
+        "firedEnRoute": [],
+        "end": [
+          310,
+          310
+        ]
+      },
+      {
+        "target": "solar_expansion.approach[0]",
+        "kind": "approach",
+        "from": "base",
+        "ok": true,
+        "reachable": true,
+        "reason": null,
+        "ticks": 45,
+        "distance": 44.721,
+        "maxStep": 1,
+        "zeroMotionTicks": 0,
+        "blocked": false,
+        "firedEnRoute": [],
+        "end": [
+          198,
+          282
+        ]
+      },
+      {
+        "target": "assembly_yard.approach[0]",
+        "kind": "approach",
+        "from": "base",
+        "ok": true,
+        "reachable": true,
+        "reason": null,
+        "ticks": 37,
+        "distance": 36.222,
+        "maxStep": 1,
+        "zeroMotionTicks": 0,
+        "blocked": false,
+        "firedEnRoute": [],
+        "end": [
+          278,
+          278
+        ]
+      },
+      {
+        "target": "industry_yard.approach[0]",
+        "kind": "approach",
+        "from": "base",
+        "ok": true,
+        "reachable": true,
+        "reason": null,
+        "ticks": 52,
+        "distance": 52,
+        "maxStep": 1,
+        "zeroMotionTicks": 0,
+        "blocked": false,
+        "firedEnRoute": [],
+        "end": [
+          194,
+          254
+        ]
+      },
+      {
+        "target": "relay_fuel.approach[0]",
+        "kind": "approach",
+        "from": "base",
+        "ok": true,
+        "reachable": true,
+        "reason": null,
+        "ticks": 29,
+        "distance": 28.844,
+        "maxStep": 1,
+        "zeroMotionTicks": 0,
+        "blocked": false,
+        "firedEnRoute": [],
+        "end": [
+          226,
+          250
+        ]
+      }
+    ],
+    "portals": []
+  },
+  "verification": "Existing preview runtime executed under Node; browser automation not completed"
+}

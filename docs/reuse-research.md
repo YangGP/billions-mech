@@ -7,6 +7,8 @@
 
 ## 1. 结论
 
+2026-11-08 本轮账本迁移选型：检查[Expresso Inventory](https://github.com/expressobits/inventory-system)（MIT，物品/堆叠与Node/GDExtension库存）及[RTS Framework](https://github.com/rluders/rts-framework)（MIT，完整RTS节点框架）。前者的数据语义是物品实例和库存约束，不是本作无槽位、无上限的全局整数余额；后者需要接管既有场景/命令架构。本轮不借用它们的源码或算法，也不按其思路重写库存系统。直接复用Godot内置[Dictionary](https://docs.godotengine.org/en/stable/classes/class_dictionary.html)的存储、复制与Resource序列化，以及项目已有命令/余数结算；项目仅适配五种资源的业务校验、费用与退款，不引入自制容器、数据库或通用库存框架。
+
 项目采用 2D 等距、模拟/表现分离；已比较 Godot 内置能力、RTS Advanced Lite 的可适配模块与其他已有方案。旧原型代码、场景与内容定义不纳入候选。只有确认外部方案不适合后，才实现本项目特有规则。
 
 ## 2. 模块复用入口
@@ -215,3 +217,28 @@ Agent-Reach 不可用，使用网页检索。先核对高星候选 [Mindustry](h
 维护现有导航/战斗模块，不更换行军场算法。直接复用 Godot 原生 [WorkerThreadPool](https://docs.godotengine.org/en/stable/classes/class_workerthreadpool.html)、Mutex、AStarGrid2D 和 NavigationServer2D。按官方[线程安全约束](https://docs.godotengine.org/en/stable/tutorials/performance/thread_safe_apis.html)，工作线程只读取独立地图与建筑状态副本，图纸 Resource 在会话内只读；AStarGrid2D 为任务私有实例，任务完成后交接主线程，禁止同一实例并发读写。主线程轮询完成状态，不等待未完成任务；重开/退出才回收仍在运行的任务。只保留一个在途任务，旧地图版本结果丢弃后按最新状态补算。
 
 项目适配仅负责需要判定、版本/脏格记录、输入复制、结果交接和原生 API 调用：玩家 A* 就地更新变更格，RVO 沿用既有按行合并算法但只更新变更行，视野通过原生 PackedByteArray 复制已有探索状态。没有新增线程池、路径求解器、避让算法或 vendor。游荡敌调整复用原有资源字段、状态与移速计算，详见[实施与检查](../validation/performance-wanderers.md)。
+
+
+## 22. 局部场规则完善（2026-11-08）
+
+本轮维护既有 MechMarchField，不替换或新增积分求解器。沿用现有多源 Dijkstra/堆实现，增加区域内索引、源点标记与边界初值接线；占用判断直接调用既有 MechGridState.is_walkable，追击仍使用 Godot 原生 AStarGrid2D，碰撞与人群分离保持原实现。无需引入外部算法或 vendor。
+
+项目自写部分为用户确认的业务规则：未接敌走可达缺口、已接敌保留目标、建筑只作短距离向前的顺路目标；区域按实际通行类型缓存，使用现有占用脏格失效，复用原生 WorkerThreadPool 计算局部场，限制一个在途任务；输入独立复制，全局场仅只读，结果按局部拓扑校验，重开/退出回收。全局场不包含 HP；局部场使用阻挡状态和可攻击格，不按损血更新。此次为项目现有模块维护，不把本地积分器描述为已接入外部成熟模块。
+
+
+## 23. 截图视角与 HUD（2026-11-08）
+
+先核对外部 [OpenRA](https://github.com/OpenRA/OpenRA)（GPL-3.0，C#/SDL 游戏引擎）的 RTS HUD 与控件方向：其 UI 绑定引擎自身运行时，不作为本项目 Godot 场景的直接依赖。此次修改既有投影与 Control 布局，没有新写 UI 框架、相机或图像算法，无需移植其实现。
+
+实际直接复用 Godot 原生 [StyleBoxFlat](https://docs.godotengine.org/en/stable/classes/class_styleboxflat.html)、Theme、Control 锚点、[Camera2D](https://docs.godotengine.org/en/stable/classes/class_camera2d.html) 和 [SubViewportContainer](https://docs.godotengine.org/en/stable/classes/class_subviewportcontainer.html)，对象预览复用现有 MechFoundationView。SubViewportContainer.stretch 会让子 Viewport 跟随控件大小，因此预览模型按实际控件尺寸定位缩放。项目自写部分只包括截图推估出的投影参数、HUD 排布/文字、原读模型接线及可视区域计算；保留现有白模风格，无新增 vendor 和外部素材。
+
+
+## 24. 探图与实时视野分离（2026-11-08）
+
+先检索核对 [OpenRA](https://github.com/OpenRA/OpenRA) 的 Shroud/VisibilityType 相关接口，依赖其 C# Actor/Trait/World 运行时，不能直接作为本项目 GDScript 状态层依赖。本轮维护现有 MechVisionSystem，未引入或重写视线算法，也未移植外部代码。
+
+实际复用原有半径遍历、MechGridState.terrain_line_clear、LOS 源缓存、PackedByteArray 原生复制和两处既有三态迷雾绘制。项目改动仅为业务顺序：半径内先写探索记忆，LOS 合格格再叠成实时可见；同次更新先投射再复制记忆，避免新灰格延迟出现。普通损血不影响源签名，未增加全图扫描或额外射线。
+
+## 25. 二级建造目录（2026-11-08）
+
+先评估[RTS Framework](https://github.com/rluders/rts-framework)（MIT，完整3D Node框架，维护者标注WIP），其选择/命令/建筑生命周期与本项目纯数据模拟和既有HUD不匹配，不为菜单引入完整框架。实际直接复用Godot原生[ButtonGroup](https://docs.godotengine.org/en/stable/classes/class_buttongroup.html)、[GridContainer](https://docs.godotengine.org/en/stable/classes/class_gridcontainer.html)、[ScrollContainer](https://docs.godotengine.org/en/stable/classes/class_scrollcontainer.html)和JSON资源导入。项目只负责目录分类、展示状态及原有建造意图接线；未移植外部代码或自写布局/滚动/互斥按钮算法。

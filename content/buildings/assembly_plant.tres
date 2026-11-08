@@ -5,10 +5,12 @@ script = ExtResource("1")
 building_id = &"assembly_plant"
 display_name = "组装厂"
 footprint = Vector2i(3, 3)
-cost = Vector4i(300, 40, 0, 0)
+cost = Dictionary[StringName, int]({&"coins": 300, &"metal_ore": 40})
 construction_seconds = 90.0
 max_hp = 800
 capacity_cost = 4
 power_cost = 4
-produced_unit = &"sentinel"
+produced_units = Array[StringName]([&"sentinel"])
 queue_limit = 5
+
+infectable = true

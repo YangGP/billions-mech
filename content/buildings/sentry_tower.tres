@@ -6,7 +6,7 @@ sight_radius = 10.0
 building_id = &"sentry_tower"
 display_name = "哨戒炮塔"
 footprint = Vector2i(2, 2)
-cost = Vector4i(120, 20, 0, 0)
+cost = Dictionary[StringName, int]({&"coins": 120, &"metal_ore": 20})
 construction_seconds = 60.0
 max_hp = 600
 capacity_cost = 2
@@ -14,3 +14,5 @@ power_cost = 3
 attack_damage = 30
 attack_seconds = 2.5
 attack_range = 8.0
+
+infectable = true
