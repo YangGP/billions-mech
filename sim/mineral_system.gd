@@ -71,8 +71,9 @@ func advance(buildings: Array[MechBuildingState], economy: MechEconomySystem, hz
 		if mineral["remaining"] <= 0:
 			building.extraction_remainder = 0
 			continue
-		building.extraction_remainder += building.definition.extraction_per_minute
-		var available: int = floori(float(building.extraction_remainder) / denominator)
+		building.extraction_remainder += building.definition.extraction_per_minute * building.extraction_multiplier_tenths
+		var extraction_denominator: int = denominator * 10
+		var available: int = floori(float(building.extraction_remainder) / extraction_denominator)
 		if available <= 0:
 			continue
 		var extracted: int = mini(available, mineral["remaining"])
@@ -80,12 +81,12 @@ func advance(buildings: Array[MechBuildingState], economy: MechEconomySystem, hz
 		income[building.definition.mined_resource] = extracted
 		economy.credit(income)
 		mineral["remaining"] -= extracted
-		building.extraction_remainder %= denominator
+		building.extraction_remainder %= extraction_denominator
 
 
 func production_rate(buildings: Array[MechBuildingState]) -> Dictionary:
 	var result := MechResources.empty()
 	for building: MechBuildingState in buildings:
 		if building.mineral_id != &"" and building.operating() and _deposits[building.mineral_id]["remaining"] > 0:
-			result[building.definition.mined_resource] += building.definition.extraction_per_minute
+			result[building.definition.mined_resource] += building.definition.extraction_per_minute * building.extraction_multiplier_tenths / 10
 	return result

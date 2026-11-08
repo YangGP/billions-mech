@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="MechBuildingDefinition" load_steps=2 format=3]
+[ext_resource type="Script" path="res://content/building_definition.gd" id="1"]
+[resource]
+script = ExtResource("1")
+building_id = &"alloy_bunker"
+display_name = "合金碉堡"
+footprint = Vector2i(2, 2)
+cost = Dictionary[StringName, int]({&"coins": 140, &"metal_ore": 14, &"alloy": 10})
+construction_seconds = 45.0
+max_hp = 1400
+garrison_capacity = 4
+garrison_range_bonus = 3.0
+level = 2
+buildable = false
+infectable = true

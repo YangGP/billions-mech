@@ -64,6 +64,12 @@
 
 [P4d 瞭望与雷达](../validation/p4d-lookout-radar.md) 记录视野源、雷达预警字段与提前量缺口。
 
+[P5a 经济光环](../validation/p5a-economy-auras.md) 记录资源/冷却/产币三站、半径8与同类取强。
+
+[P5b 驻防与接驳](../validation/p5b-garrison-contracts.md) 记录碉堡/接驳内容、参数与行为缺口。
+
+[P5c 减速栅](../validation/p5c-slow-fence-version-b.md) 记录减速栅/合金升级、格上减速与版本B边界。
+
 [M6 bundle 本地审查](../validation/m6-bundle-review.md) 记录本次合入的两个提交、原生导入发现的编译/接线问题、穿墙寻路修复，以及本地 43 个脚本、49 项既有回归、启动和原生画面的复验结果与限制。
 
 [卡顿与游荡节奏调整](../validation/performance-wanderers.md) 记录 0.5.18-dev 的后台行军场、局部 A*/RVO 更新、视野记忆复用、开局禁刷与游荡移速调整，以及加速战斗性能证据和待验项。

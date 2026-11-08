@@ -476,6 +476,7 @@ func advance_one_tick() -> void:
 		_remove_entity(id)
 	if not enemy_result["dead_units"].is_empty():
 		_recompute_economy()
+	_advance_slow_fences()
 	if _trigger_traps():
 		_recompute_economy()
 	_profile_mark(&"enemies")
@@ -683,7 +684,54 @@ func _recompute_economy() -> void:
 	if _environment_dirty:
 		_refresh_environment_power()
 		_environment_dirty = false
+	_refresh_auras()
 	_economy.recompute(_construction.all(), _grid, _units.capacity_used(_registry), _production.reserved_capacity())
+
+
+func _refresh_auras() -> void:
+	var all: Array[MechBuildingState] = _construction.all()
+	var sources: Array[Dictionary] = []
+	for source: MechBuildingState in all:
+		if source.definition.aura_kind == "none" or source.phase != MechBuildingState.Phase.OPERATING:
+			continue
+		if not _grid.footprint_covered(source.origin, source.definition.footprint):
+			continue
+		sources.append({"building": source, "center": Vector2(source.origin)
+			+ Vector2(source.definition.footprint) * 0.5})
+	for target: MechBuildingState in all:
+		target.income_multiplier_tenths = 10
+		target.extraction_multiplier_tenths = 10
+		target.cooling_multiplier_tenths = 10
+		if target.phase != MechBuildingState.Phase.OPERATING:
+			continue
+		if not _grid.footprint_covered(target.origin, target.definition.footprint):
+			continue
+		var target_center: Vector2 = Vector2(target.origin) + Vector2(target.definition.footprint) * 0.5
+		var is_node: bool = target.definition.capacity_provided > 0 and not target.definition.is_core
+		var is_extractor: bool = target.definition.mined_resource in [&"metal_ore", &"fuel"]
+		var best_income: float = 1.0
+		var best_extraction: float = 1.0
+		var best_cooling: float = 1.0
+		for entry: Dictionary in sources:
+			var source: MechBuildingState = entry["building"]
+			if source.entity_id == target.entity_id:
+				continue
+			if source.definition.aura_kind == "mining" and not is_extractor:
+				continue
+			if source.definition.aura_kind in ["cooling", "income"] and not is_node:
+				continue
+			if entry["center"].distance_to(target_center) > source.definition.aura_radius:
+				continue
+			match source.definition.aura_kind:
+				"mining":
+					best_extraction = maxf(best_extraction, source.definition.aura_multiplier)
+				"cooling":
+					best_cooling = minf(best_cooling, source.definition.aura_multiplier)
+				"income":
+					best_income = maxf(best_income, source.definition.aura_multiplier)
+		target.extraction_multiplier_tenths = roundi(best_extraction * 10.0)
+		target.income_multiplier_tenths = roundi(best_income * 10.0)
+		target.cooling_multiplier_tenths = roundi(best_cooling * 10.0)
 
 
 func _refresh_environment_power() -> void:
@@ -977,7 +1025,7 @@ func _place(id: StringName, origin: Vector2i) -> Dictionary:
 	var building: MechBuildingState = _construction.add(entity_id, id, origin, _tick_rate)
 	building.mineral_id = check["mineral_id"]
 	building.environment_power = int(check.get("environment_power", 0))
-	if rules.trap_kind != "none":
+	if rules.trap_kind != "none" or rules.slow_fence_ratio < 1.0:
 		_grid.set_pass_through(entity_id, true)
 	var energy_type := StringName(rules.environment_energy)
 	if energy_type != &"none" and not _environment.reserve(
@@ -1113,6 +1161,30 @@ func _has_water_edge(rules: MechBuildingDefinition, origin: Vector2i) -> bool:
 				if not body.has_point(cell) and _grid.is_water(cell):
 					return true
 	return false
+
+
+func _advance_slow_fences() -> void:
+	var fences: Dictionary[Vector2i, MechBuildingState] = {}
+	for building: MechBuildingState in _construction.all():
+		if building.definition.slow_fence_ratio < 1.0 and building.operating():
+			for y: int in range(building.definition.footprint.y):
+				for x: int in range(building.definition.footprint.x):
+					fences[building.origin + Vector2i(x, y)] = building
+	for enemy: MechEntityState in _registry.all():
+		if enemy.team != 2 or enemy.hp <= 0:
+			continue
+		var cell: Vector2i = enemy.position.floor()
+		var fence: MechBuildingState = fences.get(cell)
+		if fence == null:
+			enemy.last_fence_cell = Vector2i(-999, -999)
+			enemy.fence_slow_multiplier = 1.0
+			continue
+		if enemy.last_fence_cell != cell:
+			enemy.last_fence_cell = cell
+			fence.hp = maxi(0, fence.hp - 10)
+			if fence.hp <= 0:
+				_ruin_building(fence)
+		enemy.fence_slow_multiplier = fence.definition.slow_fence_ratio
 
 
 func _trigger_traps() -> bool:

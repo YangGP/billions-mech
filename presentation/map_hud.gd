@@ -371,6 +371,21 @@ func present_selection(building: Dictionary, errors: Dictionary) -> void:
 			_details.text += "\n维修等待材料"
 	if String(building.get("environment_energy", "none")) != "none":
 		_details.text += "\n环境供电  +%d（已探索选址）" % int(building.get("environment_power", 0))
+	var aura_kind: String = String(building.get("aura_kind", "none"))
+	if aura_kind != "none":
+		var aura_label: String = {"mining": "金属/燃料采集 +15%", "cooling": "节点冷却 -20%", "income": "节点产币 +20%"}.get(aura_kind, "")
+		_details.text += "\n经济光环  半径%d · %s（同类取最强）" % [int(building.get("aura_radius", 0)), aura_label]
+	if float(building.get("slow_fence_ratio", 1.0)) < 1.0:
+		_details.text += "\n减速栅  格上敌人速度 %.0f%% · 每次进入扣10HP" % (
+			float(building.get("slow_fence_ratio", 1.0)) * 100.0)
+	if int(building.get("garrison_capacity", 0)) > 0:
+		_details.text += "\n驻防  最多%d名轻型射击单位 · 射程+%.0f" % [
+			int(building.get("garrison_capacity", 0)), float(building.get("garrison_range_bonus", 0.0))]
+	if float(building.get("contract_interval_seconds", 0.0)) > 0.0:
+		_details.text += "\n接驳合同  %.0fs一份 · 交付%.0fs · 币价%.0f%%" % [
+			float(building.get("contract_interval_seconds", 0.0)),
+			float(building.get("contract_delivery_seconds", 0.0)),
+			float(building.get("contract_price_multiplier", 1.0)) * 100.0]
 	var recipe: Dictionary = building.get("alloy_recipe", {})
 	if not recipe.is_empty():
 		var processing: Dictionary = building.get("processing", {})

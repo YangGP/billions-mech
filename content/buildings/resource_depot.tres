@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="MechBuildingDefinition" load_steps=2 format=3]
+[ext_resource type="Script" path="res://content/building_definition.gd" id="1"]
+[resource]
+script = ExtResource("1")
+building_id = &"resource_depot"
+display_name = "资源调配站"
+footprint = Vector2i(3, 3)
+cost = Dictionary[StringName, int]({&"coins": 180, &"metal_ore": 16, &"alloy": 8})
+construction_seconds = 50.0
+max_hp = 500
+capacity_cost = 2
+power_cost = 3
+aura_kind = "mining"
+aura_radius = 8.0
+aura_multiplier = 1.15
+infectable = true

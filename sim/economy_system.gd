@@ -78,12 +78,14 @@ func recompute(buildings: Array[MechBuildingState], grid: MechGridState, unit_ca
 			continue
 		_capacity_used += rules.capacity_cost
 		_power_reserved += rules.power_cost
-		_cooling_reserved += rules.cooling_cost * 10
+		_cooling_reserved += roundi(float(rules.cooling_cost * 10 * building.cooling_multiplier_tenths) / 10.0)
 		if building.upgrade_target != null:
 			# Reserve only the positive delta while the old level keeps serving.
 			_capacity_used += maxi(0, building.upgrade_target.capacity_cost - rules.capacity_cost)
 			_power_reserved += maxi(0, building.upgrade_target.power_cost - rules.power_cost)
-			_cooling_reserved += maxi(0, building.upgrade_target.cooling_cost - rules.cooling_cost) * 10
+			_cooling_reserved += maxi(0, roundi(float(
+				building.upgrade_target.cooling_cost * 10 * building.cooling_multiplier_tenths) / 10.0)
+				- roundi(float(rules.cooling_cost * 10 * building.cooling_multiplier_tenths) / 10.0))
 		if building.operating():
 			_capacity_total += rules.capacity_provided
 			_capacity_system_reserved += rules.capacity_system_reserved
@@ -95,7 +97,7 @@ func recompute(buildings: Array[MechBuildingState], grid: MechGridState, unit_ca
 			else:
 				_power_supply += rules.power_provided
 			_cooling_supply += rules.cooling_provided * 10
-			_income_rate += rules.income_per_minute
+			_income_rate += rules.income_per_minute * building.income_multiplier_tenths / 10
 
 
 func reservation_error(rules: MechBuildingDefinition, available: Dictionary = {}, cost_override: Dictionary = {}) -> String:
@@ -139,10 +141,11 @@ func advance_income(buildings: Array[MechBuildingState], hz: int) -> void:
 	for building: MechBuildingState in buildings:
 		if not building.operating():
 			continue
-		building.income_remainder += building.definition.income_per_minute
-		if building.income_remainder >= denominator:
-			credit(MechResources.single(&"coins", floori(float(building.income_remainder) / denominator)))
-			building.income_remainder %= denominator
+		building.income_remainder += building.definition.income_per_minute * building.income_multiplier_tenths
+		var income_denominator: int = denominator * 10
+		if building.income_remainder >= income_denominator:
+			credit(MechResources.single(&"coins", floori(float(building.income_remainder) / income_denominator)))
+			building.income_remainder %= income_denominator
 
 
 func advance_repairs(buildings: Array[MechBuildingState], hz: int) -> void:

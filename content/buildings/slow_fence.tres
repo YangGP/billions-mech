@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="MechBuildingDefinition" load_steps=3 format=3]
+[ext_resource type="Script" path="res://content/building_definition.gd" id="1"]
+[ext_resource type="Resource" path="res://content/buildings/alloy_slow_fence.tres" id="2"]
+[resource]
+script = ExtResource("1")
+building_id = &"slow_fence"
+display_name = "减速栅"
+footprint = Vector2i(1, 1)
+cost = Dictionary[StringName, int]({&"coins": 6, &"metal_ore": 2})
+construction_seconds = 6.0
+max_hp = 100
+slow_fence_ratio = 0.75
+level = 1
+upgrade_to = ExtResource("2")
+upgrade_cost = Dictionary[StringName, int]({&"coins": 6, &"metal_ore": 0, &"alloy": 2})
+upgrade_seconds = 6.0
+infectable = false

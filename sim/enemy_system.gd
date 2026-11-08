@@ -464,6 +464,7 @@ func advance(registry: MechEntityRegistry, grid: MechGridState, navigation: Mech
 		if enemy.slow_ticks > 0:
 			enemy.slow_ticks -= 1
 		enemy.slow_multiplier = 0.4 if enemy.slow_ticks > 0 else 1.0
+		enemy.slow_multiplier = minf(enemy.slow_multiplier, enemy.fence_slow_multiplier)
 		var cell := Vector2i(enemy.position.floor())
 		var near_assets: bool = active_regions.has(_activity_bucket(cell))
 		var local_radius: float = maxf(enemy.enemy_definition.vision_radius, enemy.enemy_definition.attack_range)

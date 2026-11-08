@@ -49,6 +49,10 @@ var upgrade_target: MechBuildingDefinition
 var upgrade_elapsed: int = 0
 var upgrade_total: int = 0
 var upgrade_paid: Dictionary[StringName, int] = MechResources.empty()
+## Aura runtime multipliers in tenths; reset to 10 when no aura applies.
+var income_multiplier_tenths: int = 10
+var extraction_multiplier_tenths: int = 10
+var cooling_multiplier_tenths: int = 10
 var attack_cooldown_ticks: int = 0
 var shot_ticks: int = 0
 var shot_target: Vector2 = Vector2.ZERO
@@ -116,6 +120,9 @@ func mark_ruined() -> void:
 	upgrade_elapsed = 0
 	upgrade_total = 0
 	upgrade_paid = MechResources.empty()
+	income_multiplier_tenths = 10
+	extraction_multiplier_tenths = 10
+	cooling_multiplier_tenths = 10
 	attack_cooldown_ticks = 0
 	shot_ticks = 0
 
@@ -178,6 +185,9 @@ func snapshot() -> Dictionary:
 		"repairing": repairing, "threatened": threatened, "powered": powered,
 		"repair_waiting_for_materials": repair_waiting_for_funds,
 		"repair_material_remainder": MechResources.copy(repair_material_remainder),
+		"income_multiplier_tenths": income_multiplier_tenths,
+		"extraction_multiplier_tenths": extraction_multiplier_tenths,
+		"cooling_multiplier_tenths": cooling_multiplier_tenths,
 		"environment_power": environment_power,
 		"processing": {"active": processing_active, "elapsed": processing_elapsed,
 			"total": processing_total, "paid": MechResources.copy(processing_paid),

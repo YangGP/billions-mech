@@ -56,6 +56,15 @@ extends Resource
 @export var repair_rate: float = 0.0
 ## Radar pre-warning lead in seconds; 0 marks a non-radar sight source.
 @export var radar_warning_seconds: float = 0.0
+@export_range(0.0, 1.0, 0.05) var slow_fence_ratio: float = 1.0
+@export var garrison_capacity: int = 0
+@export var garrison_range_bonus: float = 0.0
+@export var contract_interval_seconds: float = 0.0
+@export var contract_delivery_seconds: float = 0.0
+@export var contract_price_multiplier: float = 1.0
+@export_enum("none", "mining", "cooling", "income") var aura_kind: String = "none"
+@export_range(0.0, 16.0, 0.5) var aura_radius: float = 0.0
+@export_range(0.1, 3.0, 0.01) var aura_multiplier: float = 1.0
 
 
 func validation_error() -> String:
@@ -90,6 +99,10 @@ func validation_error() -> String:
 		return "建筑范围或维修参数无效"
 	if radar_warning_seconds < 0.0:
 		return "雷达预警提前量无效"
+	if aura_kind != "none" and (aura_radius <= 0.0 or aura_multiplier <= 0.0):
+		return "经济光环参数无效"
+	if slow_fence_ratio < 0.0 or slow_fence_ratio > 1.0 or garrison_capacity < 0 or contract_interval_seconds < 0.0 or contract_delivery_seconds < 0.0 or contract_price_multiplier <= 0.0:
+		return "减速栅、驻防或接驳合同参数无效"
 	if extraction_per_minute < 0 or (mined_resource != &"" and not MechResources.mineable(mined_resource)):
 		return "采集类型或产率无效"
 	if (mined_resource == &"") != (extraction_per_minute == 0):
@@ -122,6 +135,12 @@ func snapshot() -> Dictionary:
 		"splash_radius": splash_radius, "sight_radius": sight_radius, "coverage_radius": coverage_radius,
 		"repair_radius": repair_radius, "repair_rate": repair_rate,
 		"radar_warning_seconds": radar_warning_seconds,
+		"aura_kind": aura_kind, "aura_radius": aura_radius, "aura_multiplier": aura_multiplier,
+		"slow_fence_ratio": slow_fence_ratio,
+		"garrison_capacity": garrison_capacity, "garrison_range_bonus": garrison_range_bonus,
+		"contract_interval_seconds": contract_interval_seconds,
+		"contract_delivery_seconds": contract_delivery_seconds,
+		"contract_price_multiplier": contract_price_multiplier,
 		"environment_energy": environment_energy, "infectable": infectable,
 		"environment_output_multiplier": environment_output_multiplier,
 		"environment_output_cap": environment_output_cap, "requires_water": requires_water,
