@@ -122,6 +122,21 @@ func _process(delta: float) -> void:
 				float(_perf_view_usec) / maxi(1, _perf_frames) / 1000.0,
 				Performance.get_monitor(Performance.TIME_NAVIGATION_PROCESS) * 1000.0,
 				_perf_sim_peak_usec / 1000.0, _perf_view_peak_usec / 1000.0, _perf_frame_peak * 1000.0])
+			var profile: Dictionary = _sim.consume_profile()
+			if not profile.is_empty():
+				var avg_stages: Dictionary = {}
+				var peak_stages: Dictionary = {}
+				for stage: String in profile["stages"]:
+					avg_stages[stage] = snappedf(profile["stages"][stage]["avg_ms"], 0.001)
+					peak_stages[stage] = snappedf(profile["stages"][stage]["peak_ms"], 0.001)
+				var worst: Dictionary = profile["worst"]
+				var worst_stages: Dictionary = worst.get("stages", {})
+				var rounded_worst: Dictionary = {}
+				for stage: String in worst_stages:
+					rounded_worst[stage] = snappedf(worst_stages[stage], 0.001)
+				print("[perf:stages] ticks=%d worst_ms=%.3f worst=%s avg_ms=%s peak_ms=%s counters=%s" % [
+					profile["ticks"], worst.get("total_ms", 0.0), rounded_worst,
+					avg_stages, peak_stages, profile["counters"]])
 			_perf_seconds = 0.0
 			_perf_frames = 0
 			_perf_sim_usec = 0

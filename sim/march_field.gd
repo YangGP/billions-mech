@@ -1,14 +1,10 @@
 class_name MechMarchField
 extends RefCounted
-## Weighted integration field for horde marching (values.md §11 soft-cost model,
-## Mindustry Pathfinder style). Cell enter cost = terrain weight × building soft
-## cost, so a sufficiently wide opening is always cheaper than chewing walls:
-## enemies funnel through gaps without special cases, and with no cheap route the
-## field still points into the wall, where blocker engagement in MechEnemySystem
-## keeps "撞墙打墙". The owner recomputes on occupancy changes or HP drift.
-
-const SOFT_COST_CAP: int = 400
-const SOFT_COST_DIVISOR: float = 8.0
+## Terrain-only integration field for horde marching (Mindustry Pathfinder
+## style). Cell enter cost is the terrain weight; buildings are deliberately not
+## part of the global route. A wall or building on the route is a local blocker
+## that the enemy attacks, and once removed the enemy continues toward the core.
+## The field is static for a session and is not rebuilt for occupancy or HP.
 
 const _DIRS_4: Array[Vector2i] = [
 	Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1),
@@ -21,18 +17,33 @@ const _DIRS_8: Array[Vector2i] = [
 
 var _dimensions: Vector2i = Vector2i.ZERO
 var _goal: Vector2i = Vector2i.ZERO
+var _bounds := Rect2i()
 var _cost := PackedFloat32Array()
 var _dist := PackedFloat32Array()
 
 
-func rebuild(grid: MechGridState, goal: Vector2i, buildings: Array[MechBuildingState]) -> void:
+func rebuild(grid: MechGridState, goal: Vector2i) -> void:
 	_dimensions = grid.dimensions()
 	_goal = goal
+	_bounds = Rect2i(Vector2i.ZERO, _dimensions)
 	var count: int = _dimensions.x * _dimensions.y
 	_cost.resize(count)
 	_dist.resize(count)
-	_fill_costs(grid, buildings)
-	_integrate()
+	_fill_costs(grid)
+	var sources: Array[Vector2i] = [goal]
+	_integrate_sources(sources)
+
+
+## Local tactical field: multiple building footprint cells are sources, and
+## integration is confined to `bounds`. Used by the assault field only.
+func rebuild_local(grid: MechGridState, bounds: Rect2i, sources: Array[Vector2i]) -> void:
+	_dimensions = grid.dimensions()
+	_bounds = bounds.intersection(Rect2i(Vector2i.ZERO, _dimensions))
+	var count: int = _dimensions.x * _dimensions.y
+	_cost.resize(count)
+	_dist.resize(count)
+	_fill_costs(grid)
+	_integrate_sources(sources)
 
 
 ## Integration distance to the goal; INF for unreachable/off-map cells.
@@ -65,50 +76,41 @@ func flow_at(cell: Vector2i) -> Vector2:
 
 
 func _contains(cell: Vector2i) -> bool:
-	return cell.x >= 0 and cell.y >= 0 and cell.x < _dimensions.x and cell.y < _dimensions.y
+	return _bounds.has_point(cell)
 
 
-## Enter cost per cell: terrain weight; building cells add 1 + min(HP, cap) / divisor.
-## The building containing the goal (the mainbrain) is exempt — it is the
-## destination, not an obstacle. Destroyed bases (hp == 0) are pass-through
-## rubble on open terrain: marchers stream straight through the gap they made.
-## Non-building occupants keep plain terrain cost.
-func _fill_costs(grid: MechGridState, buildings: Array[MechBuildingState]) -> void:
-	var goal_building_id: int = 0
-	var soft: Dictionary = {}
-	for building: MechBuildingState in buildings:
-		if building.hp <= 0:
-			continue
-		if Rect2i(building.origin, building.definition.footprint).has_point(_goal):
-			goal_building_id = building.entity_id
-			continue
-		var cost: float = 1.0 + float(mini(building.hp, SOFT_COST_CAP)) / SOFT_COST_DIVISOR
-		soft[building.entity_id] = cost
-	for index: int in range(_cost.size()):
-		var cell := Vector2i(index % _dimensions.x, index / _dimensions.x)
-		var weight: float = grid.movement_weight(cell)
-		var occupant: int = grid.occupant_at(cell)
-		if grid.terrain_at(cell) == MechGridState.Terrain.OBSTACLE:
-			_cost[index] = INF
-		elif occupant > 0 and occupant != goal_building_id and soft.has(occupant):
-			_cost[index] = weight * soft[occupant]
-		else:
-			_cost[index] = weight
+## Enter cost per cell is only the terrain weight. Buildings, walls and their
+## HP are intentionally absent: they are local movement blockers handled by the
+## enemy step, not route-cost inputs.
+func _fill_costs(grid: MechGridState) -> void:
+	for y: int in range(_bounds.position.y, _bounds.end.y):
+		for x: int in range(_bounds.position.x, _bounds.end.x):
+			var cell := Vector2i(x, y)
+			var index: int = y * _dimensions.x + x
+			if grid.terrain_at(cell) == MechGridState.Terrain.OBSTACLE:
+				_cost[index] = INF
+			else:
+				_cost[index] = grid.movement_weight(cell)
 
 
-## Dijkstra wavefront from the goal over enter costs, with a flat binary heap and
-## lazy stale-entry deletion. 4-connected integration; flow_at adds diagonals.
-func _integrate() -> void:
-	_dist.fill(INF)
-	if not _contains(_goal):
+## Dijkstra wavefront from all sources over enter costs, with a flat binary heap
+## and lazy stale-entry deletion. 4-connected integration; flow_at adds diagonals.
+func _integrate_sources(sources: Array[Vector2i]) -> void:
+	if _bounds.size.x <= 0 or _bounds.size.y <= 0:
 		return
-	var goal_index: int = _goal.y * _dimensions.x + _goal.x
-	if not is_finite(_cost[goal_index]):
-		return
-	_dist[goal_index] = 0.0
+	for y: int in range(_bounds.position.y, _bounds.end.y):
+		for x: int in range(_bounds.position.x, _bounds.end.x):
+			_dist[y * _dimensions.x + x] = INF
 	var heap_key := PackedFloat32Array()
 	var heap_value := PackedInt32Array()
-	_heap_push(heap_key, heap_value, 0.0, goal_index)
+	for source: Vector2i in sources:
+		if not _contains(source):
+			continue
+		var index: int = source.y * _dimensions.x + source.x
+		if not is_finite(_cost[index]) or _dist[index] <= 0.0:
+			continue
+		_dist[index] = 0.0
+		_heap_push(heap_key, heap_value, 0.0, index)
 	while heap_key.size() > 0:
 		var distance: float = heap_key[0]
 		var index: int = heap_value[0]

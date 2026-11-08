@@ -35,11 +35,23 @@ var _probe_id: int = 0
 var _mainbrain_id: int = 0
 var _generation: int = 0
 var _tick_rate: int = 30
+var _in_tick: bool = false
 var _starting_resources := Vector4i.ZERO
 var _navigation_revision: int = -1
 var _outcome: StringName = &"ongoing"
 var _alert: Dictionary = {}
 var _alert_sequence: int = 0
+
+# --perf stage accounting. Every value is microseconds; only updated while
+# profiling is enabled, so normal play pays no timer or dictionary cost.
+var _profile_tick_start: int = 0
+var _profile_mark_at: int = 0
+var _profile_tick_stages: Dictionary = {}
+var _profile_stage_totals: Dictionary = {}
+var _profile_stage_peaks: Dictionary = {}
+var _profile_ticks: int = 0
+var _profile_worst: Dictionary = {}
+var _profile_counters: Dictionary = {}
 
 
 func _init() -> void:
@@ -52,8 +64,74 @@ func shutdown() -> void:
 
 
 func _on_movement_finished() -> void:
-	_sync_vision()
+	# Movement can finish many times inside one native RVO step. The fog is
+	# refreshed once on the next simulation phase instead of once per unit.
 	state_changed.emit()
+
+
+func _profile_begin() -> void:
+	_profile_tick_start = Time.get_ticks_usec()
+	_profile_mark_at = _profile_tick_start
+	_profile_tick_stages.clear()
+
+
+func _profile_mark(stage: StringName) -> void:
+	if not profiling_enabled:
+		return
+	var now: int = Time.get_ticks_usec()
+	_profile_tick_stages[stage] = int(_profile_tick_stages.get(stage, 0)) + now - _profile_mark_at
+	_profile_mark_at = now
+
+
+func _profile_counter(stage: StringName) -> void:
+	if profiling_enabled:
+		_profile_counters[stage] = int(_profile_counters.get(stage, 0)) + 1
+
+
+func _profile_end() -> void:
+	if not profiling_enabled:
+		return
+	_profile_mark(&"tail")
+	var total: int = Time.get_ticks_usec() - _profile_tick_start
+	_profile_ticks += 1
+	for stage: StringName in _profile_tick_stages:
+		var usec: int = int(_profile_tick_stages[stage])
+		_profile_stage_totals[stage] = int(_profile_stage_totals.get(stage, 0)) + usec
+		_profile_stage_peaks[stage] = maxi(int(_profile_stage_peaks.get(stage, 0)), usec)
+	if total > int(_profile_worst.get("total_usec", 0)):
+		_profile_worst = {"total_usec": total, "stages": _profile_tick_stages.duplicate()}
+
+
+## Returns and clears the accumulated stage breakdown for the presentation
+## perf line. The worst simulation tick is kept with its full stage split so a
+## remaining spike can be attributed without another run.
+func consume_profile() -> Dictionary:
+	if not profiling_enabled or _profile_ticks == 0:
+		return {}
+	var stages: Dictionary = {}
+	for stage: StringName in _profile_stage_totals:
+		stages[String(stage)] = {
+			"avg_ms": float(_profile_stage_totals[stage]) / float(_profile_ticks) / 1000.0,
+			"peak_ms": float(_profile_stage_peaks.get(stage, 0)) / 1000.0,
+		}
+	var worst: Dictionary = {}
+	if not _profile_worst.is_empty():
+		var worst_stages: Dictionary = {}
+		for stage: StringName in _profile_worst["stages"]:
+			worst_stages[String(stage)] = float(_profile_worst["stages"][stage]) / 1000.0
+		worst = {"total_ms": float(_profile_worst["total_usec"]) / 1000.0,
+			"stages": worst_stages}
+	var counters: Dictionary = {}
+	for name: StringName in _profile_counters:
+		counters[String(name)] = int(_profile_counters[name])
+	var result: Dictionary = {"ticks": _profile_ticks, "stages": stages,
+		"worst": worst, "counters": counters}
+	_profile_stage_totals.clear()
+	_profile_stage_peaks.clear()
+	_profile_counters.clear()
+	_profile_worst.clear()
+	_profile_ticks = 0
+	return result
 
 
 func session_ended() -> bool:
@@ -220,8 +298,15 @@ func execute_command(command: MechCommand) -> Dictionary:
 					target.repair_remainder = 0
 					count += 1
 			result = {"ok": true, "reason": "", "count": count}
-	_sync_navigation()
-	_sync_vision()
+	# Only commands that change occupancy, phase or vision sources need the
+	# fog/navigation refresh. Pause, move, production and repair toggles do not.
+	if command.type in [
+		MechCommand.Type.PLACE_BUILDING, MechCommand.Type.PLACE_WALL_LINE,
+		MechCommand.Type.CANCEL_CONSTRUCTION, MechCommand.Type.DEMOLISH,
+		MechCommand.Type.CANCEL_DEMOLISH, MechCommand.Type.REBUILD,
+	]:
+		_sync_navigation()
+		_sync_vision()
 	state_changed.emit()
 	# Internal pathfinding data never needs to leave the command executor.
 	result.erase("path")
@@ -292,23 +377,32 @@ func validate_command(command: MechCommand) -> Dictionary:
 func advance_one_tick() -> void:
 	if session_ended() or not _clock.advance():
 		return
+	_in_tick = true
+	if profiling_enabled:
+		_profile_begin()
 	# Income precedes completions: newly finished nodes start accruing next tick.
 	_economy.advance_income(_construction.all(), _tick_rate)
 	_minerals.advance(_construction.all(), _economy, _tick_rate)
+	_profile_mark(&"income")
 	var changes: Dictionary = _construction.advance(_clear_building_footprint)
 	for entity_id: int in changes["demolished"]:
 		var building: MechBuildingState = _construction.get_building(entity_id)
 		_remove_building(entity_id, building.refund(), true)
 	if not changes["completed"].is_empty():
 		_recompute_economy()
+	_profile_mark(&"construction")
 	if _tick_counter % maxi(1, ceili(COMBAT_SCAN_SECONDS * _tick_rate)) == 0:
 		_scan_combat_threat()
 	_economy.advance_repairs(_construction.all(), _tick_rate)
+	_profile_mark(&"economy")
 	_sync_navigation()
+	_profile_mark(&"nav")
 	if _production.advance(_construction, _spawn_unit):
 		_recompute_economy()
+	_profile_mark(&"production")
 	_release_enemies()
 	_sync_vision()
+	_profile_mark(&"vision_pre")
 	# Noise emitted last tick reaches wanderers this tick (combat during the
 	# units/enemies passes below lands next tick).
 	var noises: Array[Dictionary] = _threat.noises()
@@ -318,6 +412,7 @@ func advance_one_tick() -> void:
 	var unit_result: Dictionary = _units.advance(_registry, _grid, _navigation, _tick_rate, _vision)
 	for hit: Dictionary in unit_result["enemy_hits"]:
 		_damage_enemy(hit["id"], hit["damage"], shelters)
+	_profile_mark(&"units")
 	var enemy_result: Dictionary = _enemies.advance(_registry, _grid, _navigation, _construction.all(), _tick_rate, noises, _vision)
 	for hit: Dictionary in enemy_result["building_hits"]:
 		damage_building(hit["id"], hit["damage"])
@@ -327,20 +422,30 @@ func advance_one_tick() -> void:
 		_remove_entity(id)
 	if not enemy_result["dead_units"].is_empty():
 		_recompute_economy()
-		_sync_navigation()
+	_profile_mark(&"enemies")
+	# Building deaths in this pass changed pass-through/occupancy; settle one
+	# navigation refresh for the whole batch instead of one per hit.
+	_sync_navigation()
+	_profile_mark(&"nav_combat")
 	# Finish removal bookkeeping for this combat pass, but never fire towers or
 	# submit a new native movement batch after the core has fallen.
 	if session_ended():
 		_sync_vision()
+		_profile_mark(&"vision_post")
+		_profile_end()
+		_in_tick = false
 		state_changed.emit()
 		return
 	# Towers fire after enemy movement; hits return as results and share the
 	# unit-kill removal bookkeeping (grid release, economy, navigation).
 	_sync_vision()
+	_profile_mark(&"vision_post")
 	var tower_hits: Array[Dictionary] = _towers.advance(_registry, _construction.all(), _tick_rate, _grid, _vision)
 	for hit: Dictionary in tower_hits:
 		_damage_enemy(hit["id"], hit["damage"], shelters)
+	_profile_mark(&"towers")
 	_registry.step(_clock.step_seconds(), _grid)
+	_profile_mark(&"step")
 	# Marching units hum: the expansion itself attracts wanderers (values.md §13).
 	_tick_counter += 1
 	var movement_noise_ticks: int = maxi(1, ceili(MOVEMENT_NOISE_SECONDS * _tick_rate))
@@ -348,6 +453,8 @@ func advance_one_tick() -> void:
 		if entity.team == 1 and entity.unit_definition != null and entity.has_move_order and (_tick_counter + entity.entity_id) % movement_noise_ticks == 0:
 			_threat.note_movement(entity.position)
 	_check_victory()
+	_profile_end()
+	_in_tick = false
 
 
 ## First-slice victory gate (development-plan M6): every scheduled wave has
@@ -557,9 +664,9 @@ func _damage_enemy(entity_id: int, damage: int, shelters: Array[MechEntityState]
 	entity.hp = maxi(0, entity.hp - damage)
 	if entity.hp > 0:
 		return
+	# Enemies do not own grid cells or economy capacity; only the registry
+	# changes. Building deaths are settled by the caller's batched pass.
 	_remove_entity(entity_id)
-	_recompute_economy()
-	_sync_navigation()
 
 
 ## The live shelter provider covering this entity, if any (first match wins;
@@ -628,6 +735,8 @@ func damage_building(entity_id: int, amount: int) -> Dictionary:
 		# the wreck plus a combat pulse (values.md §14). Demolish/cancel paths never
 		# pass through here, so controlled teardown stays infection-free.
 		var rules: MechBuildingDefinition = building.definition
+		if not rules.is_core:
+			_enemies.note_breach(Vector2(building.origin) + Vector2(rules.footprint) * 0.5)
 		if not rules.is_core and rules.capacity_cost > 0:
 			_infect_asset(rules.cost, Vector2(building.origin) + Vector2(rules.footprint) * 0.5)
 		if rules.is_core:
@@ -641,8 +750,11 @@ func damage_building(entity_id: int, amount: int) -> Dictionary:
 			# §4.1): cells and the mineral binding stay held, but the base
 			# itself never blocks movement.
 			_ruin_building(building)
+	# Combat passes settle several hits in a row; direct callers outside the
+	# tick still get an immediate refresh, while the tick batches it once.
+	if not _in_tick:
 		_sync_navigation()
-	_sync_vision()
+		_sync_vision()
 	state_changed.emit()
 	return {"ok": true, "reason": ""}
 
@@ -797,15 +909,37 @@ func _sync_navigation() -> void:
 		return
 	_navigation.rebuild(_grid)
 	_navigation_revision = _grid.revision()
+	_profile_counter(&"nav_rebuild")
 	for unit: Dictionary in _registry.movable_snapshots():
 		var entity_id: int = unit["id"]
-		if not _grid.is_walkable(Vector2i(unit["position"].floor())):
+		var position: Vector2 = unit["position"]
+		if not _grid.is_walkable(Vector2i(position.floor())):
 			_registry.stop(entity_id)
-		elif unit["has_order"]:
-			_registry.set_move_path(entity_id, _navigation.find_path_to_point(unit["position"], unit["target"]))
+			continue
+		if not unit["has_order"]:
+			continue
+		# Only re-run A* when the new occupancy actually cuts the remaining
+		# route. A wall built far away leaves the queued waypoints clear, so
+		# most moving units keep their path and avoid a per-building A* storm.
+		var path: PackedVector2Array = unit["path"]
+		if _path_is_blocked(position, path):
+			_profile_counter(&"nav_repath")
+			_registry.set_move_path(
+				entity_id, _navigation.find_path_to_point(position, unit["target"])
+			)
+
+
+func _path_is_blocked(position: Vector2, path: PackedVector2Array) -> bool:
+	var previous: Vector2 = position
+	for point: Vector2 in path:
+		if not _grid.mobile_segment_clear(previous, point):
+			return true
+		previous = point
+	return false
 
 
 func _sync_vision() -> void:
+	_profile_counter(&"vision")
 	_vision.update(_grid, _registry, _construction.all(), _settings.probe_sight_radius)
 
 

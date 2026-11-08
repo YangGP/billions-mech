@@ -5,12 +5,14 @@ extends RefCounted
 ## always cheaper than chewing walls, so enemies funnel through gaps; with no
 ## cheap route the field points into the wall and blocker engagement attacks it
 ## ("撞墙打墙", waves-enemies.md §8). The field recomputes on occupancy changes
-## or building HP drift. Enemies are not native RVO agents; stepping is guarded
+## or non-wall building HP drift; wall HP only affects local target choice.
+## Enemies are not native RVO agents; stepping is guarded
 ## here and crowd separation comes from the vendored Steering over grid-bucket
 ## neighbours. Enemies attacking buildings crowd tighter (partial overlap).
-## Wall passers (prototype, passes_walls) march on a second field that omits
-## armored walls and skip wall collision, so they walk straight over them at
-## normal speed (waves-enemies.md §8.2); other buildings and terrain still block.
+## Wall passers (prototype, passes_walls) read the same weighted field as
+## normal marchers and only skip armored-wall collision while stepping, so their
+## route matches the normal horde's route (waves-enemies.md §8.2); other
+## buildings and terrain still block.
 
 const FLOW_WEIGHT: float = 1.0
 const SEPARATION_WEIGHT: float = 0.6
@@ -19,9 +21,12 @@ const CROWD_SEPARATION_RADIUS: float = 0.3
 const VISION_SCAN_INTERVAL: int = 5
 const FOG_DECISION_STRIDE: int = 4
 const ACTIVITY_BUCKET_SIZE: int = 16
-const FIELD_HP_REFRESH_SECONDS: float = 1.0
 const CONVERGE_REPATH_SECONDS: float = 2.0
 const CONVERGE_ARRIVAL: float = 1.0
+## Assault field: a local 32×32 field around a breach/base, seeded by nearby
+## non-wall player buildings. It is only used by enemies inside its bounds.
+const ASSAULT_ZONE_SIZE: int = 32
+const ASSAULT_TRIGGER_RADIUS: float = 14.0
 const SHUFFLE_DECISION_SECONDS: float = 8.0
 const SHUFFLE_RADIUS: int = 2
 const SHUFFLE_ATTEMPTS: int = 6
@@ -30,17 +35,20 @@ const WALL_ID: StringName = &"armored_wall"
 
 var profiling_enabled: bool = false
 var _field := MechMarchField.new()
-## Prototype march field: identical to _field but armored walls contribute no
-## building cost, so the flow leads wall passers straight over them.
-var _proto_field := MechMarchField.new()
+## Wall passers follow the normal march field; they only ignore wall collision
+## while moving. The extra A* map is for chase/path queries, not a second field.
 var _proto_navigation := MechGridNavigation.new()
 var _wall_ids: Dictionary = {}
 var _goal: Vector2i = Vector2i.ZERO
 var _field_revision: int = -1
-var _field_hp: Dictionary = {}
-var _proto_field_revision: int = -1
-var _proto_field_hp: Dictionary = {}
 var _proto_navigation_revision: int = -1
+var _proto_navigation_geometry: Dictionary = {}
+var _assault_center: Vector2i = Vector2i(-1, -1)
+var _assault_bounds := Rect2i()
+var _assault_field := MechMarchField.new()
+var _assault_ready: bool = false
+var _assault_source_key: Dictionary = {}
+var _assault_dirty: bool = false
 var _tick_counter: int = 0
 var _combat_noise: Callable = Callable()
 var _field_task: int = -1
@@ -57,13 +65,16 @@ func reset(_grid: MechGridState, goal: Vector2i, _buildings: Array[MechBuildingS
 	_tick_counter = 0
 	_goal = goal
 	_field = MechMarchField.new()
-	_proto_field = MechMarchField.new()
 	_proto_navigation = MechGridNavigation.new()
 	_field_revision = -1
-	_field_hp.clear()
-	_proto_field_revision = -1
-	_proto_field_hp.clear()
 	_proto_navigation_revision = -1
+	_proto_navigation_geometry.clear()
+	_assault_center = Vector2i(-1, -1)
+	_assault_bounds = Rect2i()
+	_assault_field = MechMarchField.new()
+	_assault_ready = false
+	_assault_source_key.clear()
+	_assault_dirty = false
 	_wall_ids.clear()
 
 
@@ -74,39 +85,47 @@ func shutdown() -> void:
 	_field_result = {}
 
 
-func _refresh_field(grid: MechGridState, buildings: Array[MechBuildingState], hz: int, need_main: bool, need_proto: bool) -> void:
-	# Wanderers use the existing A* and never consume the core march fields.
-	# Keep each field invalid until a live enemy actually needs it. HP drift
-	# affects soft costs, not the native A* occupancy map.
-	_collect_field_result(grid)
+## The shared field only depends on static terrain, so it never needs a
+## signature. The wall-pass A* still needs non-wall geometry for chase/path
+## queries; wall geometry and wall HP are deliberately absent there.
+func _nav_signature(buildings: Array[MechBuildingState]) -> Dictionary:
+	var proto_geometry: Dictionary = {}
+	var wall_ids: Dictionary = {}
+	for building: MechBuildingState in buildings:
+		if building.hp <= 0:
+			continue
+		if building.definition.building_id == WALL_ID:
+			wall_ids[building.entity_id] = true
+		if Rect2i(building.origin, building.definition.footprint).has_point(_goal):
+			continue
+		if building.definition.building_id != WALL_ID:
+			proto_geometry[building.entity_id] = Vector4i(
+				building.origin.x, building.origin.y,
+				building.definition.footprint.x, building.definition.footprint.y
+			)
+	return {"proto_geometry": proto_geometry, "wall_ids": wall_ids}
+
+
+func _refresh_field(grid: MechGridState, buildings: Array[MechBuildingState], need_main: bool, need_proto: bool) -> void:
+	# Wanderers use the existing A* and never consume the core march field.
+	# The shared field is terrain-only and never invalidated by buildings.
+	_collect_field_result(buildings)
 	if _field_task >= 0 or (not need_main and not need_proto):
 		return
 	var revision: int = grid.revision()
-	var hp_due: bool = _tick_counter % maxi(1, ceili(FIELD_HP_REFRESH_SECONDS * hz)) == 0
-	var check_main: bool = need_main and (_field_revision != revision or hp_due)
-	var check_proto: bool = need_proto and (_proto_field_revision != revision or hp_due)
-	if not check_main and not check_proto:
+	var signatures: Dictionary = _nav_signature(buildings)
+	var proto_geometry: Dictionary = signatures["proto_geometry"]
+	var wall_ids: Dictionary = signatures["wall_ids"]
+	var rebuild_main: bool = need_main and _field_revision < 0
+	# The wall-pass A* is only for chase/path queries; it ignores wall
+	# occupancy, so only non-wall geometry invalidates it.
+	var nav_stale: bool = _proto_navigation_revision < 0 \
+		or _proto_navigation_geometry != proto_geometry
+	var rebuild_nav: bool = need_proto and nav_stale
+	if not rebuild_main and not rebuild_nav:
+		_wall_ids = wall_ids
 		return
 	var started: int = Time.get_ticks_usec() if profiling_enabled else 0
-	var main_costs: Dictionary = {}
-	var proto_costs: Dictionary = {}
-	var wall_ids: Dictionary = {}
-	for building: MechBuildingState in buildings:
-		if building.definition.building_id == WALL_ID:
-			wall_ids[building.entity_id] = true
-		if building.hp <= 0 or Rect2i(building.origin, building.definition.footprint).has_point(_goal):
-			continue
-		# Compare the exact capped HP used by MechMarchField. Changes above the
-		# cap, or to the exempt mainbrain, do not change any cell's soft cost.
-		var cost_hp: int = mini(building.hp, MechMarchField.SOFT_COST_CAP)
-		main_costs[building.entity_id] = cost_hp
-		if building.definition.building_id != WALL_ID:
-			proto_costs[building.entity_id] = cost_hp
-	var rebuild_main: bool = check_main and (_field_revision != revision or _field_hp != main_costs)
-	var rebuild_proto: bool = check_proto and (_proto_field_revision != revision or _proto_field_hp != proto_costs)
-	var rebuild_nav: bool = need_proto and _proto_navigation_revision != revision
-	if not rebuild_main and not rebuild_proto and not rebuild_nav:
-		return
 	var frozen_buildings: Array[MechBuildingState] = []
 	for building: MechBuildingState in buildings:
 		var frozen := MechBuildingState.new()
@@ -116,10 +135,11 @@ func _refresh_field(grid: MechGridState, buildings: Array[MechBuildingState], hz
 		# Definition resources are read-only throughout a running session.
 		frozen.definition = building.definition
 		frozen_buildings.append(frozen)
+	_wall_ids = wall_ids
 	var job: Dictionary = {"grid": grid.navigation_copy(), "goal": _goal,
 		"buildings": frozen_buildings, "wall_ids": wall_ids, "revision": revision,
-		"main": rebuild_main, "proto": rebuild_proto, "nav": rebuild_nav,
-		"main_costs": main_costs, "proto_costs": proto_costs, "profiling": profiling_enabled}
+		"main": rebuild_main, "nav": rebuild_nav,
+		"proto_geometry": proto_geometry, "profiling": profiling_enabled}
 	_field_task = WorkerThreadPool.add_task(_compute_fields.bind(job), false, "Mech march fields")
 	if profiling_enabled:
 		print("[perf:fields] submit_ms=%.3f revision=%d" % [(Time.get_ticks_usec() - started) / 1000.0, revision])
@@ -127,22 +147,13 @@ func _refresh_field(grid: MechGridState, buildings: Array[MechBuildingState], hz
 
 func _compute_fields(job: Dictionary) -> void:
 	var started: int = Time.get_ticks_usec() if job["profiling"] else 0
-	var output: Dictionary = {"revision": job["revision"], "main_costs": job["main_costs"],
-		"proto_costs": job["proto_costs"], "wall_ids": job["wall_ids"]}
+	var output: Dictionary = {"revision": job["revision"],
+		"proto_geometry": job["proto_geometry"], "wall_ids": job["wall_ids"]}
 	var grid: MechGridState = job["grid"]
-	var buildings: Array[MechBuildingState] = job["buildings"]
 	if job["main"]:
 		var field := MechMarchField.new()
-		field.rebuild(grid, job["goal"], buildings)
+		field.rebuild(grid, job["goal"])
 		output["field"] = field
-	if job["proto"]:
-		var non_walls: Array[MechBuildingState] = []
-		for building: MechBuildingState in buildings:
-			if building.definition.building_id != WALL_ID:
-				non_walls.append(building)
-		var field := MechMarchField.new()
-		field.rebuild(grid, job["goal"], non_walls)
-		output["proto_field"] = field
 	if job["nav"]:
 		# Each AStarGrid2D is owned by one thread at a time, then handed off
 		# after task completion; no live A* object is accessed concurrently.
@@ -156,7 +167,7 @@ func _compute_fields(job: Dictionary) -> void:
 	_field_mutex.unlock()
 
 
-func _collect_field_result(grid: MechGridState) -> void:
+func _collect_field_result(buildings: Array[MechBuildingState]) -> void:
 	if _field_task < 0 or not WorkerThreadPool.is_task_completed(_field_task):
 		return
 	WorkerThreadPool.wait_for_task_completion(_field_task)
@@ -165,25 +176,133 @@ func _collect_field_result(grid: MechGridState) -> void:
 	var result: Dictionary = _field_result
 	_field_result = {}
 	_field_mutex.unlock()
-	# Commands may have changed geometry while the worker was running. Discard
-	# stale output and coalesce a replacement from the latest state.
-	if result.get("revision", -1) != grid.revision():
-		return
+	var current: Dictionary = _nav_signature(buildings)
+	# The shared field is terrain-only and valid regardless of buildings. The
+	# wall-pass A* is only used for chase/path queries and depends on non-wall
+	# geometry.
+	var nav_ok: bool = result.get("proto_geometry", {}) == current["proto_geometry"]
+	var applied_main: bool = false
+	var applied_nav: bool = false
 	if result.has("field"):
 		_field = result["field"]
 		_field_revision = result["revision"]
-		_field_hp = result["main_costs"]
-	if result.has("proto_field"):
-		_proto_field = result["proto_field"]
-		_proto_field_revision = result["revision"]
-		_proto_field_hp = result["proto_costs"]
-	if result.has("navigation"):
+		applied_main = true
+	if result.has("navigation") and nav_ok:
 		_proto_navigation = result["navigation"]
 		_proto_navigation_revision = result["revision"]
-		_wall_ids = result["wall_ids"]
+		_proto_navigation_geometry = result["proto_geometry"]
+		applied_nav = true
+	elif result.has("navigation"):
+		_proto_navigation_revision = -1
+	_wall_ids = current["wall_ids"]
 	if result.has("worker_ms"):
-		print("[perf:fields] worker_ms=%.3f main=%s proto=%s nav=%s revision=%d" % [
-			result["worker_ms"], result.has("field"), result.has("proto_field"), result.has("navigation"), result["revision"]])
+		print("[perf:fields] worker_ms=%.3f main=%s nav=%s revision=%d" % [
+			result["worker_ms"], applied_main, applied_nav, result["revision"]])
+
+
+## Called by SimCore when an enemy destroys a wall/building. A zone is created
+## around the breach; the next advance fills its local building field.
+func note_breach(center: Vector2) -> void:
+	var cell := Vector2i(center.floor())
+	if cell.x < 0 or cell.y < 0:
+		return
+	if _assault_center == cell or _assault_bounds.has_point(cell):
+		return
+	_assault_center = cell
+	_assault_bounds = Rect2i()
+	_assault_ready = false
+	_assault_source_key.clear()
+	_assault_dirty = true
+
+
+func _assault_rect(center: Vector2i, grid: MechGridState) -> Rect2i:
+	var half: int = ASSAULT_ZONE_SIZE / 2
+	var area := Rect2i(center - Vector2i(half, half), Vector2i(ASSAULT_ZONE_SIZE, ASSAULT_ZONE_SIZE))
+	return area.intersection(Rect2i(Vector2i.ZERO, grid.dimensions()))
+
+
+func _assault_has_source(area: Rect2i, buildings: Array[MechBuildingState]) -> bool:
+	for building: MechBuildingState in buildings:
+		if building.hp <= 0 or building.definition.is_core or building.definition.building_id == WALL_ID:
+			continue
+		var overlap: Rect2i = area.intersection(Rect2i(building.origin, building.definition.footprint))
+		if overlap.size.x > 0 and overlap.size.y > 0:
+			return true
+	return false
+
+
+## Proximity fallback: enemies that reach the base without a recorded breach
+## still activate a zone around the mainbrain, provided there is a nearby
+## non-wall building to assault.
+func _maybe_activate_assault(enemies: Array[MechEntityState], buildings: Array[MechBuildingState], grid: MechGridState) -> void:
+	if _assault_center.x >= 0:
+		return
+	var goal_position := Vector2(_goal) + Vector2(0.5, 0.5)
+	var radius_squared: float = ASSAULT_TRIGGER_RADIUS * ASSAULT_TRIGGER_RADIUS
+	var near := false
+	for enemy: MechEntityState in enemies:
+		if enemy.enemy_definition.marches_to_core and enemy.position.distance_squared_to(goal_position) <= radius_squared:
+			near = true
+			break
+	if not near:
+		return
+	var area: Rect2i = _assault_rect(_goal, grid)
+	if not _assault_has_source(area, buildings):
+		return
+	_assault_center = _goal
+	_assault_bounds = area
+	_assault_ready = false
+	_assault_source_key.clear()
+	_assault_dirty = true
+
+
+## Rebuild the local assault field when the set/geometry of nearby non-wall
+## buildings changes. Wall HP, wall placement and ordinary building HP are not
+## inputs; only the building topology inside the zone matters.
+func _refresh_assault_field(grid: MechGridState, buildings: Array[MechBuildingState]) -> void:
+	if _assault_center.x < 0:
+		return
+	if _assault_bounds.size.x <= 0 or _assault_bounds.size.y <= 0:
+		_assault_bounds = _assault_rect(_assault_center, grid)
+	var source_cells: Dictionary = {}
+	var key: Dictionary = {}
+	for building: MechBuildingState in buildings:
+		if building.hp <= 0 or building.definition.is_core or building.definition.building_id == WALL_ID:
+			continue
+		var area := Rect2i(building.origin, building.definition.footprint)
+		var overlap: Rect2i = _assault_bounds.intersection(area)
+		if overlap.size.x <= 0 or overlap.size.y <= 0:
+			continue
+		key[building.entity_id] = Vector4i(
+			building.origin.x, building.origin.y,
+			building.definition.footprint.x, building.definition.footprint.y
+		)
+		for y: int in range(building.definition.footprint.y):
+			for x: int in range(building.definition.footprint.x):
+				var cell: Vector2i = building.origin + Vector2i(x, y)
+				if _assault_bounds.has_point(cell):
+					source_cells[cell] = true
+	if key.is_empty():
+		# Nothing left to assault inside the zone: return to the global field.
+		_assault_center = Vector2i(-1, -1)
+		_assault_bounds = Rect2i()
+		_assault_ready = false
+		_assault_source_key.clear()
+		_assault_dirty = false
+		return
+	if not _assault_dirty and key == _assault_source_key:
+		return
+	var sources: Array[Vector2i] = []
+	for cell: Vector2i in source_cells:
+		sources.append(cell)
+	var started: int = Time.get_ticks_usec() if profiling_enabled else 0
+	_assault_field.rebuild_local(grid, _assault_bounds, sources)
+	_assault_source_key = key
+	_assault_ready = true
+	_assault_dirty = false
+	if profiling_enabled:
+		print("[perf:assault] ms=%.3f sources=%d center=%s" % [
+			(Time.get_ticks_usec() - started) / 1000.0, sources.size(), _assault_center])
 
 
 func create(registry: MechEntityRegistry, rules: MechEnemyDefinition, position: Vector2) -> int:
@@ -234,12 +353,16 @@ func advance(registry: MechEntityRegistry, grid: MechGridState, navigation: Mech
 		elif entity.team == 2 and entity.enemy_definition != null:
 			enemies.append(entity)
 			need_proto = need_proto or entity.enemy_definition.passes_walls
-			need_main = need_main or (entity.enemy_definition.marches_to_core and not entity.enemy_definition.passes_walls)
+			# Wall passers read the same weighted field as normal marchers;
+			# only their collision ignores armored walls.
+			need_main = need_main or entity.enemy_definition.marches_to_core
 			var enemy_cell := Vector2i(entity.position.floor())
 			if not enemy_buckets.has(enemy_cell):
 				enemy_buckets[enemy_cell] = []
 			enemy_buckets[enemy_cell].append(entity)
-	_refresh_field(grid, buildings, hz, need_main, need_proto)
+	_maybe_activate_assault(enemies, buildings, grid)
+	_refresh_assault_field(grid, buildings)
+	_refresh_field(grid, buildings, need_main, need_proto)
 	var dt: float = 1.0 / float(hz)
 	var tick: int = _tick_counter
 	_tick_counter += 1
@@ -292,7 +415,7 @@ func _advance_one(enemy: MechEntityState, registry: MechEntityRegistry, grid: Me
 			building_cells, unit_buckets, enemy_buckets, dt, hz, result)
 		return
 	if scan_due:
-		var target: int = _acquire_target(enemy, grid, unit_buckets, building_cells)
+		var target: int = _acquire_target(enemy, grid, unit_buckets, building_cells, buildings_by_id)
 		if target > 0:
 			_engage(enemy, target)
 	if enemy.order == &"engaged":
@@ -388,15 +511,16 @@ func _shuffle_cell(enemy: MechEntityState, grid: MechGridState) -> Vector2i:
 
 
 func _advance_marching(enemy: MechEntityState, grid: MechGridState, enemy_buckets: Dictionary, buildings_by_id: Dictionary, dt: float) -> void:
-	if (_proto_field_revision if enemy.enemy_definition.passes_walls else _field_revision) < 0:
-		return
 	var cell: Vector2i = Vector2i(enemy.position.floor())
-	# Wall passers march on the wall-free field; everyone else follows the
-	# standard gap-chewing flow.
-	var field: MechMarchField = _proto_field if enemy.enemy_definition.passes_walls else _field
-	var flow_dir: Vector2 = field.flow_at(cell)
+	# Inside a breach/base zone, nearby player buildings become the local
+	# target field. Outside it, the static global field leads to the mainbrain.
+	var flow_dir: Vector2 = Vector2.ZERO
+	if _assault_ready and _assault_bounds.has_point(cell):
+		flow_dir = _assault_field.flow_at(cell)
 	if flow_dir == Vector2.ZERO:
-		return
+		if _field_revision < 0:
+			return
+		flow_dir = _field.flow_at(cell)
 	var speed: float = enemy.enemy_definition.move_speed / grid.movement_weight(cell)
 	var desired: Vector2 = Steering.desired_velocity(flow_dir, speed)
 	var separation: Vector2 = Steering.separation(enemy.position, _separation_neighbors(enemy, enemy_buckets), SEPARATION_RADIUS)
@@ -416,7 +540,7 @@ func _advance_engaged(enemy: MechEntityState, registry: MechEntityRegistry, grid
 		if target_unit == null or target_unit.team != 1 or target_unit.hp <= 0:
 			target_unit = null
 	if target_building == null and target_unit == null:
-		var found: int = _acquire_target(enemy, grid, unit_buckets, building_cells)
+		var found: int = _acquire_target(enemy, grid, unit_buckets, building_cells, buildings_by_id)
 		if found > 0:
 			_engage(enemy, found)
 			target_building = buildings_by_id.get(found)
@@ -511,15 +635,21 @@ func _disengage(enemy: MechEntityState) -> void:
 	enemy.set_move_path(PackedVector2Array())
 
 
-func _acquire_target(enemy: MechEntityState, grid: MechGridState, unit_buckets: Dictionary, building_cells: Dictionary) -> int:
+func _acquire_target(enemy: MechEntityState, grid: MechGridState, unit_buckets: Dictionary, building_cells: Dictionary, buildings_by_id: Dictionary) -> int:
 	var rules: MechEnemyDefinition = enemy.enemy_definition
 	var center: Vector2i = Vector2i(enemy.position.floor())
+	var assaulting: bool = _assault_ready and _assault_bounds.has_point(center)
 	var radius: int = ceili(rules.vision_radius)
 	var vision_squared: float = rules.vision_radius * rules.vision_radius
 	var best: int = 0
 	var best_distance: float = INF
 	var best_building: int = 0
 	var best_building_distance: float = INF
+	# Low-HP walls are a local choice; the shared march field stays wall-HP
+	# agnostic. Wall targets beat other buildings, then lowest HP, then nearest.
+	var best_wall: int = 0
+	var best_wall_hp: int = 0x7fffffff
+	var best_wall_distance: float = INF
 	for y: int in range(center.y - radius, center.y + radius + 1):
 		for x: int in range(center.x - radius, center.x + radius + 1):
 			var cell := Vector2i(x, y)
@@ -534,14 +664,32 @@ func _acquire_target(enemy: MechEntityState, grid: MechGridState, unit_buckets: 
 			var building_id: int = building_cells.get(cell, 0)
 			if building_id <= 0:
 				continue
+			var building: MechBuildingState = buildings_by_id.get(building_id)
+			if building == null:
+				continue
 			var cell_center := Vector2(cell) + Vector2(0.5, 0.5)
 			var building_distance: float = enemy.position.distance_squared_to(cell_center)
-			if building_distance <= vision_squared and building_distance < best_building_distance and grid.terrain_line_clear(enemy.position, cell_center):
+			if building_distance > vision_squared or not grid.terrain_line_clear(enemy.position, cell_center):
+				continue
+			if building.definition.building_id == WALL_ID:
+				# Inside an assault zone, walls are only engaged by movement
+				# collision; target acquisition goes for nearby buildings.
+				if assaulting:
+					continue
+				if building.hp < best_wall_hp or (
+					building.hp == best_wall_hp and building_distance < best_wall_distance
+				):
+					best_wall = building_id
+					best_wall_hp = building.hp
+					best_wall_distance = building_distance
+			elif building_distance < best_building_distance:
 				best_building = building_id
 				best_building_distance = building_distance
-	if rules.prefers_buildings and best_building > 0:
+	if rules.prefers_buildings:
+		if best_wall > 0:
+			return best_wall
 		return best_building
-	return best if best > 0 else best_building
+	return best if best > 0 else (best_wall if best_wall > 0 else best_building)
 
 
 func _separation_neighbors(enemy: MechEntityState, enemy_buckets: Dictionary) -> PackedVector2Array:
@@ -586,7 +734,9 @@ func _guarded_step(enemy: MechEntityState, velocity: Vector2, direction: Vector2
 func _slide_step(enemy: MechEntityState, direction: Vector2, speed: float, dt: float,
 		grid: MechGridState, buildings_by_id: Dictionary) -> void:
 	var cell: Vector2i = Vector2i(enemy.position.floor())
-	var field: MechMarchField = _proto_field if enemy.enemy_definition.passes_walls else _field
+	var field: MechMarchField = _field
+	if _assault_ready and _assault_bounds.has_point(cell):
+		field = _assault_field
 	var ignore_walls: bool = enemy.enemy_definition.passes_walls
 	var step_x: int = int(sign(direction.x))
 	var step_y: int = int(sign(direction.y))

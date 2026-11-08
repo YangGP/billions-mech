@@ -103,11 +103,11 @@
 
 ## 9. M5 行军场与分离选型
 
-当前机潮采用加权软成本场：地形权重 × 建筑软成本，目标为主脑；占用变化重算、HP 漂移限频刷新。接敌后走既有 AStarGrid2D，接敌判定与分离走网格桶，游荡敌按噪声各自寻路。
+当前机潮采用**地形-only** 加权场：只按地形权重积分到主脑，建筑与 HP 不参与全局路线；墙/建筑由局部碰撞接敌处理，场在单局内静态。接敌后走既有 AStarGrid2D，接敌判定与分离走网格桶，游荡敌按噪声各自寻路。
 
 | 候选 | 许可证与依赖 | 当前结论 |
 |---|---|---|
-| [Crusade RTS](https://github.com/saman-mb/crusade-rts) flow_field / steering | MIT；Godot 4.4、纯 RefCounted；锁定 `e4929c8` | 直接 vendor `steering.gd`；均匀成本 BFS 无法表达建筑软成本择路，flow_field 已移出工程 |
+| [Crusade RTS](https://github.com/saman-mb/crusade-rts) flow_field / steering | MIT；Godot 4.4、纯 RefCounted；锁定 `e4929c8` | 直接 vendor `steering.gd`；均匀成本 BFS 无法表达本项目的地形权重，flow_field 已移出工程 |
 | [godot-tilemap-flowfields](https://github.com/arnemileswinter/godot-tilemap-flowfields) | MIT；Godot 3.5 GDNative/Rust、FlowFieldGenerator/TileMap | 引擎版本、原生二进制和节点耦合不满足当前边界 |
 | [openage pathfinding](https://github.com/SFTtech/openage) | GPLv3；C++/Python、扇区/门户与流场 | 仅参考分层/缓存设计，不复制源码或接入运行时 |
 | [bevy_pathfinder](https://lib.rs/crates/bevy_pathfinder) | MIT；Rust crate | 需要新增原生扩展工具链；仅作候选参考 |
