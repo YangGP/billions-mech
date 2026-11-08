@@ -40,6 +40,7 @@ var _repair_all_button: Button
 var _build_menu: MechBuildMenu
 var _selection_title: Label
 var _status_label: Label
+var _wave_label: Label
 var _build_label: Label
 var _build_bar: ProgressBar
 var _hp_label: Label
@@ -82,6 +83,12 @@ func _ready() -> void:
 	_feedback_label = $Root/StatusStrip/Feedback
 	_zoom_label = $Root/Toolbar/Zoom
 	_pause_button = $Root/Header/Pause
+	_wave_label = Label.new()
+	_wave_label.position = Vector2(12, 132)
+	_wave_label.add_theme_font_override("font", _state_label.get_theme_font("font"))
+	_wave_label.add_theme_font_size_override("font_size", 15)
+	_wave_label.add_theme_color_override("font_color", Color("f0bc79"))
+	$Root/Header.add_child(_wave_label)
 	_selection_title = $Root/Inspector/Title
 	_status_label = $Root/Inspector/Status
 	_build_label = $Root/Inspector/BuildLabel
@@ -155,6 +162,24 @@ func present_map(map_state: Dictionary) -> void:
 
 func present_state(state: Dictionary) -> void:
 	_session_ended = state["session"]["ended"]
+	var threat: Dictionary = state.get("threat", {})
+	if _wave_label != null:
+		if _session_ended or threat.is_empty() or not threat.get("active", false) or threat.get("phase", &"") == &"done":
+			_wave_label.hide()
+		else:
+			var seconds: int = ceili(float(threat.get("seconds_remaining", 0.0)))
+			var clock := "%02d:%02d" % [seconds / 60, seconds % 60]
+			var edge_name: String = String(threat.get("edge_name", ""))
+			var phase: StringName = threat.get("phase", &"")
+			if phase == &"announced":
+				_wave_label.text = "第%d波 %s · %s" % [int(threat.get("wave_number", 1)), clock, edge_name]
+			elif phase == &"active":
+				_wave_label.text = "第%d波已出兵%s · 下一波 %s" % [int(threat.get("wave_number", 1)), (" · " + edge_name) if not edge_name.is_empty() else "", clock]
+			elif phase == &"silence" and threat.get("next_event", &"") == &"announce":
+				_wave_label.text = "首波预告 %s" % clock
+			else:
+				_wave_label.text = "下一波 %s" % clock
+			_wave_label.show()
 	$Root/SessionResult.visible = _session_ended
 	$Root/WorldInfo/Subtitle.text = "%s  /  战术视图" % state["scenario"]
 	if _generation != state["generation"]:
@@ -262,6 +287,10 @@ func present_cell(info: Dictionary, preview: Dictionary) -> void:
 	else:
 		var cell: Vector2i = info["cell"]
 		_cell_label.text = "格子  (%d, %d)  ·  %s" % [cell.x, cell.y, info["terrain_name"]]
+		if info.get("wind", false):
+			_cell_label.text += " · 风口"
+		if info.get("water", false):
+			_cell_label.text += " · 水域（不可通行/建造）"
 		if info["inside"] and info.get("vision", MechVisionSystem.State.VISIBLE) == MechVisionSystem.State.UNEXPLORED:
 			_cell_label.text += "\n派遣单位探索；未知区域不显示地形与矿点。"
 		elif info["inside"]:
@@ -280,6 +309,12 @@ func present_cell(info: Dictionary, preview: Dictionary) -> void:
 	else:
 		var footprint: Vector2i = preview["footprint"]
 		_space_label.text = "%d×%d  ·  %s  ·  %s" % [footprint.x, footprint.y, MechResources.text(preview.get("cost", {})), "可下单；左键轻点确认" if preview["ok"] else preview["reason"]]
+		var energy_type: String = String(preview.get("environment_energy", "none"))
+		if energy_type != "none":
+			var bounds: Rect2i = preview.get("collection_bounds", Rect2i())
+			_space_label.text += "\n环境预计 +%d 电 · 采集区 %d×%d%s" % [
+				int(preview.get("environment_power", 0)), bounds.size.x, bounds.size.y,
+				" · 同类采集区冲突" if not preview.get("conflict_cells", []).is_empty() else ""]
 		_space_label.modulate = ACCENT if preview["ok"] else Color("f27c78")
 
 	_space_label.tooltip_text = _space_label.text
@@ -300,7 +335,8 @@ func present_selection(building: Dictionary, errors: Dictionary) -> void:
 	_selection_title.text = "%s · %d×%d" % [building["name"], footprint.x, footprint.y]
 	_status_label.text = building["status"]
 	_status_label.tooltip_text = _status_label.text
-	_status_label.modulate = Color("f27c78") if building["phase"] == MechBuildingState.Phase.RUINED else (ACCENT if building["phase"] == MechBuildingState.Phase.OPERATING else Color("f0bc79"))
+	_status_label.modulate = Color("f27c78") if building["phase"] == MechBuildingState.Phase.RUINED or not building.get("powered", true) \
+		else (ACCENT if building["phase"] == MechBuildingState.Phase.OPERATING else Color("f0bc79"))
 	_build_bar.value = 100.0 * float(building["demolition_progress"] if building["phase"] == MechBuildingState.Phase.DEMOLISHING else building["build_progress"])
 	_build_label.text = "%s  %d%%" % ["清除基座进度" if building["phase"] == MechBuildingState.Phase.DEMOLISHING and building["hp"] <= 0 else ("拆除进度" if building["phase"] == MechBuildingState.Phase.DEMOLISHING else "施工进度"), roundi(_build_bar.value)]
 	var show_progress: bool = building["phase"] in [MechBuildingState.Phase.CONSTRUCTING, MechBuildingState.Phase.DEMOLISHING]
@@ -309,6 +345,14 @@ func present_selection(building: Dictionary, errors: Dictionary) -> void:
 	_hp_bar.value = 100.0 * float(building["hp"]) / float(building["max_hp"])
 	_hp_label.text = "血量  %d / %d" % [building["hp"], building["max_hp"]]
 	_details.text = "预留  电力 %d · 容量 %d\n供给  电力 +%d · 容量 +%d\n运行收入  +%d 币/分钟" % [building["power_cost"], building["capacity_cost"], building["power_provided"], building["capacity_provided"], building["income_per_minute"]]
+	if int(building.get("cooling_cost", 0)) > 0:
+		_details.text += "\n冷却预留  %.1f" % (float(building["cooling_cost"]))
+	if int(building.get("cooling_provided", 0)) > 0:
+		_details.text += "\n冷却供给  +%.1f（全基地共享）" % (float(building["cooling_provided"]))
+	if int(building.get("coverage_radius", 0)) > 0 and not building.get("is_core", false):
+		_details.text += "\n覆盖扩展  +%d 格（需与主脑连通）" % int(building["coverage_radius"])
+	if String(building.get("environment_energy", "none")) != "none":
+		_details.text += "\n环境供电  +%d（已探索选址）" % int(building.get("environment_power", 0))
 	var mineral: Dictionary = building.get("mineral", {})
 	if building["phase"] == MechBuildingState.Phase.RUINED:
 		_build_label.hide()

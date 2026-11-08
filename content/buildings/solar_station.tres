@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="MechBuildingDefinition" load_steps=2 format=3]
+[ext_resource type="Script" path="res://content/building_definition.gd" id="1"]
+[resource]
+script = ExtResource("1")
+building_id = &"solar_station"
+display_name = "太阳能站"
+footprint = Vector2i(2, 2)
+cost = Dictionary[StringName, int]({&"coins": 50, &"metal_ore": 6})
+construction_seconds = 30.0
+max_hp = 250
+environment_energy = "solar"
+infectable = true

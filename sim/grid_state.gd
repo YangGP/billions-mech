@@ -11,6 +11,11 @@ var _terrain := PackedByteArray()
 var _occupancy := PackedInt32Array()
 var _pass_through: Dictionary[int, bool] = {}
 var _coverage := PackedByteArray()
+## Explicit environment layers; water is also obstacle terrain, wind is not.
+var _wind := PackedByteArray()
+var _water := PackedByteArray()
+## Per-cell coverage change marker, independent from the occupancy revision.
+var _coverage_changes: Dictionary[int, int] = {}
 var _rough_weight: float = 2.0
 var _revision: int = 0
 var _terrain_revision: int = 0
@@ -29,6 +34,8 @@ func configure(definition: MechMapDefinition) -> void:
 	_rough_weight = definition.rough_movement_weight
 	_terrain = definition.terrain_cells()
 	_playable = definition.playable_cells()
+	_wind = definition.wind_mask()
+	_water = definition.water_mask()
 	_outline = definition.outline()
 	_cache_boundary()
 	_occupancy.resize(_terrain.size())
@@ -36,6 +43,7 @@ func configure(definition: MechMapDefinition) -> void:
 	_pass_through.clear()
 	_coverage.resize(_terrain.size())
 	_coverage.fill(0)
+	_coverage_changes.clear()
 	_revision += 1
 	_terrain_revision = _revision
 	_coverage_revision = _revision
@@ -60,6 +68,14 @@ func terrain_revision() -> int:
 
 func coverage_revision() -> int:
 	return _coverage_revision
+
+
+func coverage_changes_since(since: int) -> Array[Vector2i]:
+	var cells: Array[Vector2i] = []
+	for index: int in _coverage_changes:
+		if _coverage_changes[index] > since:
+			cells.append(Vector2i(index % _dimensions.x, index / _dimensions.x))
+	return cells
 
 
 func navigation_changes_since(since: int) -> Array[Vector2i]:
@@ -138,6 +154,14 @@ func is_covered(cell: Vector2i) -> bool:
 	return contains(cell) and _coverage[_index(cell)] != 0
 
 
+func is_wind(cell: Vector2i) -> bool:
+	return contains(cell) and _wind[_index(cell)] != 0
+
+
+func is_water(cell: Vector2i) -> bool:
+	return contains(cell) and _water[_index(cell)] != 0
+
+
 func footprint_covered(origin: Vector2i, footprint: Vector2i) -> bool:
 	for y: int in range(footprint.y):
 		for x: int in range(footprint.x):
@@ -146,17 +170,77 @@ func footprint_covered(origin: Vector2i, footprint: Vector2i) -> bool:
 	return true
 
 
+## Legacy single-source coverage used by the settings validator and existing
+## vision fixtures. Runtime coverage goes through recompute_coverage().
 func set_core_coverage(origin: Vector2i, footprint: Vector2i, radius: int) -> void:
-	_coverage.fill(0)
+	var mask := PackedByteArray()
+	mask.resize(_coverage.size())
+	mask.fill(0)
 	if radius >= 0:
-		for y: int in range(_dimensions.y):
-			for x: int in range(_dimensions.x):
-				var dx: int = maxi(maxi(origin.x - x, 0), x - (origin.x + footprint.x - 1))
-				var dy: int = maxi(maxi(origin.y - y, 0), y - (origin.y + footprint.y - 1))
-				if contains(Vector2i(x, y)) and dx * dx + dy * dy <= radius * radius:
-					_coverage[_index(Vector2i(x, y))] = 1
+		_stamp_source(mask, origin, footprint, radius)
+	_apply_coverage_mask(mask)
 	_revision += 1
-	_coverage_revision = _revision
+
+
+## Connected coverage rooted at the mainbrain. A relay only extends the mask
+## when its own cell is already covered by the root or another connected relay;
+## isolated loops and disconnected relays never self-power.
+func recompute_coverage(buildings: Array[MechBuildingState]) -> Array[Vector2i]:
+	var root: MechBuildingState = null
+	var relays: Array[MechBuildingState] = []
+	for building: MechBuildingState in buildings:
+		if building.hp <= 0 or building.phase != MechBuildingState.Phase.OPERATING:
+			continue
+		if building.definition == null or building.definition.coverage_radius <= 0:
+			continue
+		if building.definition.is_core:
+			root = building
+		else:
+			relays.append(building)
+	var mask := PackedByteArray()
+	mask.resize(_coverage.size())
+	mask.fill(0)
+	if root != null:
+		_stamp_source(mask, root.origin, root.definition.footprint, root.definition.coverage_radius)
+		var pending: Array[MechBuildingState] = relays.duplicate()
+		var grew: bool = true
+		while grew:
+			grew = false
+			for index: int in range(pending.size() - 1, -1, -1):
+				var relay: MechBuildingState = pending[index]
+				if not contains(relay.origin) or mask[_index(relay.origin)] == 0:
+					continue
+				_stamp_source(mask, relay.origin, relay.definition.footprint, relay.definition.coverage_radius)
+				pending.remove_at(index)
+				grew = true
+	return _apply_coverage_mask(mask)
+
+
+func _stamp_source(mask: PackedByteArray, origin: Vector2i, footprint: Vector2i, radius: int) -> void:
+	if radius < 0:
+		return
+	var low := (origin - Vector2i(radius, radius)).max(Vector2i.ZERO)
+	var high := (origin + footprint - Vector2i.ONE + Vector2i(radius, radius)).min(_dimensions - Vector2i.ONE)
+	for y: int in range(low.y, high.y + 1):
+		for x: int in range(low.x, high.x + 1):
+			var dx: int = maxi(maxi(origin.x - x, 0), x - (origin.x + footprint.x - 1))
+			var dy: int = maxi(maxi(origin.y - y, 0), y - (origin.y + footprint.y - 1))
+			if dx * dx + dy * dy <= radius * radius:
+				mask[_index(Vector2i(x, y))] = 1
+
+
+func _apply_coverage_mask(mask: PackedByteArray) -> Array[Vector2i]:
+	var changed: Array[Vector2i] = []
+	var next_revision: int = _coverage_revision + 1
+	for index: int in range(_coverage.size()):
+		if mask[index] == _coverage[index]:
+			continue
+		_coverage[index] = mask[index]
+		_coverage_changes[index] = next_revision
+		changed.append(Vector2i(index % _dimensions.x, index / _dimensions.x))
+	if not changed.is_empty():
+		_coverage_revision = next_revision
+	return changed
 
 
 func release(entity_id: int) -> void:
@@ -270,7 +354,8 @@ func inspect_cell(cell: Vector2i) -> Dictionary:
 		reason = "已有建筑占用"
 	return {"cell": cell, "inside": true, "terrain": terrain, "terrain_name": terrain_name,
 		"occupied_by": occupant_at(cell), "walkable": is_walkable(cell),
-		"movement_weight": movement_weight(cell), "covered": is_covered(cell), "reason": reason}
+		"movement_weight": movement_weight(cell), "covered": is_covered(cell),
+		"wind": is_wind(cell), "water": is_water(cell), "reason": reason}
 
 
 func preview_footprint(origin: Vector2i, footprint: Vector2i) -> Dictionary:
@@ -317,12 +402,15 @@ func snapshot() -> Dictionary:
 	return {"dimensions": _dimensions, "terrain": _terrain.duplicate(),
 		"playable": _playable.duplicate(), "outline": _outline.duplicate(),
 		"occupancy": _occupancy.duplicate(), "coverage": _coverage.duplicate(),
+		"wind": _wind.duplicate(), "water": _water.duplicate(),
 		"rough_weight": _rough_weight, "revision": _revision}
 
 
 func terrain_build_error(cell: Vector2i) -> String:
 	if not contains(cell):
 		return "超出地图边界"
+	if is_water(cell):
+		return "水域不可建造"
 	match terrain_at(cell):
 		Terrain.ROUGH:
 			return "崎岖地不可建造"

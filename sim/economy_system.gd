@@ -83,7 +83,10 @@ func recompute(buildings: Array[MechBuildingState], grid: MechGridState, unit_ca
 			_capacity_total += rules.capacity_provided
 			_capacity_system_reserved += rules.capacity_system_reserved
 			_capacity_supply += rules.capacity_provided - rules.capacity_system_reserved
-			_power_supply += rules.power_provided
+			if rules.environment_energy != "none":
+				_power_supply += building.environment_power
+			else:
+				_power_supply += rules.power_provided
 			_cooling_supply += rules.cooling_provided * 10
 			_income_rate += rules.income_per_minute
 

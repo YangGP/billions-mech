@@ -2437,25 +2437,31 @@
   "environment_sites": [
     {
       "id": "wind_start",
-      "score": 30.0,
-      "base_power": 15
+      "points": 96,
+      "power": 18,
+      "minimum_score": 24
     },
     {
       "id": "solar_start",
-      "score": 60,
-      "base_power": 20
+      "points": 60,
+      "power": 20,
+      "minimum_score": 28
     },
     {
       "id": "wind_expansion",
-      "score": 24.0,
-      "base_power": 12
+      "points": 96,
+      "power": 18,
+      "minimum_score": 24
     },
     {
       "id": "solar_expansion",
-      "score": 60,
-      "base_power": 20
+      "points": 60,
+      "power": 20,
+      "minimum_score": 28
     }
   ],
+  "wind_cells": 98,
+  "water_cells": 1051,
   "terrain_counts": {
     "open": 10183,
     "rough": 1561,
@@ -2463,5 +2469,5 @@
   },
   "native_mineral_count": 13,
   "fuel_reservations": 6,
-  "source_sha256": "08205428973a36659d4b9c35421110f4b7c9a9d9127a3715750fb0fa68465914"
+  "source_sha256": "b0308a477b28a1d7704751bbd588a44665bf764eb067d4bc2d4f8a56230fed86"
 }

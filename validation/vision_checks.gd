@@ -175,6 +175,7 @@ func _check_session() -> void:
 	settings.map_definition = map
 	settings.threat_enabled = false
 	settings.starting_unit_cells = [Vector2i(8, 8)]
+	settings.diagnostic_probe_enabled = true
 	var sim := MechSimCore.new()
 	_check(sim.configure(settings), "configure integrated fog session")
 	_check(sim._construction.definition(&"mainbrain").sight_radius == 12.0, "mainbrain sight is loaded")

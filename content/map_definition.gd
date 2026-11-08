@@ -12,6 +12,10 @@ extends Resource
 @export_range(0.0, 64.0, 1.0) var wanderer_exclusion_radius: float = 20.0
 @export var obstacle_rects: Array[Rect2i] = []
 @export var rough_rects: Array[Rect2i] = []
+## Explicit environment layers. Water is also forced to obstacle terrain;
+## wind is a scoring/visual layer and does not change movement.
+@export var wind_cells: Array[Vector2i] = []
+@export var water_cells: Array[Vector2i] = []
 @export_range(1.0, 10.0, 0.1) var rough_movement_weight: float = 2.0
 @export var mainbrain_origin: Vector2i = Vector2i(61, 61)
 @export var mainbrain_footprint: Vector2i = Vector2i(5, 5)
@@ -48,6 +52,16 @@ func validation_error() -> String:
 		for rectangle: Rect2i in rectangles:
 			if rectangle.size.x < 1 or rectangle.size.y < 1 or not bounds.encloses(rectangle):
 				return "地形区域超出地图或尺寸无效"
+	for cell: Vector2i in wind_cells:
+		if not bounds.has_point(cell) or not contains_cell(cell):
+			return "风口格超出可玩边界"
+		if Rect2i(mainbrain_origin, mainbrain_footprint).has_point(cell):
+			return "风口格与主脑重叠"
+	for cell: Vector2i in water_cells:
+		if not bounds.has_point(cell) or not contains_cell(cell):
+			return "水域格超出可玩边界"
+		if Rect2i(mainbrain_origin, mainbrain_footprint).has_point(cell):
+			return "水域格与主脑重叠"
 	if not is_finite(rough_movement_weight) or rough_movement_weight < 1.0:
 		return "崎岖地移动权重无效"
 	var ids: Dictionary = {}
@@ -113,6 +127,9 @@ func terrain_cells() -> PackedByteArray:
 			for y: int in range(rectangle.position.y, rectangle.end.y):
 				for x: int in range(rectangle.position.x, rectangle.end.x):
 					cells[y * dimensions.x + x] = kind
+	for cell: Vector2i in water_cells:
+		if Rect2i(Vector2i.ZERO, dimensions).has_point(cell):
+			cells[cell.y * dimensions.x + cell.x] = MechGridState.Terrain.OBSTACLE
 	for y: int in range(dimensions.y):
 		for x: int in range(dimensions.x):
 			if not contains_cell(Vector2i(x, y)):
@@ -120,9 +137,28 @@ func terrain_cells() -> PackedByteArray:
 	return cells
 
 
+func wind_mask() -> PackedByteArray:
+	return _cell_mask(wind_cells)
+
+
+func water_mask() -> PackedByteArray:
+	return _cell_mask(water_cells)
+
+
+func _cell_mask(cells: Array[Vector2i]) -> PackedByteArray:
+	var mask := PackedByteArray()
+	mask.resize(dimensions.x * dimensions.y)
+	mask.fill(0)
+	for cell: Vector2i in cells:
+		if Rect2i(Vector2i.ZERO, dimensions).has_point(cell):
+			mask[cell.y * dimensions.x + cell.x] = 1
+	return mask
+
+
 func terrain_snapshot() -> Dictionary:
 	return {"dimensions": dimensions, "terrain": terrain_cells(), "name": display_name,
 		"playable": playable_cells(), "outline": outline(),
+		"wind": wind_mask(), "water": water_mask(),
 		"main_gate": main_gate, "flank": flank, "mainbrain_origin": mainbrain_origin,
 		"mainbrain_footprint": mainbrain_footprint, "minerals": mineral_snapshots()}
 

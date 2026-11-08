@@ -13,6 +13,8 @@ var _sources: Dictionary = {}
 var _footprints: Dictionary = {}
 var _grid_revision: int = -1
 var _revision: int = 0
+var _explored_revision: int = 0
+var _explored_changed: bool = false
 
 
 func reset(grid: MechGridState) -> void:
@@ -24,6 +26,12 @@ func reset(grid: MechGridState) -> void:
 	_footprints.clear()
 	_grid_revision = -1
 	_revision += 1
+	_explored_revision += 1
+	_explored_changed = false
+
+
+func explored_revision() -> int:
+	return _explored_revision
 
 
 func update(grid: MechGridState, registry: MechEntityRegistry, buildings: Array[MechBuildingState], probe_radius: float) -> bool:
@@ -45,11 +53,17 @@ func update(grid: MechGridState, registry: MechEntityRegistry, buildings: Array[
 			sources[entity.entity_id] = Vector3(center.x, center.y, radius)
 	if sources == _sources and _grid_revision == grid.coverage_revision():
 		return false
+	_explored_changed = false
 	if _grid_revision != grid.coverage_revision():
-		for y: int in range(_dimensions.y):
-			for x: int in range(_dimensions.x):
-				if grid.is_covered(Vector2i(x, y)):
-					_explored[y * _dimensions.x + x] = State.EXPLORED
+		if _grid_revision < 0:
+			for y: int in range(_dimensions.y):
+				for x: int in range(_dimensions.x):
+					if grid.is_covered(Vector2i(x, y)):
+						_mark_explored(y * _dimensions.x + x)
+		else:
+			for cell: Vector2i in grid.coverage_changes_since(_grid_revision):
+				if grid.is_covered(cell):
+					_mark_explored(cell.y * _dimensions.x + cell.x)
 	var footprints: Dictionary = {}
 	for id: int in sources:
 		var source: Vector3 = sources[id]
@@ -69,11 +83,20 @@ func update(grid: MechGridState, registry: MechEntityRegistry, buildings: Array[
 	_sources = sources
 	_footprints = footprints
 	_grid_revision = grid.coverage_revision()
+	if _explored_changed:
+		_explored_revision += 1
 	if next == _states:
 		return false
 	_states = next
 	_revision += 1
 	return true
+
+
+func _mark_explored(index: int) -> void:
+	if _explored[index] == State.EXPLORED:
+		return
+	_explored[index] = State.EXPLORED
+	_explored_changed = true
 
 
 func _cast_source(grid: MechGridState, center: Vector2, radius: float) -> PackedInt32Array:
@@ -87,7 +110,7 @@ func _cast_source(grid: MechGridState, center: Vector2, radius: float) -> Packed
 			if not grid.contains(cell) or center.distance_squared_to(point) > radius * radius:
 				continue
 			var index: int = y * _dimensions.x + x
-			_explored[index] = State.EXPLORED
+			_mark_explored(index)
 			if grid.terrain_line_clear(center, point, true):
 				result.append(index)
 	return result

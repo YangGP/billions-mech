@@ -4,6 +4,6 @@
 script = ExtResource("1")
 building_id = &"armored_wall"
 display_name = "装甲墙"
-cost = Dictionary[StringName, int]({&"coins": 2})
+cost = Dictionary[StringName, int]({&"coins": 2, &"metal_ore": 1})
 construction_seconds = 8.0
 max_hp = 400

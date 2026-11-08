@@ -61,7 +61,7 @@ func catalog(economy: MechEconomySystem) -> Array[Dictionary]:
 	return result
 
 
-func preview_placement(id: StringName, origin: Vector2i, grid: MechGridState, economy: MechEconomySystem, minerals: MechMineralSystem, available: Dictionary = {}, planned_cells: Dictionary = {}) -> Dictionary:
+func preview_placement(id: StringName, origin: Vector2i, grid: MechGridState, economy: MechEconomySystem, minerals: MechMineralSystem, available: Dictionary = {}, planned_cells: Dictionary = {}, environment: MechEnvironmentEnergy = null, vision: MechVisionSystem = null) -> Dictionary:
 	var rules: MechBuildingDefinition = definition(id)
 	if rules == null or not rules.buildable:
 		return {"ok": false, "reason": "该建筑不可下单", "cells": [], "origin": origin, "footprint": Vector2i.ONE}
@@ -90,6 +90,22 @@ func preview_placement(id: StringName, origin: Vector2i, grid: MechGridState, ec
 	var mineral_check: Dictionary = minerals.placement(rules, origin)
 	if reason.is_empty() and not mineral_check["ok"]:
 		reason = mineral_check["reason"]
+	var energy_type := StringName(rules.environment_energy)
+	var environment_power: int = 0
+	var collection_bounds := Rect2i()
+	var conflict_cells: Array[Vector2i] = []
+	if reason.is_empty() and energy_type != &"none":
+		if environment == null or vision == null:
+			reason = "环境采集规则未就绪"
+		else:
+			collection_bounds = environment.collection_bounds(origin, rules.footprint)
+			conflict_cells = environment.conflicts(energy_type, origin, rules.footprint)
+			if not conflict_cells.is_empty():
+				reason = "同类环境电源采集区重叠"
+			else:
+				environment_power = environment.score(energy_type, origin, rules.footprint, grid, vision)
+				if environment_power <= 0:
+					reason = "环境评分不足（需已探索有效地形）"
 	if reason.is_empty():
 		reason = economy.reservation_error(rules, available)
 	if not reason.is_empty() and terrain_error.is_empty() and coverage_error.is_empty() and overlap_error.is_empty():
@@ -101,6 +117,10 @@ func preview_placement(id: StringName, origin: Vector2i, grid: MechGridState, ec
 	result["cost"] = MechResources.copy(rules.cost)
 	result["building_id"] = id
 	result["mineral_id"] = mineral_check["mineral_id"]
+	result["environment_energy"] = String(energy_type)
+	result["environment_power"] = environment_power
+	result["collection_bounds"] = collection_bounds
+	result["conflict_cells"] = conflict_cells
 	return result
 
 

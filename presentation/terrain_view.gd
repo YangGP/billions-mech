@@ -94,6 +94,8 @@ func _paint_map() -> void:
 	var dimensions: Vector2i = _map["dimensions"]
 	var terrain: PackedByteArray = _map["terrain"]
 	var playable: PackedByteArray = _map["playable"]
+	var wind: PackedByteArray = _map.get("wind", PackedByteArray())
+	var water: PackedByteArray = _map.get("water", PackedByteArray())
 	var boundary: PackedVector2Array = MechIsoGeometry.project_polygon(_map["outline"])
 	_painter.draw_colored_polygon(boundary, Color("122a34"))
 	for y: int in range(dimensions.y):
@@ -113,8 +115,12 @@ func _paint_map() -> void:
 				if clipped.is_empty() or clipped[0].size() < 3:
 					continue
 				polygon = clipped[0]
+			var is_water: bool = not water.is_empty() and water[y * dimensions.x + x] != 0
+			var is_wind: bool = not wind.is_empty() and wind[y * dimensions.x + x] != 0
 			var fill := Color("122a34") if (x + y) % 2 == 0 else Color("142e38")
-			if kind == MechGridState.Terrain.ROUGH:
+			if is_water:
+				fill = Color("183a55") if (x + y) % 2 == 0 else Color("17364e")
+			elif kind == MechGridState.Terrain.ROUGH:
 				fill = Color("47493a") if (x + y) % 2 == 0 else Color("424535")
 			elif kind == MechGridState.Terrain.OBSTACLE:
 				fill = Color("293b49")
@@ -123,14 +129,21 @@ func _paint_map() -> void:
 			outline.append(polygon[0])
 			_painter.draw_polyline(outline, Color(0.59, 0.61, 0.53, 0.22), 0.9, true)
 			var center: Vector2 = MechIsoGeometry.cell_center(cell)
-			if kind == MechGridState.Terrain.ROUGH:
+			if is_water:
+				_painter.draw_line(center + Vector2(-12, 1), center + Vector2(-1, 1), Color("6fb4d6"), 1.0, true)
+				_painter.draw_line(center + Vector2(3, 5), center + Vector2(13, 5), Color("5a9ec0"), 1.0, true)
+			elif is_wind:
+				_painter.draw_line(center + Vector2(-12, 4), center + Vector2(1, -3), Color("8fe6d6"), 1.2, true)
+				_painter.draw_line(center + Vector2(2, 6), center + Vector2(13, 0), Color("65c8ba"), 1.0, true)
+			elif kind == MechGridState.Terrain.ROUGH:
 				_painter.draw_line(center + Vector2(-11, 2), center + Vector2(-2, -3), Color("83816a"), 1.0, true)
 				_painter.draw_line(center + Vector2(3, 5), center + Vector2(13, 0), Color("83816a"), 1.0, true)
 	# Short rock facets on a second pass so later ground tiles never erase them.
 	for diagonal: int in range(dimensions.x + dimensions.y - 1):
 		for x: int in range(maxi(0, diagonal - dimensions.y + 1), mini(dimensions.x, diagonal + 1)):
 			var y: int = diagonal - x
-			if playable[y * dimensions.x + x] != 0 and terrain[y * dimensions.x + x] == MechGridState.Terrain.OBSTACLE:
+			if playable[y * dimensions.x + x] != 0 and terrain[y * dimensions.x + x] == MechGridState.Terrain.OBSTACLE \
+					and (water.is_empty() or water[y * dimensions.x + x] == 0):
 				_draw_rock(MechIsoGeometry.cell_center(Vector2i(x, y)), x + y, boundary)
 	# A boundary stroke extends outside the fog polygon and leaks unexplored
 	# map edges. Keep that authoring guide in the editor only.

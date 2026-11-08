@@ -76,4 +76,5 @@ func snapshot() -> Dictionary:
 		"extraction_per_minute": extraction_per_minute, "is_core": is_core, "buildable": buildable,
 		"produced_units": produced_units.duplicate(), "queue_limit": queue_limit,
 		"attack_damage": attack_damage, "attack_seconds": attack_seconds, "attack_range": attack_range,
-		"sight_radius": sight_radius}
+		"sight_radius": sight_radius, "coverage_radius": coverage_radius,
+		"environment_energy": environment_energy, "infectable": infectable}

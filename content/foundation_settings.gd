@@ -14,6 +14,9 @@ extends Resource
 @export var practice_target_cells: Array[Vector2i] = []
 @export_range(0.1, 10.0, 0.1) var probe_speed: float = 2.5
 @export_range(0.5, 64.0, 0.5) var probe_sight_radius: float = 7.0
+## Free validation entity for legacy vision fixtures/diagnostics only. The
+## normal game must never count it as an extra unit.
+@export var diagnostic_probe_enabled: bool = false
 
 ## First-wave migration switch. Development mode keeps the old "silence or
 ## 8 operating nodes" trigger; fixed-time mode ignores development and uses

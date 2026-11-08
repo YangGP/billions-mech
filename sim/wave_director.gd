@@ -111,7 +111,23 @@ func advance(grid: MechGridState, buildings: Array[MechBuildingState]) -> Array[
 
 
 func state() -> Dictionary:
+	var seconds_remaining: float = 0.0
+	var next_event: StringName = &"done"
+	var wave_number: int = _wave_index + 1
+	match _phase:
+		&"silence":
+			seconds_remaining = maxf(0.0, float(_silence_ticks - _tick_counter) / float(_tick_rate))
+			next_event = &"announce"
+		&"announced":
+			seconds_remaining = maxf(0.0, float(_announce_delay_ticks - _tick_counter) / float(_tick_rate))
+			next_event = &"release"
+		&"active":
+			wave_number = _wave_index
+			seconds_remaining = maxf(0.0, float(maxi(1, _wave_interval_ticks - _announce_delay_ticks) - _tick_counter) / float(_tick_rate))
+			next_event = &"next_announce"
 	return {"active": _active, "phase": _phase, "wave_index": _wave_index,
+		"wave_number": wave_number, "next_event": next_event,
+		"seconds_remaining": seconds_remaining,
 		"edge": _edge, "edge_name": _edge_name, "tier": _tier_label,
 		"total_waves": _total_waves, "exhausted": exhausted()}
 

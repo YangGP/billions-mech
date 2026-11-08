@@ -42,6 +42,14 @@
 
 [P0/P1-R 接手核对](../validation/p0-p1r-takeover.md) 记录 0.5.27-dev 基线、交易闭环静态审计、生产队列/退款修复与开发默认；不表示 P1 原生交易验收完成。
 
+[P2a 连通供电](../validation/p2a-coverage.md) 记录主脑根覆盖 BFS、中继/冷却塔内容、覆盖 revision 与差集刷新、启动检查及原生未验项。
+
+[P2b 环境采集](../validation/p2b-environment.md) 记录风能/太阳能评分、采集区预约、运行时环境输出、预览与探索差集刷新。
+
+[P2c 地图环境](../validation/p2c-map-environment.md) 记录风口/水域环境层、同源地图编译与参考风能/太阳能选址实测。
+
+[P2d 无燃料开局](../validation/p2d-opening.md) 记录新供给/配方、scout/sentinel、固定首波、启动日志与原生未验项。
+
 [M6 bundle 本地审查](../validation/m6-bundle-review.md) 记录本次合入的两个提交、原生导入发现的编译/接线问题、穿墙寻路修复，以及本地 43 个脚本、49 项既有回归、启动和原生画面的复验结果与限制。
 
 [卡顿与游荡节奏调整](../validation/performance-wanderers.md) 记录 0.5.18-dev 的后台行军场、局部 A*/RVO 更新、视野记忆复用、开局禁刷与游荡移速调整，以及加速战斗性能证据和待验项。

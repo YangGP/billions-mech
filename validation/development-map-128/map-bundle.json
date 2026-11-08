@@ -2191,12 +2191,12 @@
     "inputs": [
       {
         "path": "../../content/maps/development_basin_128.source.json",
-        "sha256": "08205428973a36659d4b9c35421110f4b7c9a9d9127a3715750fb0fa68465914"
+        "sha256": "b0308a477b28a1d7704751bbd588a44665bf764eb067d4bc2d4f8a56230fed86"
       }
     ],
     "route": "existing Godot renderer; collision/navigation data only",
     "source": "content/maps/development_basin_128.source.json",
-    "source_sha256": "08205428973a36659d4b9c35421110f4b7c9a9d9127a3715750fb0fa68465914",
+    "source_sha256": "b0308a477b28a1d7704751bbd588a44665bf764eb067d4bc2d4f8a56230fed86",
     "no_new_art": true
   }
 }

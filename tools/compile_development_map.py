@@ -47,6 +47,21 @@ def compile_map(source, output, qa_dir):
         for polygon in data[key]:
             painter.polygon([tuple(point) for point in polygon], fill=value)
     terrain = np.array(image)
+    wind_image = Image.new("L", (width, height), 0)
+    wind_painter = ImageDraw.Draw(wind_image)
+    for polygon in data.get("wind_polygons", []):
+        wind_painter.polygon([tuple(point) for point in polygon], fill=1)
+    wind = np.array(wind_image)
+    water_image = Image.new("L", (width, height), 0)
+    water_painter = ImageDraw.Draw(water_image)
+    for reservation in data.get("water_reservations", []):
+        polygon = data["obstacle_polygons"][reservation["polygon_index"]]
+        water_painter.polygon([tuple(point) for point in polygon], fill=1)
+    water = np.array(water_image)
+    if np.any(water[terrain != 2]):
+        raise ValueError("Water reservation is not an obstacle polygon")
+    if np.any(water & wind):
+        raise ValueError("Water and wind environment layers overlap")
     bx, by = data["mainbrain"]["origin"]
     bw, bh = data["mainbrain"]["footprint"]
     if not np.all(terrain[by:by + bh, bx:bx + bw] == 0):
@@ -82,22 +97,35 @@ def compile_map(source, output, qa_dir):
         if not np.all(components[y:y + h, x:x + w] == component):
             raise ValueError(f"Unreachable development site: {site['id']}")
         if site.get("building"):
-            area = terrain[y - 3:y + h + 3, x - 3:x + w + 3].copy()
-            area[3:3 + h, 3:3 + w] = 255
+            area_terrain = terrain[y - 3:y + h + 3, x - 3:x + w + 3]
+            area_wind = wind[y - 3:y + h + 3, x - 3:x + w + 3]
+            area_water = water[y - 3:y + h + 3, x - 3:x + w + 3]
+            body = np.zeros_like(area_terrain, dtype=bool)
+            body[3:3 + h, 3:3 + w] = True
+            valid = ~body & (area_water == 0) & (area_terrain != 2)
             is_wind = site["building"] == "wind"
-            score = float(np.sum(area == 1) + np.sum(area == 0) * .5) if is_wind else int(np.sum(area == 0))
-            if score < site["minimum_score"]:
-                raise ValueError(f"Insufficient environment score: {site['id']} = {score}")
-            environment.append({"id": site["id"], "score": score,
-                                "base_power": min(18 if is_wind else 20, int(score // 2))})
+            if is_wind:
+                points = int(np.sum(valid & ((area_wind == 1) | (area_terrain == 1))) * 2
+                             + np.sum(valid & (area_wind == 0) & (area_terrain == 0)))
+                power = min(18, points // 4)
+            else:
+                points = int(np.sum(valid & (area_terrain == 0)))
+                power = min(20, points // 2)
+            if power * 2 < site["minimum_score"]:
+                raise ValueError(f"Insufficient environment power: {site['id']} = {power}")
+            environment.append({"id": site["id"], "points": points, "power": power,
+                                "minimum_score": site["minimum_score"]})
     for point in list(data["gates"].values()) + list(data["edge_routes"].values()):
         x, y = point
         if components[y, x] != component:
             raise ValueError(f"Unreachable gate or edge route: {point}")
     obstacles = native_rectangles(terrain, 2)
     rough = native_rectangles(terrain, 1)
+    wind_cells = [[int(x), int(y)] for y, x in zip(*np.nonzero(wind))]
+    water_cells = [[int(x), int(y)] for y, x in zip(*np.nonzero(water))]
     compiled = {"obstacle_rects": obstacles, "rough_rects": rough,
                 "environment_sites": environment,
+                "wind_cells": len(wind_cells), "water_cells": len(water_cells),
                 "terrain_counts": {name: int(np.sum(terrain == value))
                                    for value, name in enumerate(("open", "rough", "obstacle"))}}
     # Only current runtime resource keys enter the native map. Fuel remains metadata.
@@ -115,11 +143,14 @@ def compile_map(source, output, qa_dir):
         return 'Array[Rect2i]([' + ', '.join('Rect2i(%d, %d, %d, %d)' % tuple(v) for v in values) + '])'
     def vector(values):
         return 'Vector2i(%d, %d)' % tuple(values)
+    def cells(values):
+        return 'Array[Vector2i]([' + ', '.join(vector(cell) for cell in values) + '])'
     lines += ['[resource]', 'script = ExtResource("1")', f'map_id = &"{data["id"]}"',
               f'display_name = {json.dumps(data["name"], ensure_ascii=False)}',
               'dimensions = ' + vector(data["dimensions"]),
               f'wanderer_exclusion_radius = {float(data["wanderer_exclusion_radius"])}',
               'obstacle_rects = ' + rectangles(obstacles), 'rough_rects = ' + rectangles(rough),
+              'wind_cells = ' + cells(wind_cells), 'water_cells = ' + cells(water_cells),
               'rough_movement_weight = 2.0', 'mainbrain_origin = ' + vector([bx, by]),
               'mainbrain_footprint = ' + vector([bw, bh]), 'probe_cell = ' + vector(data["probe_cell"]),
               'main_gate = ' + vector(data["gates"]["north"]), 'flank = ' + vector(data["gates"]["east"]),

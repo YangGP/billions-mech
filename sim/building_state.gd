@@ -30,6 +30,9 @@ var repairing: bool = false
 var repair_waiting_for_funds: bool = false
 var repair_remainder: int = 0
 var income_remainder: int = 0
+## Runtime output of an environment source (wind/solar); definition fields stay
+## immutable and shared. Recomputed only when the explored map changes.
+var environment_power: int = 0
 var attack_cooldown_ticks: int = 0
 var shot_ticks: int = 0
 var shot_target: Vector2 = Vector2.ZERO
@@ -87,6 +90,7 @@ func mark_ruined() -> void:
 	paid_cost = MechResources.empty()
 	extraction_remainder = 0
 	income_remainder = 0
+	environment_power = 0
 	attack_cooldown_ticks = 0
 	shot_ticks = 0
 
@@ -107,7 +111,7 @@ func status() -> String:
 	if threatened:
 		return "交战中 · 维修暂停" if repairing else "交战中"
 	if not powered:
-		return "未通电"
+		return "断覆盖"
 	if repairing:
 		return "维修等待资金" if repair_waiting_for_funds else "维修中"
 	return "运转中"
@@ -121,6 +125,7 @@ func snapshot() -> Dictionary:
 		"demolition_progress": float(elapsed_demolition_ticks) / demolition_ticks,
 		"demolition_seconds": definition.demolition_seconds, "refund": refund(),
 		"repairing": repairing, "threatened": threatened, "powered": powered,
+		"environment_power": environment_power,
 		"waiting_for_clearance": waiting_for_clearance, "rebuild_cost": rebuild_cost(),
 		"shot_ticks": shot_ticks, "shot_target": shot_target}, true)
 	return result

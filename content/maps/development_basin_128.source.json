@@ -961,6 +961,20 @@
       ]
     ]
   ],
+  "wind_polygons": [
+    [
+      [54, 58],
+      [60, 58],
+      [60, 64],
+      [54, 64]
+    ],
+    [
+      [74, 74],
+      [80, 74],
+      [80, 80],
+      [74, 80]
+    ]
+  ],
   "water_reservations": [
     {
       "id": "west_lake",
@@ -969,7 +983,7 @@
         28,
         63
       ],
-      "runtime_status": "obstacle placeholder until water terrain support"
+      "runtime_status": "water environment; obstacle and no storage"
     },
     {
       "id": "north_east_lake",
@@ -978,7 +992,7 @@
         111,
         28
       ],
-      "runtime_status": "obstacle placeholder until water terrain support"
+      "runtime_status": "water environment; obstacle and no storage"
     },
     {
       "id": "south_east_lake",
@@ -987,7 +1001,7 @@
         93,
         114
       ],
-      "runtime_status": "obstacle placeholder until water terrain support"
+      "runtime_status": "water environment; obstacle and no storage"
     }
   ],
   "development_sites": [
@@ -1288,5 +1302,5 @@
     ]
   },
   "runtime_economy": "Five-resource Dictionary ledger; balance values retained until the new power/cooling launch.",
-  "notes": "Fuel and water remain reserved. Metal ore and crystals use their stable resource IDs. Four gates are landmarks, not fixed enemy spawn points."
+  "notes": "Fuel remains reserved for P3a. Water is an environment-only obstacle with no storage. Wind is an explicit environment layer. Metal ore and crystals use their stable resource IDs. Four gates are landmarks, not fixed enemy spawn points."
 }

@@ -38,6 +38,10 @@ var _tick_rate: int = 30
 var _in_tick: bool = false
 var _starting_resources := MechResources.empty()
 var _navigation_revision: int = -1
+var _coverage_dirty: bool = true
+var _environment := MechEnvironmentEnergy.new()
+var _environment_dirty: bool = true
+var _environment_explored_revision: int = -1
 var _outcome: StringName = &"ongoing"
 var _alert: Dictionary = {}
 var _alert_sequence: int = 0
@@ -260,6 +264,7 @@ func execute_command(command: MechCommand) -> Dictionary:
 			building.elapsed_demolition_ticks = 0
 			building.repairing = false
 			building.repair_remainder = 0
+			_coverage_dirty = true
 			_threat.note_construction(Vector2(building.origin) + Vector2(building.definition.footprint) * 0.5)
 			_recompute_economy()
 			result["clearing"] = clearing
@@ -269,6 +274,8 @@ func execute_command(command: MechCommand) -> Dictionary:
 			var was_clearing: bool = building.hp <= 0
 			building.phase = MechBuildingState.Phase.RUINED if was_clearing else MechBuildingState.Phase.OPERATING
 			building.elapsed_demolition_ticks = 0
+			_coverage_dirty = true
+			_environment_dirty = true
 			_recompute_economy()
 			result["was_clearing"] = was_clearing
 		MechCommand.Type.TOGGLE_REPAIR:
@@ -292,6 +299,8 @@ func execute_command(command: MechCommand) -> Dictionary:
 			# A rebuild is fresh construction: blocking resumes from the order on.
 			_grid.set_pass_through(building.entity_id, false)
 			_production.register_factory(building)
+			_coverage_dirty = true
+			_environment_dirty = true
 			_threat.note_construction(Vector2(building.origin) + Vector2(building.definition.footprint) * 0.5)
 			_recompute_economy()
 			result = {"ok": true, "reason": "", "entity_id": building.entity_id, "cost": cost}
@@ -394,6 +403,8 @@ func advance_one_tick() -> void:
 		var building: MechBuildingState = _construction.get_building(entity_id)
 		_remove_building(entity_id, building.refund(), true)
 	if not changes["completed"].is_empty():
+		_coverage_dirty = true
+		_environment_dirty = true
 		_recompute_economy()
 	_profile_mark(&"construction")
 	if _tick_counter % maxi(1, ceili(COMBAT_SCAN_SECONDS * _tick_rate)) == 0:
@@ -523,7 +534,8 @@ func snapshot() -> Dictionary:
 			"reason": {"defeat": "主脑已被摧毁", "victory": "威胁已清除"}.get(String(_outcome), "")},
 		"threat": _waves.state(),
 		"alert": _alert.duplicate(),
-		"map_revision": _grid.revision(), "map_name": _map_definition.display_name}
+		"map_revision": _grid.revision(), "coverage_revision": _grid.coverage_revision(),
+		"map_name": _map_definition.display_name}
 
 
 func map_snapshot() -> Dictionary:
@@ -573,7 +585,35 @@ func _building_snapshot(building: MechBuildingState) -> Dictionary:
 
 
 func _recompute_economy() -> void:
+	# Coverage is a connected-root graph, updated before economy reads it.
+	# Coverage revision is independent from occupancy/navigation revision, and
+	# production/unit changes never dirty it.
+	if _coverage_dirty:
+		var coverage_changes: Array[Vector2i] = _grid.recompute_coverage(_construction.all())
+		_coverage_dirty = false
+		if profiling_enabled and not coverage_changes.is_empty():
+			print("[coverage] changed_cells=%d revision=%d" % [
+				coverage_changes.size(), _grid.coverage_revision()])
+	if _environment_dirty:
+		_refresh_environment_power()
+		_environment_dirty = false
 	_economy.recompute(_construction.all(), _grid, _units.capacity_used(_registry), _production.reserved_capacity())
+
+
+func _refresh_environment_power() -> void:
+	for building: MechBuildingState in _construction.all():
+		if building.hp <= 0:
+			continue
+		var energy_type := StringName(building.definition.environment_energy)
+		if energy_type == &"none":
+			continue
+		var previous_power: int = building.environment_power
+		building.environment_power = _environment.score(
+			energy_type, building.origin, building.definition.footprint, _grid, _vision
+		)
+		if profiling_enabled and building.environment_power != previous_power:
+			print("[environment] id=%d type=%s power=%d" % [
+				building.entity_id, energy_type, building.environment_power])
 
 
 func _spawn_unit(building: MechBuildingState, rally: Vector2i, unit_id: StringName) -> bool:
@@ -713,7 +753,9 @@ func preview_footprint(origin: Vector2i, footprint: Vector2i) -> Dictionary:
 
 
 func preview_build(id: StringName, origin: Vector2i) -> Dictionary:
-	var result: Dictionary = _construction.preview_placement(id, origin, _grid, _economy, _minerals)
+	var result: Dictionary = _construction.preview_placement(
+		id, origin, _grid, _economy, _minerals, {}, {}, _environment, _vision
+	)
 	_mask_unknown_preview(result)
 	if session_ended():
 		result["ok"] = false
@@ -792,6 +834,7 @@ func _ruin_building(building: MechBuildingState) -> void:
 	# The base keeps its cells for placement and mineral binding but never
 	# blocks movement (building-economy.md §4.1).
 	_grid.set_pass_through(building.entity_id, true)
+	_coverage_dirty = true
 	_recompute_economy()
 
 
@@ -839,7 +882,21 @@ func _place(id: StringName, origin: Vector2i) -> Dictionary:
 		return _reject("资源不足")
 	var building: MechBuildingState = _construction.add(entity_id, id, origin, _tick_rate)
 	building.mineral_id = check["mineral_id"]
+	building.environment_power = int(check.get("environment_power", 0))
+	var energy_type := StringName(rules.environment_energy)
+	if energy_type != &"none" and not _environment.reserve(
+		entity_id, energy_type, origin, rules.footprint
+	):
+		# Preview should have rejected this; keep the transaction atomic if the
+		# state raced between preview and commit.
+		_construction.remove(entity_id)
+		_grid.release(entity_id)
+		_minerals.release(entity_id)
+		_registry.remove(entity_id)
+		_economy.credit(rules.cost)
+		return _reject("同类环境电源采集区重叠")
 	_production.register_factory(building)
+	_coverage_dirty = true
 	_recompute_economy()
 	return {"ok": true, "reason": "", "entity_id": entity_id, "origin": origin, "cost": MechResources.copy(rules.cost)}
 
@@ -847,8 +904,10 @@ func _place(id: StringName, origin: Vector2i) -> Dictionary:
 func _remove_building(entity_id: int, refund: Dictionary, refund_orders: bool = false) -> void:
 	_grid.release(entity_id)
 	_minerals.release(entity_id)
+	_environment.release(entity_id)
 	_construction.remove(entity_id)
 	_registry.remove(entity_id)
+	_coverage_dirty = true
 	_economy.credit(MechResources.add(refund, _production.remove_factory(entity_id, refund_orders)))
 	if entity_id == _mainbrain_id:
 		_grid.set_core_coverage(Vector2i.ZERO, Vector2i.ONE, -1)
@@ -889,6 +948,16 @@ func _validate_building_action(command: MechCommand) -> Dictionary:
 			# reservations. Rebuilding must reserve them again at its discounted cost.
 			if not _grid.footprint_covered(building.origin, building.definition.footprint):
 				return _reject("超出供电覆盖")
+			var energy_type := StringName(building.definition.environment_energy)
+			if energy_type != &"none":
+				if not _environment.conflicts(
+					energy_type, building.origin, building.definition.footprint, building.entity_id
+				).is_empty():
+					return _reject("同类环境电源采集区重叠")
+				if _environment.score(
+					energy_type, building.origin, building.definition.footprint, _grid, _vision
+				) <= 0:
+					return _reject("环境评分不足（需已探索有效地形）")
 			var rebuild_error: String = _economy.reservation_error(building.definition, {}, building.rebuild_cost())
 			if not rebuild_error.is_empty():
 				return _reject(rebuild_error)
@@ -970,6 +1039,10 @@ func _path_is_blocked(position: Vector2, path: PackedVector2Array) -> bool:
 func _sync_vision() -> void:
 	_profile_counter(&"vision")
 	_vision.update(_grid, _registry, _construction.all(), _settings.probe_sight_radius)
+	if _vision.explored_revision() != _environment_explored_revision:
+		_environment_explored_revision = _vision.explored_revision()
+		_environment_dirty = true
+		_recompute_economy()
 
 
 func _clear_building_footprint(building: MechBuildingState) -> bool:
@@ -1038,6 +1111,10 @@ func _reset() -> void:
 	_construction.clear()
 	_production.clear()
 	_grid.configure(_map_definition)
+	_coverage_dirty = true
+	_environment.clear()
+	_environment_dirty = true
+	_environment_explored_revision = -1
 	_economy.reset(_starting_resources)
 	_minerals.reset(_map_definition.minerals)
 	var brain: MechBuildingDefinition = _construction.definition(&"mainbrain")
@@ -1045,15 +1122,21 @@ func _reset() -> void:
 	_mainbrain_id = _registry.create(&"mainbrain", brain.display_name, center, 0.0, brain.footprint)
 	_grid.try_occupy(_mainbrain_id, _map_definition.mainbrain_origin, brain.footprint)
 	_construction.add(_mainbrain_id, &"mainbrain", _map_definition.mainbrain_origin, _tick_rate, true)
-	_grid.set_core_coverage(_map_definition.mainbrain_origin, brain.footprint, brain.coverage_radius)
 	for origin: Vector2i in _settings.starting_buildings:
 		var id: StringName = _settings.starting_buildings[origin]
 		var rules: MechBuildingDefinition = _construction.definition(id)
 		var initial_center: Vector2 = Vector2(origin) + Vector2(rules.footprint) * 0.5
 		var entity_id: int = _registry.create(id, rules.display_name, initial_center, 0.0, rules.footprint)
 		_grid.try_occupy(entity_id, origin, rules.footprint)
-		_production.register_factory(_construction.add(entity_id, id, origin, _tick_rate, true))
-	_probe_id = _registry.create(&"probe", "验证实体", Vector2(_map_definition.probe_cell) + Vector2(0.5, 0.5), _probe_speed)
+		var starting_building: MechBuildingState = _construction.add(entity_id, id, origin, _tick_rate, true)
+		_production.register_factory(starting_building)
+		var energy_type := StringName(rules.environment_energy)
+		if energy_type != &"none":
+			_environment.reserve(entity_id, energy_type, origin, rules.footprint)
+			starting_building.environment_power = 0
+	_probe_id = 0
+	if _settings.diagnostic_probe_enabled:
+		_probe_id = _registry.create(&"probe", "验证实体", Vector2(_map_definition.probe_cell) + Vector2(0.5, 0.5), _probe_speed)
 	for cell: Vector2i in _settings.starting_unit_cells:
 		_units.create(_registry, _unit_definitions[_settings.starting_unit_id], cell)
 	for cell: Vector2i in _settings.practice_target_cells:
@@ -1063,6 +1146,9 @@ func _reset() -> void:
 		target.hp = 200
 		target.max_hp = 200
 		_grid.try_occupy(id, cell, Vector2i.ONE)
+	# Reset vision before environment scoring so starting sources do not read a
+	# previous session's explored memory.
+	_vision.reset(_grid)
 	_recompute_economy()
 	_navigation_revision = -1
 	_sync_navigation()
@@ -1070,8 +1156,17 @@ func _reset() -> void:
 	_enemies.reset(_grid, _map_definition.mainbrain_origin + (brain.footprint - Vector2i.ONE) / 2, _construction.all())
 	_waves.reset(_grid, _map_definition, _settings.threat_enabled, _tick_rate)
 	_threat.reset(_grid, _map_definition, _settings.threat_enabled, _tick_rate)
-	_vision.reset(_grid)
 	_sync_vision()
+	if profiling_enabled:
+		var economy_state: Dictionary = _economy.snapshot()
+		var player_units: int = 0
+		for entity: MechEntityState in _registry.all():
+			if entity.unit_definition != null:
+				player_units += 1
+		print("[p2d] player_units=%d capacity_used=%d capacity_supply=%d power=%d cooling=%.1f wave=%s remaining=%.1f" % [
+			player_units, _units.capacity_used(_registry), int(economy_state["capacity_supply"]),
+			int(economy_state["power_supply"]), float(economy_state["cooling_supply"]) / 10.0,
+			String(_waves.state()["phase"]), float(_waves.state()["seconds_remaining"])])
 	print("[Billions Mech] playable cells=", _grid.playable_cell_count())
 
 

@@ -9,7 +9,9 @@ cost = Dictionary[StringName, int]({&"coins": 30})
 construction_seconds = 40.0
 max_hp = 250
 power_cost = 2
-capacity_provided = 6
-income_per_minute = 4
+cooling_cost = 2
+capacity_provided = 4
+capacity_system_reserved = 1
+income_per_minute = 6
 
 infectable = true

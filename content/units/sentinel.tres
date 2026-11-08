@@ -4,12 +4,13 @@
 script = ExtResource("1")
 unit_id = &"sentinel"
 display_name = "卫兵"
-cost = Dictionary[StringName, int]({&"coins": 20})
+cost = Dictionary[StringName, int]({&"coins": 20, &"metal_ore": 2})
 production_seconds = 20.0
-capacity_cost = 1
+capacity_cost = 2
 max_hp = 100
 damage = 10
 attack_seconds = 0.8
 attack_range = 4.0
 acquisition_range = 6.0
 move_speed = 2.5
+sight_radius = 7.0

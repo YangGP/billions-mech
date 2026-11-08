@@ -5,12 +5,12 @@ script = ExtResource("1")
 building_id = &"mining_station"
 display_name = "金属采矿站"
 footprint = Vector2i(2, 2)
-cost = Dictionary[StringName, int]({&"coins": 80})
+cost = Dictionary[StringName, int]({&"coins": 40})
 construction_seconds = 30.0
-max_hp = 200
+max_hp = 250
 capacity_cost = 1
-power_cost = 1
+power_cost = 2
 mined_resource = &"metal_ore"
-extraction_per_minute = 4
+extraction_per_minute = 12
 
 infectable = true

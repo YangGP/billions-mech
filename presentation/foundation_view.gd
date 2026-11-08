@@ -256,6 +256,13 @@ func _draw_cursor() -> void:
 	if _preview.is_empty():
 		_outline_cell(_hover, Vector2i.ONE, Color("e4f6f2"), 1.5)
 		return
+	if _preview.has("collection_bounds"):
+		var bounds: Rect2i = _preview["collection_bounds"]
+		for y: int in range(bounds.position.y, bounds.end.y):
+			for x: int in range(bounds.position.x, bounds.end.x):
+				_outline_cell(Vector2i(x, y), Vector2i.ONE, Color(CYAN, 0.22), 1.0)
+		for cell: Vector2i in _preview.get("conflict_cells", []):
+			_outline_cell(cell, Vector2i.ONE, Color("f27c78"), 1.5)
 	for cell_info: Dictionary in _preview["cells"]:
 		var color: Color = CYAN if cell_info["ok"] else Color("f27c78")
 		draw_colored_polygon(MechIsoGeometry.footprint_polygon(cell_info["cell"], Vector2i.ONE), Color(color, 0.24))

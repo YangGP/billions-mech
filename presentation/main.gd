@@ -15,6 +15,7 @@ var _commands := MechCommandQueue.new()
 var _resume_after_settings: bool = false
 var _last_generation: int = -1
 var _last_map_revision: int = -1
+var _last_coverage_revision: int = -1
 var _selected := Vector2i(-1, -1)
 var _build_id: StringName = &""
 var _wall_dragging: bool = false
@@ -604,7 +605,8 @@ func _publish_state() -> void:
 	_selection.reconcile(state["entities"])
 	_world.present(state)
 	_hud.present_state(state)
-	if _last_generation != state["generation"] or _last_map_revision != state["map_revision"]:
+	if _last_generation != state["generation"] or _last_map_revision != state["map_revision"] \
+			or _last_coverage_revision != state["coverage_revision"]:
 		var map_state: Dictionary = _sim.map_snapshot()
 		if generation_changed:
 			_terrain.present_map(map_state)
@@ -618,6 +620,7 @@ func _publish_state() -> void:
 			_camera.configure(MechIsoGeometry.map_bounds(_dimensions, map_state["outline"]), focus)
 		_last_generation = state["generation"]
 		_last_map_revision = state["map_revision"]
+		_last_coverage_revision = state["coverage_revision"]
 	_fog.present(state["vision"], state["generation"], _map_outline)
 	_terrain.present_vision(state["vision"])
 	if generation_changed:
