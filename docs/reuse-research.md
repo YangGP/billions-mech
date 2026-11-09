@@ -252,3 +252,9 @@ Agent-Reach 不可用，使用网页检索。先核对高星候选 [Mindustry](h
 ## 27. 新敌人运行接入（2026-11-09）
 
 检索官方Godot示例与GDQuest Steering AI后，继续直接复用项目已接入的原生AStarGrid2D、WorkerThreadPool、Resource、现有Steering vendor和MechMarchField。没有从外部框架移植或重新实现导航算法。项目新增部分为敌人数据、阶段/配额编成及战斗状态适配；候选来源、复用边界和验证见[接入记录](../validation/enemy-integration.md)。
+
+## 28. 三维表现迁移首阶段（2026-11-09）
+
+实施前重新检索[官方示例](https://github.com/godotengine/godot-demo-projects)（MIT）和[RTS Framework](https://github.com/rluders/rts-framework)（MIT，WIP）。完整RTS框架绑定自己的Controller/SelectionManager/节点化单位，不作为本项目模拟、导航和命令层的替代依赖；没有复制或按其源码重写算法。官方示例用于查找原生能力的适用范围，目前未下载具体示例源码，不宣称源码已复用。Agent-Reach当前工具不可用，使用网页检索。
+
+实际直接使用Godot原生Camera3D正交投影/射线/屏幕投影、Plane/AABB求交、Geometry2D裁剪/三角化、SurfaceTool、BoxMesh/CylinderMesh、MultiMeshInstance3D、ImageTexture与现有快照/HUD。自写部分为地图坐标、镜头手势、快照到模型批次的绑定、预览及迷雾材质接线；不新增相机投影、求交、寻路或避让算法。兼容渲染器保持不变，具体阶段和验证边界见[迁移方案](3d-presentation-migration.md)。

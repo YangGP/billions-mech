@@ -1,13 +1,13 @@
 # 文档索引
 
-更新于2026-11-09，对应 **0.5.89-dev / `c220110` 提交及当前工作区的新敌人接入**。运行和常用键位见根目录[README](../README.md)。
+更新于2026-11-10，对应 **0.5.89-dev / 三维迁移前基线`42972f8`及首批三维开发入口**。运行和常用键位见根目录[README](../README.md)。
 
 ## 从哪里开始
 
 | 目的 | 入口 |
 | --- | --- |
 | 查看完成度、缺口和下一步 | [当前开发计划](development-plan.md) |
-| 修正2D地图与3D模型技术路线 | [三维表现修正方案](3d-presentation-migration.md)：保留二维逻辑/导航，迁移实时模型、正交相机及交互；待实施 |
+| 修正2D地图与3D模型技术路线 | [三维表现修正方案](3d-presentation-migration.md)：保留二维逻辑/导航，`--3d`首批开发入口已接入；[检查与待验项](../validation/3d-presentation-first-pass.md) |
 | 交给其他 AI 继续实现 | [开发任务与验收规格](ai-development-handoff.md)；先查当前进度，再选未完成任务 |
 | 查当前运行数值 | [数值表](values.md)；最终以 `content/` Resource 和权威校验为准 |
 | 查最近修复与证据 | [0.5.89 修复](../validation/review-fixes-0.5.89.md)、[验证索引](../validation/README.md) |

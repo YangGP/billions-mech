@@ -4,7 +4,7 @@ extends Control
 ## 全部数据经 present_* 到达；视图绝不读取模拟层。
 ## 全屏模式兼作区域管理操作面，因此一切按当前控件尺寸计算。
 
-signal focus_requested(world_position: Vector2)
+signal focus_requested(map_position: Vector2)
 signal region_selected(cells: Array[Vector2i])
 
 const TERRAIN_OPEN := Color("16323c")
@@ -31,7 +31,7 @@ var _fog_revision: int = -1
 var _fog_generation: int = -1
 var _state: Dictionary = {}
 var _map: Dictionary = {}
-var _camera_rect := Rect2()
+var _camera_polygon := PackedVector2Array()
 var _map_scale: float = 1.0
 var _map_offset := Vector2.ZERO
 var _polygon := PackedVector2Array()
@@ -70,10 +70,10 @@ func present_state(state: Dictionary) -> void:
 	queue_redraw()
 
 
-func present_camera(rect: Rect2) -> void:
-	if rect.is_equal_approx(_camera_rect):
+func present_camera(polygon: PackedVector2Array) -> void:
+	if polygon == _camera_polygon:
 		return
-	_camera_rect = rect
+	_camera_polygon = polygon
 	queue_redraw()
 
 
@@ -159,9 +159,14 @@ func _draw() -> void:
 		draw_colored_polygon(brain, Color(MAINBRAIN, 0.35))
 		brain.append(brain[0])
 		draw_polyline(brain, MAINBRAIN, 1.5, true)
-	var shown: Rect2 = _camera_rect.intersection(_bounds)
-	if shown.has_area():
-		draw_rect(Rect2(_w2l(shown.position), shown.size * _map_scale), CAMERA_FRAME, false, 1.5)
+	if _camera_polygon.size() >= 3:
+		for clipped: PackedVector2Array in Geometry2D.intersect_polygons(_camera_polygon, _outline):
+			var frame := PackedVector2Array()
+			for point: Vector2 in clipped:
+				frame.append(_w2l(MechIsoGeometry.project(point)))
+			if frame.size() >= 3:
+				frame.append(frame[0])
+				draw_polyline(frame, CAMERA_FRAME, 1.5, true)
 	if _region_mode:
 		draw_rect(Rect2(_region_start, _region_end - _region_start).abs(), Color(0.45, 0.9, 0.78, 0.9), false, 2.0)
 
@@ -246,4 +251,4 @@ func _footprint_local(origin: Vector2i, footprint: Vector2i) -> PackedVector2Arr
 func _emit_focus(local: Vector2) -> void:
 	if _map_scale <= 0.0 or _polygon.size() < 3:
 		return
-	focus_requested.emit(_local_to_world(local))
+	focus_requested.emit(MechIsoGeometry.unproject(_local_to_world(local)))

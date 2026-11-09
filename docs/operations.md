@@ -2,6 +2,8 @@
 
 对应 0.5.89-dev。现行输入取自 `presentation/main.gd`，配置和运行方法见[README](../README.md)。本稿替代早期三页签/QWERTY 槽位方案；功能状态见[开发计划](development-plan.md)。
 
+2026-11-10新增`.\run.bat -- --3d`三维开发入口，复用下述操作/命令；默认入口仍是2D对照。三维相机、建造与选择已接线，真实输入尚待[首批复验](../validation/3d-presentation-first-pass.md)，不能直接继承旧2D验收结果。
+
 2026-11-09用户已确认建造与选择清单1–8项全部通过，具体范围及未覆盖事项见[人工验证记录](../validation/build-selection-manual.md)。
 
 ## 1. 基本原则

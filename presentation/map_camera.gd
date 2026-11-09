@@ -79,6 +79,41 @@ func visible_world_rect() -> Rect2:
 	return Rect2(position - half, half * 2.0)
 
 
+## 主画面统一使用逻辑地图坐标；等距投影仅由2D适配器处理。
+func configure_map(map_state: Dictionary) -> void:
+	var focus: Vector2 = Vector2(map_state["mainbrain_origin"]) + Vector2(map_state["mainbrain_footprint"]) * 0.5
+	configure(MechIsoGeometry.map_bounds(map_state["dimensions"], map_state["outline"]), MechIsoGeometry.project(focus))
+
+
+func screen_to_map(point: Vector2) -> Vector2:
+	return MechIsoGeometry.unproject(get_viewport().get_canvas_transform().affine_inverse() * point)
+
+
+func map_to_screen(point: Vector2, _height: float = 0.0) -> Vector2:
+	return get_viewport().get_canvas_transform() * MechIsoGeometry.project(point)
+
+
+func focus_map(point: Vector2) -> void:
+	focus_world(MechIsoGeometry.project(point))
+
+
+func zoom_factor() -> float:
+	return zoom.x
+
+
+func visible_map_polygon() -> PackedVector2Array:
+	var viewport: Rect2 = get_viewport_rect()
+	viewport.size = _play_area_size()
+	var polygon := PackedVector2Array()
+	for point: Vector2 in [viewport.position, Vector2(viewport.end.x, viewport.position.y), viewport.end, Vector2(viewport.position.x, viewport.end.y)]:
+		polygon.append(screen_to_map(point))
+	return polygon
+
+
+func map_point_on_screen(point: Vector2) -> bool:
+	return Rect2(Vector2.ZERO, _play_area_size()).has_point(map_to_screen(point))
+
+
 func focus_world(world_position: Vector2) -> void:
 	_stop_drag()
 	position = world_position

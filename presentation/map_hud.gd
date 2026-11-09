@@ -14,7 +14,7 @@ signal production_cancelled(factory_id: int, ticket: int)
 signal upgrade_requested(entity_id: int)
 signal upgrade_cancelled(entity_id: int)
 signal settings_requested
-signal minimap_focus_requested(world_position: Vector2)
+signal minimap_focus_requested(map_position: Vector2)
 signal dispatch_region_selected(cells: Array[Vector2i])
 signal repair_all_requested
 
@@ -332,8 +332,8 @@ func present_state(state: Dictionary) -> void:
 	_minimap_view.present_state(state)
 
 
-func present_camera(rect: Rect2) -> void:
-	_minimap_view.present_camera(rect)
+func present_camera(polygon: PackedVector2Array) -> void:
+	_minimap_view.present_camera(polygon)
 
 
 func is_minimap_fullscreen() -> bool:

@@ -1,4 +1,4 @@
-extends Node2D
+extends Node
 ## 组合根：装配模拟、命令队列与全部表现层视图；只有命令可以改变模拟状态。
 
 const SETTINGS: MechFoundationSettings = preload("res://content/development_128.tres")
@@ -10,11 +10,12 @@ const SAME_KIND_CHAIN_RADIUS: float = 2.0
 
 var _sim := MechSimCore.new()
 var _commands := MechCommandQueue.new()
-@onready var _terrain: MechTerrainView = $Terrain
-@onready var _coverage: MechCoverageView = $Coverage
-@onready var _world: MechFoundationView = $Entities
-@onready var _fog: MechFogView = $Fog
-@onready var _camera: MechMapCamera = $MapCamera
+## 2D基线与3D开发场景共享同一模拟、命令和交互；只读视图使用相同present接口。
+@onready var _terrain = $Terrain
+@onready var _coverage = $Coverage
+@onready var _world = $Entities
+@onready var _fog = $Fog
+@onready var _camera = $MapCamera
 @onready var _hud: MechMapHud = $HUD
 @onready var _settings: MechSettingsMenu = $Settings
 var _resume_after_settings: bool = false
@@ -65,6 +66,13 @@ var _perf_frame_peak: float = 0.0
 
 
 func _ready() -> void:
+	if OS.get_cmdline_user_args().has("--3d") and not _camera is Camera3D:
+		get_tree().call_deferred("change_scene_to_file", "res://scenes/main_3d.tscn")
+		set_process(false)
+		set_physics_process(false)
+		set_process_input(false)
+		set_process_unhandled_input(false)
+		return
 	# 部分 Windows/DPI 配置会把窗口恢复到屏幕外，这里把启动位置钳制回可用区域，确保工具栏始终可及。
 	var window := get_window()
 	var usable: Rect2i = DisplayServer.screen_get_usable_rect()
@@ -114,7 +122,7 @@ func _ready() -> void:
 		_fit_map()
 	if OS.get_cmdline_user_args().has("--settings"):
 		_open_settings()
-	print("[Billions Mech] vision fog ready; 1920x1080; whitebox; ", initial_settings.scenario_name)
+	print("[Billions Mech] vision fog ready; 1920x1080; ", "3D development whitebox" if _camera is Camera3D else "2D whitebox", "; ", initial_settings.scenario_name)
 
 
 func _physics_process(_delta: float) -> void:
@@ -135,8 +143,8 @@ func _process(delta: float) -> void:
 	var started: int = Time.get_ticks_usec() if _perf_enabled else 0
 	_publish_state()
 	_update_cursor()
-	_hud.present_zoom(_camera.zoom.x)
-	_hud.present_camera(_camera.visible_world_rect())
+	_hud.present_zoom(_camera.zoom_factor())
+	_hud.present_camera(_camera.visible_map_polygon())
 	if _stress_mode:
 		_stress_advance(delta)
 	if _perf_enabled:
@@ -227,7 +235,7 @@ func _input(event: InputEvent) -> void:
 		return
 	# 鼠标回到战场即恢复跟随，不必先放下第一座建筑。
 	if event is InputEventMouseMotion and _build_id != &"" and not event.relative.is_zero_approx() \
-			and get_viewport_rect().has_point(event.position) and not _hud.blocks_point(event.position):
+			and get_viewport().get_visible_rect().has_point(event.position) and not _hud.blocks_point(event.position):
 		_keyboard_build = false
 	# 建造快捷键必须先于获得焦点的 HUD 按钮处理，否则按键会被按钮吞掉。
 	if event is InputEventKey and event.pressed and not event.echo and not _wall_dragging:
@@ -248,7 +256,7 @@ func _input(event: InputEvent) -> void:
 		elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and not event.pressed:
 			_selection_end = _clamped_selection_point(event.position)
 			# 从战场开始的框选允许在HUD上松开，仍按裁剪后的战场矩形提交。
-			if _selection_bounds.has_area() and get_viewport_rect().has_point(event.position):
+			if _selection_bounds.has_area() and get_viewport().get_visible_rect().has_point(event.position):
 				_finish_selection()
 			_cancel_selection_drag()
 			get_viewport().set_input_as_handled()
@@ -265,7 +273,7 @@ func _input(event: InputEvent) -> void:
 	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and not event.pressed:
 		_wall_end = _clamped_line_cell(_mouse_cell())
 		var cells: Array[Vector2i] = _wall_cells()
-		var can_commit: bool = not _hud.blocks_point(event.position) and get_viewport_rect().has_point(event.position)
+		var can_commit: bool = not _hud.blocks_point(event.position) and get_viewport().get_visible_rect().has_point(event.position)
 		_cancel_wall_drag()
 		if can_commit:
 			_commands.submit(MechCommand.new(MechCommand.Type.PLACE_WALL_LINE, {"cells": cells}))
@@ -305,7 +313,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if event.button_index == MOUSE_BUTTON_LEFT:
 		if _build_id != &"":
-			_select_world_position(_world.get_global_mouse_position())
+			_select_map_position(_camera.screen_to_map(event.position))
 		elif _attack_move_mode:
 			_issue_unit_order(true)
 		elif _is_double_click(event.position):
@@ -334,10 +342,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 
-func _select_world_position(world_position: Vector2) -> void:
+func _select_map_position(map_position: Vector2) -> void:
 	if _hud.blocks_point(get_viewport().get_mouse_position()):
 		return
-	var cell: Vector2i = MechIsoGeometry.cell_at(_world.to_local(world_position))
+	var cell: Vector2i = _map_cell(map_position)
 	if _build_id != &"":
 		_keyboard_build = false
 	if _build_id != &"":
@@ -376,7 +384,7 @@ func _handle_key(key: int) -> bool:
 		return true
 	if _build_id != &"" and key == KEY_ENTER:
 		var mouse: Vector2 = get_viewport().get_mouse_position()
-		if not _keyboard_build and (not get_viewport_rect().has_point(mouse) or _hud.blocks_point(mouse)):
+		if not _keyboard_build and (not get_viewport().get_visible_rect().has_point(mouse) or _hud.blocks_point(mouse)):
 			return true
 		var cell: Vector2i = _build_cell if _keyboard_build else _mouse_cell()
 		_commands.submit(MechCommand.new(MechCommand.Type.PLACE_BUILDING, {"building_id": _build_id, "origin": cell}))
@@ -490,9 +498,9 @@ func _focus_mainbrain() -> void:
 	_camera.focus_mainbrain()
 
 
-func _focus_minimap(world_position: Vector2) -> void:
+func _focus_minimap(map_position: Vector2) -> void:
 	# 从小地图跳转镜头不打断建造放置（operations.md §3.2）；此处不取消、也不下发任何命令。
-	_camera.focus_world(world_position)
+	_camera.focus_map(map_position)
 
 
 func _fit_map() -> void:
@@ -678,17 +686,20 @@ func _clamped_selection_point(point: Vector2) -> Vector2:
 
 
 func _screen_position(entity: Dictionary) -> Vector2:
-	return _world.get_global_transform_with_canvas() * MechIsoGeometry.project(entity["position"])
+	return _camera.map_to_screen(entity["position"])
 
 
 func _hit_entity(point: Vector2, enemy: bool = false) -> int:
+	if _world.has_method("pick_unit"):
+		return _world.pick_unit(point, enemy)
 	var best: float = INF
 	var result: int = 0
 	for entity: Dictionary in _state["entities"]:
 		if (entity.get("team", 1) == 2) != enemy or entity.get("is_building", false):
 			continue
-		var distance: float = (_screen_position(entity) - Vector2(0, 15) * _camera.zoom.x).distance_to(point)
-		if distance <= 24.0 * _camera.zoom.x and distance < best:
+		var factor: float = _camera.zoom_factor()
+		var distance: float = (_screen_position(entity) - Vector2(0, 15) * factor).distance_to(point)
+		if distance <= 24.0 * factor and distance < best:
 			best = distance
 			result = entity["id"]
 	return result
@@ -696,7 +707,7 @@ func _hit_entity(point: Vector2, enemy: bool = false) -> int:
 
 func _finish_selection() -> void:
 	var ids: Array[int] = []
-	var release_cell: Vector2i = MechIsoGeometry.cell_at(_world.get_global_transform_with_canvas().affine_inverse() * _selection_end)
+	var release_cell: Vector2i = _map_cell(_camera.screen_to_map(_selection_end))
 	if _selection_start.distance_to(_selection_end) < 6.0:
 		var hit: int = _hit_entity(_selection_end)
 		if hit > 0:
@@ -762,12 +773,11 @@ func _select_same_kind(point: Vector2) -> void:
 			if entity.get("team", 1) == 1 and not entity.get("is_building", false) and entity.get("kind", &"") == kind:
 				same_kind.append(entity)
 				positions[entity["id"]] = entity["position"]
-		var visible: Rect2 = _camera.visible_world_rect()
 		var chosen: Dictionary[int, bool] = {}
 		var units: Array[int] = []
 		for entity: Dictionary in same_kind:
-			# 镜头矩形使用等距投影坐标；命中的单位始终作为扩选起点。
-			if entity["id"] == hit or visible.has_point(MechIsoGeometry.project(entity["position"])):
+			# 屏幕范围由实际相机投影判断，命中的单位始终作为扩选起点。
+			if entity["id"] == hit or _camera.map_point_on_screen(entity["position"]):
 				chosen[entity["id"]] = true
 				units.append(entity["id"])
 		while not units.is_empty():
@@ -826,7 +836,9 @@ func _issue_unit_order(attack_move: bool) -> void:
 		return
 	var ids: Array[int] = _selected_units()
 	var cell: Vector2i = _mouse_cell()
-	var goal: Vector2 = MechIsoGeometry.unproject(_world.get_local_mouse_position())
+	var goal: Vector2 = _camera.screen_to_map(get_viewport().get_mouse_position())
+	if not goal.is_finite():
+		return
 	if not ids.is_empty():
 		var target_id: int = _hit_entity(get_viewport().get_mouse_position(), true)
 		_commands.submit(MechCommand.new(MechCommand.Type.ISSUE_UNIT_ORDER, {
@@ -984,8 +996,7 @@ func _publish_state() -> void:
 		_map_outline = map_state["outline"]
 		if _last_generation != state["generation"]:
 			_selected = Vector2i(-1, -1)
-			var focus: Vector2 = MechIsoGeometry.project(Vector2(map_state["mainbrain_origin"]) + Vector2(map_state["mainbrain_footprint"]) * 0.5)
-			_camera.configure(MechIsoGeometry.map_bounds(_dimensions, map_state["outline"]), focus)
+			_camera.configure_map(map_state)
 		_last_generation = state["generation"]
 		_last_map_revision = state["map_revision"]
 		_last_coverage_revision = state["coverage_revision"]
@@ -1046,7 +1057,11 @@ func _refresh_selection() -> void:
 
 
 func _mouse_cell() -> Vector2i:
-	return MechIsoGeometry.cell_at(_world.get_local_mouse_position())
+	return _map_cell(_camera.screen_to_map(get_viewport().get_mouse_position()))
+
+
+func _map_cell(point: Vector2) -> Vector2i:
+	return Vector2i(point.floor()) if point.is_finite() else Vector2i(-1, -1)
 
 
 func _clamped_line_cell(cell: Vector2i) -> Vector2i:
@@ -1059,7 +1074,7 @@ func _wall_cells() -> Array[Vector2i]:
 
 func _update_cursor() -> void:
 	var mouse: Vector2 = get_viewport().get_mouse_position()
-	var cursor_visible: bool = not _settings.is_open() and get_window().has_focus() and get_viewport_rect().has_point(mouse) and not _hud.blocks_point(mouse)
+	var cursor_visible: bool = not _settings.is_open() and get_window().has_focus() and get_viewport().get_visible_rect().has_point(mouse) and not _hud.blocks_point(mouse)
 	var keyboard_cursor_visible: bool = _build_id != &"" and _keyboard_build and not _settings.is_open() and get_window().has_focus()
 	var cell: Vector2i = _build_cell if _build_id != &"" and _keyboard_build else _mouse_cell()
 	var info: Dictionary = {}
