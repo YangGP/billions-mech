@@ -1,15 +1,16 @@
 class_name MechThreatSystem
 extends RefCounted
-## 游荡敌种群、噪声事件与感疫转化（values.md §13–§15）。
-## 游荡敌：TAB 式散布在核心覆盖之外，平时原地挪动（见 MechEnemySystem），
+## 环境威胁：建造者游荡形态的种群、噪声事件与感疫转化（values.md §13–§15）。
+## 游荡散兵与波次建造者共用同一敌种定义，仅由生成时的游荡标记决定行为：
+## TAB 式散布在核心覆盖之外，平时原地挪动（见 MechEnemySystem），
 ## 边缘缓慢补充，闻声缓慢聚拢。感疫：敌方摧毁有正容量价值的资产时，
 ## 在残骸处生成建造者（第一幕编成）并发一次战斗级脉冲。
 ## 噪声是事件列表而非共享场：同时存活的事件最多几十个，
-## 每个游荡敌各自走自己的 A* 路线，行军场保持核心专用（architecture.md §5）。
+## 每个游荡散兵各自走自己的 A* 路线，行军场保持核心专用（architecture.md §5）。
 
-## 每多少个可走格分配一名游荡敌。
+## 每多少个可走格分配一名游荡散兵。
 const CELLS_PER_WANDERER: int = 100
-## 边缘补充游荡敌的间隔（秒）。
+## 边缘补充游荡散兵的间隔（秒）。
 const BACKFILL_SECONDS: float = 60.0
 ## 各类噪声事件的存续时长（秒）。
 const COMBAT_NOISE_SECONDS: float = 3.0
@@ -20,7 +21,7 @@ const MOVEMENT_NOISE_SECONDS: float = 2.5
 const OPERATION_NOISE_INTERVAL_SECONDS: float = 5.0
 
 var _active: bool = false
-var _wanderer: MechEnemyDefinition
+## 建造者定义：既是感疫产物，也是环境散兵；散兵在生成时标记为游荡形态。
 var _builder: MechEnemyDefinition
 var _pending_scatter: Array[Vector2] = []
 var _edge_cells: Array[Vector2] = []
@@ -38,19 +39,14 @@ var _tick_rate: int = 30
 
 ## 从敌种定义表与全局设置装配参数；返回错误描述，空字符串表示成功。
 func configure(definitions: Array[MechEnemyDefinition], settings: MechFoundationSettings) -> String:
-	_wanderer = null
 	_builder = null
 	for rules: MechEnemyDefinition in definitions:
 		if rules == null:
 			continue
-		if rules.enemy_id == &"wanderer":
-			_wanderer = rules
-		elif rules.enemy_id == &"builder":
+		if rules.enemy_id == &"builder":
 			_builder = rules
-	if _wanderer == null:
-		return "缺少游荡敌定义"
 	if _builder == null:
-		return "缺少建造者定义（感疫产出）"
+		return "缺少建造者定义（游荡散兵与感疫产出共用）"
 	_radius_combat = maxf(1.0, settings.noise_radius_combat)
 	_radius_construction = maxf(1.0, settings.noise_radius_construction)
 	_radius_operation = maxf(1.0, settings.noise_radius_operation)
@@ -69,7 +65,7 @@ func reset(grid: MechGridState, map_definition: MechMapDefinition, active: bool,
 	_backfill_interval = maxi(1, ceili(BACKFILL_SECONDS * hz))
 	_pending_scatter.clear()
 	_edge_cells.clear()
-	if not _active or _wanderer == null:
+	if not _active or _builder == null:
 		return
 	# 散布与补充都排除地图固定的基座安全半径，与电力覆盖无关；已有敌人仍可被噪声吸引过来。
 	var eligible: Array[Vector2] = []
@@ -106,13 +102,13 @@ func advance(buildings: Array[MechBuildingState]) -> Array[Dictionary]:
 		var scatter: Array[Vector2] = _pending_scatter.duplicate()
 		_pending_scatter.clear()
 		for position: Vector2 in scatter:
-			requests.append({"enemy_id": _wanderer.enemy_id, "position": position})
+			requests.append({"enemy_id": _builder.enemy_id, "position": position, "wandering": true})
 		return requests
 	_backfill_ticks += 1
 	if _backfill_ticks < _backfill_interval or _edge_cells.is_empty():
 		return requests
 	_backfill_ticks = 0
-	requests.append({"enemy_id": _wanderer.enemy_id, "position": _edge_cells[randi() % _edge_cells.size()]})
+	requests.append({"enemy_id": _builder.enemy_id, "position": _edge_cells[randi() % _edge_cells.size()], "wandering": true})
 	return requests
 
 

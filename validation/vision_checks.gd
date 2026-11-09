@@ -134,8 +134,8 @@ func _check_distant_decisions() -> void:
 	vision.reset(grid)
 	var enemies := MechEnemySystem.new()
 	enemies.reset(grid, Vector2i(2, 2), [])
-	var rules: MechEnemyDefinition = load("res://content/enemies/wanderer.tres")
-	var id: int = enemies.create(registry, rules, Vector2(50.5, 50.5))
+	var rules: MechEnemyDefinition = load("res://content/enemies/builder.tres")
+	var id: int = enemies.create(registry, rules, Vector2(50.5, 50.5), true)
 	var enemy: MechEntityState = registry.get_entity(id)
 	enemies._tick_counter = 3
 	var noises: Array[Dictionary] = [{"position": Vector2(45.5, 50.5), "radius": 24.0}]
@@ -144,7 +144,7 @@ func _check_distant_decisions() -> void:
 	var position: Vector2 = enemy.position
 	var cooldown: int = enemy.repath_ticks
 	enemies.advance(registry, grid, navigation, [], 30, noises, vision)
-	_check(enemy.position.distance_to(position) > 0.0 and enemy.position.distance_to(position) <= rules.move_speed / 30.0 + 0.001, "skipped decisions preserve normal movement steps")
+	_check(enemy.position.distance_to(position) > 0.0 and enemy.position.distance_to(position) <= rules.move_speed * rules.wandering_speed_ratio / 30.0 + 0.001, "skipped decisions preserve normal movement steps")
 	_check(enemy.repath_ticks == cooldown - 1, "coarse decisions do not slow cooldown time")
 	registry.create(&"probe", "scout", enemy.position)
 	vision.update(grid, registry, [], 7.0)

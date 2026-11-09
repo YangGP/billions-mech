@@ -19,6 +19,8 @@ var has_move_order: bool = false
 var footprint: Vector2i = Vector2i.ONE
 var unit_definition: MechUnitDefinition
 var enemy_definition: MechEnemyDefinition
+## 游荡形态标记：环境散兵即便使用行军型敌种定义，也只闻声聚拢或原地挪动。
+var wandering: bool = false
 var team: int = 1
 var hp: int = 0
 var max_hp: int = 0

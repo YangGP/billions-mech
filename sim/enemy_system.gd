@@ -230,7 +230,7 @@ func _refresh_zones(enemies: Array[MechEntityState], buildings: Array[MechBuildi
 			zone["dirty"] = true
 	var active: Dictionary = {}
 	for enemy: MechEntityState in enemies:
-		if not enemy.enemy_definition.marches_to_core:
+		if enemy.wandering:
 			continue
 		var cell := Vector2i(enemy.position.floor())
 		var previous: Dictionary = _zones.get(enemy.march_zone, {})
@@ -423,7 +423,8 @@ func _opportunistic_target(enemy: MechEntityState) -> int:
 
 
 ## 创建敌人实体：team=2，按规则初始化 HP 与初始命令（闲逛或行军）。
-func create(registry: MechEntityRegistry, rules: MechEnemyDefinition, position: Vector2) -> int:
+## ambient 为真时标记为游荡形态：使用同一敌种定义，但不向主脑行军。
+func create(registry: MechEntityRegistry, rules: MechEnemyDefinition, position: Vector2, ambient: bool = false) -> int:
 	# rvo_speed 保持为 0，让 RVO 管线（registry step/快照）跳过敌人。
 	var id: int = registry.create(rules.enemy_id, rules.display_name, position, 0.0, Vector2i.ONE)
 	var enemy: MechEntityState = registry.get_entity(id)
@@ -432,7 +433,9 @@ func create(registry: MechEntityRegistry, rules: MechEnemyDefinition, position: 
 	enemy.hp = rules.max_hp
 	enemy.max_hp = rules.max_hp
 	enemy.hp_last_tick = rules.max_hp
-	enemy.order = &"wandering" if not rules.marches_to_core else &"marching"
+	# 敌种定义可整体指定游荡型；生成时也可把行军型标为环境散兵。
+	enemy.wandering = ambient or not rules.marches_to_core
+	enemy.order = &"wandering" if enemy.wandering else &"marching"
 	return id
 
 
@@ -473,7 +476,7 @@ func advance(registry: MechEntityRegistry, grid: MechGridState, navigation: Mech
 			need_proto = need_proto or entity.enemy_definition.passes_walls
 			# 穿墙单位读取与普通行军者相同的加权场，
 			# 只是碰撞时无视装甲墙。
-			need_main = need_main or entity.enemy_definition.marches_to_core
+			need_main = need_main or not entity.wandering
 			var enemy_cell := Vector2i(entity.position.floor())
 			if not enemy_buckets.has(enemy_cell):
 				enemy_buckets[enemy_cell] = []
@@ -546,8 +549,8 @@ func _advance_one(enemy: MechEntityState, registry: MechEntityRegistry, grid: Me
 		_advance_engaged(enemy, registry, grid, navigation, buildings_by_id,
 			building_cells, unit_buckets, enemy_buckets, dt, hz, result)
 		return
-	# 闲逛者从不向核心行军：只会闻声聚拢或 TAB 式随机挪动。
-	if not enemy.enemy_definition.marches_to_core:
+	# 游荡形态从不向核心行军：只会闻声聚拢或 TAB 式随机挪动。
+	if enemy.wandering:
 		var decision_due: bool = (tick + enemy.entity_id) % stride == 0
 		_advance_wandering(enemy, noises, grid, navigation, enemy_buckets, buildings_by_id, dt, decision_due, stride)
 		return
@@ -753,8 +756,8 @@ func _engage(enemy: MechEntityState, target_id: int) -> void:
 
 
 func _disengage(enemy: MechEntityState) -> void:
-	# 闲逛者在追击终点原地待机；波次敌人恢复向核心行军。
-	enemy.order = &"wandering" if not enemy.enemy_definition.marches_to_core else &"marching"
+	# 游荡形态在追击终点原地待机；波次敌人恢复向核心行军。
+	enemy.order = &"wandering" if enemy.wandering else &"marching"
 	enemy.attack_target_id = 0
 	enemy.set_move_path(PackedVector2Array())
 
@@ -767,7 +770,7 @@ func _acquire_target(enemy: MechEntityState, grid: MechGridState, unit_buckets: 
 	var vision_squared: float = rules.vision_radius * rules.vision_radius
 	var best: int = 0
 	var best_distance: float = INF
-	var best_building: int = _opportunistic_target(enemy) if rules.marches_to_core else 0
+	var best_building: int = _opportunistic_target(enemy) if not enemy.wandering else 0
 	var best_building_distance: float = INF
 	for y: int in range(center.y - radius, center.y + radius + 1):
 		for x: int in range(center.x - radius, center.x + radius + 1):
@@ -792,7 +795,7 @@ func _acquire_target(enemy: MechEntityState, grid: MechGridState, unit_buckets: 
 				continue
 			# 行军者只有已在射程内才直接锁定建筑；
 			# 更远的接近交给可达且有界的绕行场处理。
-			if rules.marches_to_core and not _building_in_range(enemy, building, rules.attack_range):
+			if not enemy.wandering and not _building_in_range(enemy, building, rules.attack_range):
 				continue
 			if building_distance < best_building_distance:
 				best_building = building_id

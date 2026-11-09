@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="MechFoundationSettings" load_steps=46 format=3]
+[gd_resource type="Resource" script_class="MechFoundationSettings" load_steps=45 format=3]
 
 [ext_resource type="Script" path="res://content/foundation_settings.gd" id="1"]
 [ext_resource type="Resource" path="res://content/maps/development_basin_128.tres" id="2"]
@@ -12,7 +12,6 @@
 [ext_resource type="Resource" path="res://content/units/sentinel.tres" id="10"]
 [ext_resource type="Script" path="res://content/enemy_definition.gd" id="11"]
 [ext_resource type="Resource" path="res://content/enemies/builder.tres" id="12"]
-[ext_resource type="Resource" path="res://content/enemies/wanderer.tres" id="13"]
 [ext_resource type="Resource" path="res://content/enemies/recycler.tres" id="14"]
 [ext_resource type="Resource" path="res://content/enemies/prototype.tres" id="15"]
 
@@ -58,7 +57,7 @@ starting_resources = Dictionary[StringName, int]({&"coins": 600, &"metal_ore": 8
 starting_unit_id = &"scout"
 starting_unit_cells = Array[Vector2i]([Vector2i(59, 68), Vector2i(66, 68)])
 probe_speed = 2.5
-enemy_definitions = Array[ExtResource("11")]([ExtResource("12"), ExtResource("13"), ExtResource("14"), ExtResource("15")])
+enemy_definitions = Array[ExtResource("11")]([ExtResource("12"), ExtResource("14"), ExtResource("15")])
 threat_enabled = true
 wave_trigger_mode = 1
 silence_seconds = 570.0

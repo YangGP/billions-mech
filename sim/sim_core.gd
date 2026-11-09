@@ -664,7 +664,7 @@ func _check_victory() -> void:
 	for entity: MechEntityState in _registry.all():
 		if entity.team != 2 or entity.hp <= 0 or entity.enemy_definition == null:
 			continue
-		if entity.enemy_definition.marches_to_core or entity.order == &"engaged":
+		if not entity.wandering or entity.order == &"engaged":
 			return
 	_outcome = &"victory"
 	_clock.set_paused(true)
@@ -1509,7 +1509,7 @@ func _release_spawns(requests: Array[Dictionary]) -> void:
 	for request: Dictionary in requests:
 		var rules: MechEnemyDefinition = _enemy_defs.get(request["enemy_id"])
 		if rules != null:
-			_enemies.create(_registry, rules, request["position"])
+			_enemies.create(_registry, rules, request["position"], bool(request.get("wandering", false)))
 
 
 func _infect_asset(cost: Dictionary, position: Vector2) -> void:
