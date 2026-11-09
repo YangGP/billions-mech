@@ -1,24 +1,29 @@
 class_name MechEnvironmentEnergy
 extends RefCounted
-## Wind/solar collection-area scoring and same-type reservations. Scoring only
-## reads map terrain and explored state; it never reads live enemy/unit state.
+## 风能/太阳能的集能区计分与同类型预留。计分只读取地图地形与探索状态，
+## 绝不读取实时敌人或单位状态。
 
+## 集能区向建筑脚印外扩的格数。
 const EXTENSION: int = 3
+## 风能/太阳能的发电上限。
 const WIND_CAP: int = 18
 const SOLAR_CAP: int = 20
 
-## energy_type -> {cell: entity_id}
+## 索引结构：energy_type（能量类型）→ { 格子坐标: 实体 ID }。
 var _reserved: Dictionary[StringName, Dictionary] = {}
 
 
+## 清空全部预留。
 func clear() -> void:
 	_reserved.clear()
 
 
+## 建筑的集能区范围：脚印向外扩 EXTENSION 格。
 func collection_bounds(origin: Vector2i, footprint: Vector2i) -> Rect2i:
 	return Rect2i(origin - Vector2i(EXTENSION, EXTENSION), footprint + Vector2i(EXTENSION * 2, EXTENSION * 2))
 
 
+## 列出集能区内被其他同类型建筑占用的格子；ignore_id 用于排除自身。
 func conflicts(energy_type: StringName, origin: Vector2i, footprint: Vector2i, ignore_id: int = 0) -> Array[Vector2i]:
 	var result: Array[Vector2i] = []
 	if energy_type == &"" or energy_type == &"none":
@@ -33,6 +38,7 @@ func conflicts(energy_type: StringName, origin: Vector2i, footprint: Vector2i, i
 	return result
 
 
+## 为建筑预留整个集能区；与同类型既有预留冲突则失败。
 func reserve(entity_id: int, energy_type: StringName, origin: Vector2i, footprint: Vector2i) -> bool:
 	if energy_type == &"" or energy_type == &"none":
 		return true
@@ -47,6 +53,7 @@ func reserve(entity_id: int, energy_type: StringName, origin: Vector2i, footprin
 	return true
 
 
+## 解除某实体的全部集能区预留；清空的类型键随之移除。
 func release(entity_id: int) -> void:
 	for energy_type: StringName in _reserved.keys():
 		var occupied: Dictionary = _reserved[energy_type]
@@ -59,6 +66,8 @@ func release(entity_id: int) -> void:
 			_reserved[energy_type] = occupied
 
 
+## 计算建筑当前集能区的发电功率：只统计已探索、非障碍且不在自身脚印内的格子。
+## multiplier 为升级倍率，cap 为正时覆盖默认上限。
 func score(energy_type: StringName, origin: Vector2i, footprint: Vector2i, grid: MechGridState, vision: MechVisionSystem, multiplier: int = 1, cap: int = 0) -> int:
 	if energy_type == &"" or energy_type == &"none" or grid == null or vision == null:
 		return 0
@@ -76,8 +85,7 @@ func score(energy_type: StringName, origin: Vector2i, footprint: Vector2i, grid:
 			if terrain == MechGridState.Terrain.OBSTACLE:
 				continue
 			if energy_type == &"wind":
-				# Explicit wind cells and rough terrain are the high-value cells;
-				# never add both for the same cell.
+				# 显式风区格与崎岖地形是高分格；同一格只计一次，不叠加。
 				points += 2 if grid.is_wind(cell) or terrain == MechGridState.Terrain.ROUGH else 1
 			elif energy_type == &"solar":
 				if terrain == MechGridState.Terrain.OPEN:

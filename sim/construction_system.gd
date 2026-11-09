@@ -1,11 +1,12 @@
 class_name MechConstructionSystem
 extends RefCounted
-## Shared placement rules and independent parallel building lifecycles.
+## 共享的放置规则与各自独立的并行建筑生命周期。
 
 var _definitions: Dictionary[StringName, MechBuildingDefinition] = {}
 var _buildings: Dictionary[int, MechBuildingState] = {}
 
 
+## 装配建筑定义表；返回错误描述，空字符串表示成功。
 func configure(definitions: Array[MechBuildingDefinition]) -> String:
 	_definitions.clear()
 	for rules: MechBuildingDefinition in definitions:
@@ -40,6 +41,7 @@ func all() -> Array[MechBuildingState]:
 	return result
 
 
+## 创建并登记一栋建筑；completed 为真时直接完工入场。
 func add(entity_id: int, id: StringName, origin: Vector2i, hz: int, completed: bool = false) -> MechBuildingState:
 	var building := MechBuildingState.new()
 	building.configure(entity_id, _definitions[id], origin, hz, completed)
@@ -51,6 +53,7 @@ func remove(entity_id: int) -> void:
 	_buildings.erase(entity_id)
 
 
+## 可下单建筑目录：定义快照附带当前资源下的不可下单原因。
 func catalog(economy: MechEconomySystem) -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
 	for rules: MechBuildingDefinition in _definitions.values():
@@ -61,6 +64,9 @@ func catalog(economy: MechEconomySystem) -> Array[Dictionary]:
 	return result
 
 
+## 建造预览：逐格校验地形、覆盖、占用，再校验水冷邻水、矿点、
+## 环境源评分与经济预留；错误按 地形→覆盖→占用 的优先级返回。
+## planned_cells 用于墙线等连续下单时排除本批已计划的格子。
 func preview_placement(id: StringName, origin: Vector2i, grid: MechGridState, economy: MechEconomySystem, minerals: MechMineralSystem, available: Dictionary = {}, planned_cells: Dictionary = {}, environment: MechEnvironmentEnergy = null, vision: MechVisionSystem = null, cooling_multiplier: float = 1.0) -> Dictionary:
 	var rules: MechBuildingDefinition = definition(id)
 	if rules == null or not rules.buildable:
@@ -129,6 +135,7 @@ func preview_placement(id: StringName, origin: Vector2i, grid: MechGridState, ec
 	return result
 
 
+## 水冷站是否与水域正交相邻（不含对角）。
 func _has_water_edge(rules: MechBuildingDefinition, origin: Vector2i, grid: MechGridState) -> bool:
 	var body := Rect2i(origin, rules.footprint)
 	for y: int in range(origin.y, origin.y + rules.footprint.y):
@@ -142,6 +149,8 @@ func _has_water_edge(rules: MechBuildingDefinition, origin: Vector2i, grid: Mech
 	return false
 
 
+## 墙线批量预览：沿格子逐段预览，前序可下单段会扣减虚拟钱包并占用 planned，
+## 返回合计费用与 可下单/跳过 数量。
 func preview_wall_line(cells: Array[Vector2i], grid: MechGridState, economy: MechEconomySystem, minerals: MechMineralSystem) -> Dictionary:
 	var planned: Dictionary = {}
 	var combined: Array[Dictionary] = []
@@ -159,6 +168,8 @@ func preview_wall_line(cells: Array[Vector2i], grid: MechGridState, economy: Mec
 		"cost": MechResources.subtract(economy.balance(), available), "line": true}
 
 
+## 推进全部建筑的施工/拆除；完工时经回调确认脚印内无阻挡才转运行态。
+## 返回本 tick 完工与拆完的实体 ID 列表。
 func advance(try_clear_footprint: Callable) -> Dictionary:
 	var completed: Array[int] = []
 	var demolished: Array[int] = []

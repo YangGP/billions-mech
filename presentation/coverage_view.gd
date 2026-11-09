@@ -1,10 +1,11 @@
 class_name MechCoverageView
 extends Node2D
-## Cached coverage read model. Hidden outside building mode.
+## 缓存的供电覆盖只读模型。建造模式之外隐藏。
 
 var _map: Dictionary = {}
 
 
+## 接收覆盖快照并请求重绘。
 func present_map(map_state: Dictionary) -> void:
 	_map = map_state.duplicate(true)
 	queue_redraw()

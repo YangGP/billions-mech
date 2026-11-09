@@ -1,5 +1,5 @@
 extends Node2D
-## Composition root. Only commands may change simulation state.
+## 组合根：装配模拟、命令队列与全部表现层视图；只有命令可以改变模拟状态。
 
 const SETTINGS: MechFoundationSettings = preload("res://content/development_128.tres")
 
@@ -56,8 +56,7 @@ var _perf_frame_peak: float = 0.0
 
 
 func _ready() -> void:
-	# Some Windows/DPI configurations restore the window offscreen. Clamp the
-	# startup position so the player can always reach the toolbar.
+	# 部分 Windows/DPI 配置会把窗口恢复到屏幕外，这里把启动位置钳制回可用区域，确保工具栏始终可及。
 	var window := get_window()
 	var usable: Rect2i = DisplayServer.screen_get_usable_rect()
 	var position: Vector2i = window.position
@@ -214,7 +213,7 @@ func _input(event: InputEvent) -> void:
 			_close_settings()
 			get_viewport().set_input_as_handled()
 		return
-	# Build hotkeys must run before focused HUD Buttons consume the key.
+	# 建造快捷键必须先于获得焦点的 HUD 按钮处理，否则按键会被按钮吞掉。
 	if event is InputEventKey and event.pressed and not event.echo and not _wall_dragging:
 		var key: int = _event_key(event)
 		if key in [KEY_Q, KEY_W, KEY_E]:
@@ -462,8 +461,7 @@ func _focus_mainbrain() -> void:
 
 
 func _focus_minimap(world_position: Vector2) -> void:
-	# Jumping the camera from the minimap keeps build placement active
-	# (operations.md §3.2); nothing here cancels or issues commands.
+	# 从小地图跳转镜头不打断建造放置（operations.md §3.2）；此处不取消、也不下发任何命令。
 	_camera.focus_world(world_position)
 
 
@@ -798,8 +796,7 @@ func _on_command_finished(command_type: int, result: Dictionary) -> void:
 
 
 func _refresh() -> void:
-	# Commands, damage and RVO may all notify during a frame. Pack once from
-	# _process; input and rendering keep reading the same published state.
+	# 命令、伤害与 RVO 都可能在一帧内多次通知；统一由 _process 打包一次发布，输入与渲染始终读取同一份已发布状态。
 	_state_dirty = true
 
 
@@ -878,8 +875,7 @@ func _publish_state() -> void:
 
 
 func _present_threat(state: Dictionary) -> void:
-	# Interim announcement: a text line on the transition into "announced".
-	# The proper wave-slot HUD arrives with the M5-04 batch.
+	# 过渡到"已宣告"阶段的临时播报：一行文字提示；正式的波次槽位 HUD 随 M5-04 批次提供。
 	var threat: Dictionary = state.get("threat", {})
 	if threat.is_empty() or not threat.get("active", false):
 		_last_threat_key = ""

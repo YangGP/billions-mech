@@ -1,6 +1,6 @@
 class_name MechBuildMenu
 extends Panel
-## Presentation-only directory. The simulation catalog alone authorizes orders.
+## 纯表现层的建造目录；下单授权只来自模拟层目录。
 
 signal build_requested(id: StringName)
 signal cancel_requested
@@ -57,6 +57,7 @@ func _add_entry(entry: Dictionary) -> void:
 	_buttons[id] = button
 
 
+## 接收模拟层目录并刷新按钮的可用性与文案。
 func present_catalog(catalog: Array, ended: bool) -> void:
 	_ended = ended
 	_catalog.clear()
@@ -64,12 +65,13 @@ func present_catalog(catalog: Array, ended: bool) -> void:
 		var id: StringName = entry["building_id"]
 		_catalog[id] = entry
 		if not _entries.has(id):
-			# New runtime definitions always get an entry, even before directory metadata is added.
+			# 新的运行时定义即使尚未补充目录元数据也先给一个条目。
 			_add_entry({"id": id, "name": entry["name"], "category": "support", "description": ""})
 			_buttons[id].visible = _category == &"support"
 	_refresh_buttons()
 
 
+## 同步当前建造选择的高亮与取消按钮状态。
 func present_build(id: StringName) -> void:
 	_active_build = id
 	if id != &"" and _entries.has(id):
@@ -141,10 +143,11 @@ func _building_pressed(id: StringName) -> void:
 		focus_requested.emit()
 	elif _catalog.has(id) and _catalog[id]["unavailable_reason"].is_empty():
 		build_requested.emit(id)
-	# The presenter accepts or rejects the intent before the toggle is updated.
+	# 表现层先接受或拒绝该意图，然后才更新按钮的开关状态。
 	present_build(_active_build)
 
 
+## 造价压缩为“2币 3矿”式的短文案。
 func _compact_cost(cost: Dictionary) -> String:
 	var parts := PackedStringArray()
 	for index: int in range(MechResources.KEYS.size()):

@@ -1,13 +1,15 @@
 class_name MechVisionSystem
 extends RefCounted
-## Exploration covers each source's radius regardless of occlusion. Live sight
-## additionally requires terrain LOS. LOS footprints are cached per source;
-## movement within a tile does not rebuild visibility or upload the fog texture.
+## 视野与战争迷雾。探索覆盖每个视野源的半径，不受遮挡影响；
+## 实时可视野额外要求地形通视（LOS）。通视脚印按视野源缓存，
+## 格内移动不会重建可见性，也不会重新上传迷雾纹理。
 
 enum State { UNEXPLORED, EXPLORED, VISIBLE }
 
 var _dimensions := Vector2i.ZERO
+## 当前可见性状态（探索 ∪ 实时可视野）。
 var _states := PackedByteArray()
+## 已探索记录，单调递增，只增不减。
 var _explored := PackedByteArray()
 var _sources: Dictionary = {}
 var _footprints: Dictionary = {}
@@ -18,6 +20,7 @@ var _explored_changed: bool = false
 var _explored_changes: Array[Vector2i] = []
 
 
+## 按网格尺寸重置全部视野状态。
 func reset(grid: MechGridState) -> void:
 	_dimensions = grid.dimensions()
 	_states.resize(_dimensions.x * _dimensions.y)
@@ -36,12 +39,15 @@ func explored_revision() -> int:
 	return _explored_revision
 
 
+## 取走自上次消费以来新探索的格子；消费后清空，调用方独占这批变更。
 func consume_explored_changes() -> Array[Vector2i]:
 	var result: Array[Vector2i] = _explored_changes.duplicate()
 	_explored_changes.clear()
 	return result
 
 
+## 汇总所有视野源（运行中的建筑 + 玩家实体）并重建可见性。
+## 返回本 tick 可见性是否发生变化（决定是否上传迷雾纹理）。
 func update(grid: MechGridState, registry: MechEntityRegistry, buildings: Array[MechBuildingState], probe_radius: float) -> bool:
 	var sources: Dictionary = {}
 	for building: MechBuildingState in buildings:
@@ -81,9 +87,7 @@ func update(grid: MechGridState, registry: MechEntityRegistry, buildings: Array[
 		else:
 			cells = _cast_source(grid, Vector2(source.x, source.y), source.z)
 		footprints[id] = cells
-	# Casting first records the full exploration discs, including occluded
-	# terrain. Copy afterwards so new gray cells appear in this same update.
-	# Memory is 0/1 and monotonic; live visibility is a separate current union.
+	# 先施放再复制：施放先记录完整探索圆盘（含遮挡地形），复制让新灰格同次更新生效；记忆 0/1 单调，实时可见是独立并集。
 	var next: PackedByteArray = _explored.duplicate()
 	for cells: PackedInt32Array in footprints.values():
 		for index: int in cells:
@@ -131,6 +135,7 @@ func state_at(cell: Vector2i) -> State:
 	return _states[cell.y * _dimensions.x + cell.x] as State
 
 
+## 世界坐标处的目标当前是否可见（战斗锁定的判定条件）。
 func is_visible(position: Vector2) -> bool:
 	return state_at(Vector2i(position.floor())) == State.VISIBLE
 

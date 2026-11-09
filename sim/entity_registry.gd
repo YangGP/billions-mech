@@ -1,10 +1,12 @@
 class_name MechEntityRegistry
 extends RefCounted
-## Sim systems share owned states; presentation receives only value snapshots.
+## 实体注册表：模拟系统共享自有状态；表现层只接收值快照。
 
+## 整批原生移动提交完成后发一次（不是每实体一次）。
 signal movement_finished
 
 const CROWD_SCRIPT = preload("res://sim/crowd_navigation.gd")
+## 出生点间距：出生格搜索时与其他移动实体的最小间距（格）。
 const MOBILE_SPACING: float = 0.52
 
 var _entities: Dictionary[int, MechEntityState] = {}
@@ -29,6 +31,7 @@ func clear() -> void:
 	_next_id = 1
 
 
+## 登记一个新实体并分配自增 ID；rvo_speed 为 0 的实体不进入原生求解器。
 func create(kind: StringName, display_name: String, position: Vector2, rvo_speed: float = 0.0, footprint: Vector2i = Vector2i.ONE) -> int:
 	var entity := MechEntityState.new()
 	entity.entity_id = _next_id
@@ -59,6 +62,7 @@ func all() -> Array[MechEntityState]:
 	return result
 
 
+## 出生点判定：与未驻防的活跃移动实体保持 MOBILE_SPACING 间距。
 func mobile_space_free(point: Vector2, ignored: Dictionary = {}) -> bool:
 	for entity: MechEntityState in _entities.values():
 		if not entity.garrisoned and (entity.rvo_speed > 0.0 or (entity.enemy_definition != null and entity.hp > 0)) and not ignored.has(entity.entity_id) and entity.position.distance_squared_to(point) < MOBILE_SPACING * MOBILE_SPACING:
@@ -105,6 +109,8 @@ func set_friendly_pass(enabled: bool) -> void:
 	_crowd.set_friendly_pass(enabled)
 
 
+## 发起一帧原生移动：收集期望速度，向 RVO 提交异步请求；
+## 请求即刻完成或回调 _apply_velocities 后发 movement_finished。
 func step(seconds: float, grid: MechGridState) -> void:
 	_motion_grid = grid
 	_motion_seconds = seconds
@@ -135,6 +141,7 @@ func suspend_motion() -> void:
 	_crowd.suspend()
 
 
+## RVO 回调：提交整批解算速度，静态阻挡兜底、更新朝向并检测卡位。
 func _apply_velocities(request_id: int, velocities: Dictionary) -> void:
 	if request_id != _pending_request:
 		return
@@ -145,7 +152,7 @@ func _apply_velocities(request_id: int, velocities: Dictionary) -> void:
 			continue
 		var velocity: Vector2 = velocities[id]
 		var desired: Vector2 = entity.position + velocity * _motion_seconds
-		# Final static guard only; all dynamic avoidance is performed by native RVO.
+		# 仅做最后的静态阻挡兜底；全部动态避让由原生 RVO 完成。
 		if _motion_grid.mobile_segment_clear(entity.position, desired, {}, _friendly_pass):
 			entity.position = desired
 		entity.face_direction(entity.position - _starting_positions[id])
@@ -160,6 +167,7 @@ func _apply_velocities(request_id: int, velocities: Dictionary) -> void:
 	movement_finished.emit()
 
 
+## 导出全部实体的只读快照。
 func snapshots() -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
 	for entity: MechEntityState in _entities.values():

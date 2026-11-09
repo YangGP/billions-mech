@@ -1,6 +1,6 @@
 class_name MechBuildingDefinition
 extends Resource
-## Immutable content rules; no progress, wallet or scene dependencies.
+## 不可变的内容规则；不含进度、钱包或场景依赖。
 
 @export var building_id: StringName
 @export var display_name: String
@@ -8,38 +8,49 @@ extends Resource
 @export var cost: Dictionary[StringName, int] = {}
 @export var construction_seconds: float = 1.0
 @export var max_hp: int = 100
+## 建成后持续占用的算力容量。
 @export var capacity_cost: int = 0
 @export var power_cost: int = 0
+## 提供的算力容量。
 @export var capacity_provided: int = 0
+## 容量中系统预留的部分，不计入玩家可用容量。
 @export var capacity_system_reserved: int = 0
 @export var power_provided: int = 0
 @export var cooling_cost: int = 0
 @export var cooling_provided: int = 0
+## 可被敌方感染转化。
 @export var infectable: bool = false
+## 环境能源类型：none（无）/wind（风力）/solar（太阳能）。
 @export_enum("none", "wind", "solar") var environment_energy: String = "none"
+## 环境能源输出倍率（不小于 1）。
 @export var environment_output_multiplier: int = 1
+## 环境能源输出上限（0 表示不设上限）。
 @export var environment_output_cap: int = 0
 @export var requires_water: bool = false
 @export var is_gate: bool = false
+## 陷阱类型：none（无）/emp（电磁减速）/blast（爆破地雷）。
 @export_enum("none", "emp", "blast") var trap_kind: String = "none"
 @export_range(0.0, 8.0, 0.5) var trigger_radius: float = 2.0
 @export var trap_damage: int = 0
 @export_range(0.0, 1.0, 0.05) var slow_multiplier: float = 1.0
 @export var slow_seconds: float = 0.0
+## 陷阱是否一次性（触发后自毁）。
 @export var one_shot: bool = true
-## Optional independent process recipe (thermal smelter alloy cycles).
+## 可选的独立工艺配方（热熔炉的合金循环）。
 @export var alloy_recipe: MechAlloyRecipe
 @export var income_per_minute: int = 0
+## 采集的资源类型（空表示非采集站）。
 @export var mined_resource: StringName = &""
 @export var extraction_per_minute: int = 0
+## 覆盖半径（格，0 表示不提供覆盖）。
 @export var coverage_radius: int = 0
 @export_range(0.0, 64.0, 0.5) var sight_radius: float = 0.0
 @export var demolition_seconds: float = 3.0
 @export_range(0.0, 1.0) var refund_ratio: float = 0.5
 @export var is_core: bool = false
 @export var buildable: bool = true
-## Level chain and in-place upgrade. Level-2+ definitions stay non-buildable and
-## are reached only through upgrade_to; tech_level is the tech-center rank.
+## 等级链与原地升级。2 级及以上的定义保持不可建造，只能经 upgrade_to 达成；
+## tech_level 是科技中心的等级。
 @export var level: int = 1
 @export var tech_level: int = 0
 @export var required_tech_level: int = 0
@@ -49,30 +60,38 @@ extends Resource
 @export var upgrade_seconds: float = 0.0
 @export var produced_units: Array[StringName] = []
 @export_range(1, 20, 1) var queue_limit: int = 5
-## Tower-style autofire; attack_damage 0 marks an unarmed building.
+## 塔式自动开火；attack_damage 为 0 表示无武装建筑。
 @export var attack_damage: int = 0
 @export_range(0.1, 10.0, 0.1) var attack_seconds: float = 1.0
 @export_range(0.0, 24.0, 0.5) var attack_range: float = 0.0
 @export_range(0.0, 8.0, 0.5) var splash_radius: float = 0.0
 @export_range(0.0, 16.0, 0.5) var repair_radius: float = 0.0
 @export var repair_rate: float = 0.0
-## Radar pre-warning lead in seconds; 0 marks a non-radar sight source.
+## 雷达预警提前量（秒）；0 表示非雷达视野源。
 @export var radar_warning_seconds: float = 0.0
+## 减速栅减速生效比例（0–1）。
 @export_range(0.0, 1.0, 0.05) var slow_fence_ratio: float = 1.0
+## 可驻防单位数。
 @export var garrison_capacity: int = 0
+## 驻防单位带来的射程加成。
 @export var garrison_range_bonus: float = 0.0
+## 接驳合同生成间隔（秒，0 表示无合同）。
 @export var contract_interval_seconds: float = 0.0
+## 接驳合同交付耗时（秒）。
 @export var contract_delivery_seconds: float = 0.0
 @export var contract_price_multiplier: float = 1.0
+## 经济光环类型：none（无）/mining（采矿）/cooling（冷却）/income（收入）。
 @export_enum("none", "mining", "cooling", "income") var aura_kind: String = "none"
 @export_range(0.0, 16.0, 0.5) var aura_radius: float = 0.0
 @export_range(0.1, 3.0, 0.01) var aura_multiplier: float = 1.0
 
 
+## 是否属于墙类建筑（装甲墙/合金墙）；敌人系统对墙有特殊的攻击与寻路规则。
 func is_wall_like() -> bool:
 	return building_id in [&"armored_wall", &"alloy_wall"]
 
 
+## 校验全部字段。返回空字符串表示通过，否则返回中文错误原因。
 func validation_error() -> String:
 	if building_id == &"" or display_name.is_empty():
 		return "建筑缺少编号或名称"
@@ -124,10 +143,13 @@ func validation_error() -> String:
 	return ""
 
 
+## 是否为供给恢复设施（提供容量/电力/冷却/覆盖/环境能源）。
+## 算力超载时仅允许建造零占容的此类建筑。
 func supply_recovery() -> bool:
 	return capacity_provided > capacity_system_reserved or power_provided > 0 or cooling_provided > 0 or coverage_radius > 0 or environment_energy != "none"
 
 
+## 导出全部关键字段的普通字典快照（供 HUD 与外部读取）。
 func snapshot() -> Dictionary:
 	return {"building_id": building_id, "name": display_name, "footprint": footprint,
 		"cost": MechResources.copy(cost), "construction_seconds": construction_seconds, "max_hp": max_hp,

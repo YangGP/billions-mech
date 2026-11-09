@@ -1,33 +1,36 @@
 class_name MechEnemyDefinition
 extends Resource
-## Threat-side combat data (values.md §11); behavior rules stay in waves-enemies.md §8.
+## 威胁方战斗数据（values.md 	11）；行为规则在 waves-enemies.md 	8。
 
 @export var enemy_id: StringName = &"builder"
 @export var display_name: String = "建造者"
 @export var max_hp: int = 30
 @export var damage: int = 6
-## 0 = same damage against buildings; flat form of architecture.md §7 damage modifier table.
+## 0 = 对建筑伤害与常规伤害相同；architecture.md 	7 伤害修正表的平铺形式。
 @export var damage_vs_building: int = 0
 @export var attack_seconds: float = 1.0
 @export var attack_range: float = 1.0
 @export var move_speed: float = 1.5
 @export var vision_radius: float = 6.0
+## 波次预算的威胁单价，用于按预算凑敌。
 @export var threat_cost: float = 1.0
+## 优先攻击建筑而非单位。
 @export var prefers_buildings: bool = false
-## false = wanderer-style: never marches to the core; idles with slow TAB-style
-## shuffling, converges on noise, and engages when seen or attacked.
+## false = 游荡型：从不向主脑行军；以缓慢的 TAB 式挪动待机，
+## 闻声聚集，被发现或受击时交战。
 @export var marches_to_core: bool = true
-## Unengaged wandering/noise convergence only; combat pursuit retains move_speed.
+## 仅用于未接战时的游荡/闻声聚集；战斗追击仍用 move_speed。
 @export_range(0.1, 1.0, 0.05) var wandering_speed_ratio: float = 1.0
-## Electromagnetic shelter (prototype): enemies within shelter_radius of this
-## unit take reduced damage from every source; killing it lifts the shelter.
+## 电磁庇护（原型）：处于该单位 shelter_radius 内的敌方受到的所有来源
+## 伤害降低；击杀该单位后庇护解除。
 @export var shelter_radius: float = 0.0
 @export_range(0.0, 1.0, 0.01) var shelter_reduction: float = 0.5
-## Wall pass-through (prototype): walks over armored walls at normal speed;
-## other buildings and obstacle terrain still block (attacks its way through).
+## 穿墙（原型）：以正常速度越过装甲墙；其他建筑与障碍地形仍然阻挡
+## （一路攻击开道）。
 @export var passes_walls: bool = false
 
 
+## 校验全部字段。返回空字符串表示通过，否则返回中文错误原因。
 func validation_error() -> String:
 	if enemy_id == &"" or display_name.is_empty():
 		return "敌种编号或名称无效"
@@ -49,10 +52,12 @@ func validation_error() -> String:
 	return ""
 
 
+## 对建筑的实际伤害；damage_vs_building 为 0 时退回 damage。
 func building_damage() -> int:
 	return damage_vs_building if damage_vs_building > 0 else damage
 
 
+## 导出全部关键字段的普通字典快照。
 func snapshot() -> Dictionary:
 	return {"enemy_id": enemy_id, "name": display_name, "max_hp": max_hp,
 		"damage": damage, "damage_vs_building": building_damage(),

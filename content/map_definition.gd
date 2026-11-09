@@ -1,21 +1,22 @@
 @tool
 class_name MechMapDefinition
 extends Resource
-## Hand-authored rectangular terrain stamps, not a random map generator.
+## 手工编排的矩形地形印章，不是随机地图生成器。
 
 @export var map_id: StringName = &"development_basin_128"
 @export var display_name: String = "四隘盆地 · 128开发图"
 @export var dimensions: Vector2i = Vector2i(128, 128)
-## Clockwise boundary in logical coordinates; edges are north/east/south/west.
-## Empty preserves the rectangular grid used by older maps.
+## 逻辑坐标系下的顺时针边界；四边为北/东/南/西。
+## 留空则保留旧地图使用的矩形网格。
 @export var playable_polygon := PackedVector2Array()
+## 主脑周边禁止刷新游荡敌的半径。
 @export_range(0.0, 64.0, 1.0) var wanderer_exclusion_radius: float = 20.0
 @export var obstacle_rects: Array[Rect2i] = []
 @export var rough_rects: Array[Rect2i] = []
-## Explicit environment layers. Water is also forced to obstacle terrain;
-## wind is a scoring/visual layer and does not change movement.
+## 显式环境层。水域同时强制为障碍地形；风力只是计分/视觉层，不影响移动。
 @export var wind_cells: Array[Vector2i] = []
 @export var water_cells: Array[Vector2i] = []
+## 崎岖地形的移动权重（越大越慢）。
 @export_range(1.0, 10.0, 0.1) var rough_movement_weight: float = 2.0
 @export var mainbrain_origin: Vector2i = Vector2i(61, 61)
 @export var mainbrain_footprint: Vector2i = Vector2i(5, 5)
@@ -25,6 +26,7 @@ extends Resource
 @export var minerals: Array[MechMineralDefinition] = []
 
 
+## 校验全部字段。返回空字符串表示通过，否则返回中文错误原因。
 func validation_error() -> String:
 	if dimensions.x < 8 or dimensions.y < 8 or dimensions.x > 256 or dimensions.y > 256:
 		return "地图尺寸必须在 8–256 格之间"
@@ -83,25 +85,27 @@ func validation_error() -> String:
 	return ""
 
 
+## 可玩边界多边形；未设置时退回地图矩形。
 func outline() -> PackedVector2Array:
 	if not playable_polygon.is_empty():
 		return playable_polygon.duplicate()
 	return PackedVector2Array([Vector2.ZERO, Vector2(dimensions.x, 0), Vector2(dimensions), Vector2(0, dimensions.y)])
 
 
+## 该格是否完整位于可玩边界内（要求四个角都在多边形内）。
 func contains_cell(cell: Vector2i) -> bool:
 	if not Rect2i(Vector2i.ZERO, dimensions).has_point(cell):
 		return false
 	if playable_polygon.is_empty():
 		return true
-	# Gameplay uses complete tiles, so spawn bodies and building footprints
-	# never start on a tile cut in half by the visible boundary.
+	# 玩法使用完整格子，因此出生实体与建筑占地不会落在被可见边界切开的半格上。
 	for offset: Vector2 in [Vector2.ZERO, Vector2.RIGHT, Vector2.ONE, Vector2.DOWN]:
 		if not Geometry2D.is_point_in_polygon(Vector2(cell) + offset, playable_polygon):
 			return false
 	return true
 
 
+## 全图逐格的可玩掩码（1 = 可玩）。
 func playable_cells() -> PackedByteArray:
 	var mask := PackedByteArray()
 	mask.resize(dimensions.x * dimensions.y)
@@ -111,13 +115,15 @@ func playable_cells() -> PackedByteArray:
 	return mask
 
 
+## 游荡敌是否允许在该点刷新（主脑排除圈之外才允许）。
 func wanderer_spawn_allowed(point: Vector2) -> bool:
 	var core := Rect2(Vector2(mainbrain_origin), Vector2(mainbrain_footprint))
 	return point.distance_squared_to(point.clamp(core.position, core.end)) > wanderer_exclusion_radius * wanderer_exclusion_radius
 
 
+## 全图地形字节数组（MechGridState.Terrain 枚举值）。
 func terrain_cells() -> PackedByteArray:
-	# Shared by the editor preview and the authoritative runtime grid.
+	# 编辑器预览与权威运行时网格共用。
 	var cells := PackedByteArray()
 	cells.resize(dimensions.x * dimensions.y)
 	cells.fill(MechGridState.Terrain.OPEN)
@@ -155,6 +161,7 @@ func _cell_mask(cells: Array[Vector2i]) -> PackedByteArray:
 	return mask
 
 
+## 导出运行时与 HUD 用的地形快照字典。
 func terrain_snapshot() -> Dictionary:
 	return {"dimensions": dimensions, "terrain": terrain_cells(), "name": display_name,
 		"playable": playable_cells(), "outline": outline(),
@@ -163,6 +170,7 @@ func terrain_snapshot() -> Dictionary:
 		"mainbrain_footprint": mainbrain_footprint, "minerals": mineral_snapshots()}
 
 
+## 各矿点快照组成的列表。
 func mineral_snapshots() -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
 	for mineral: MechMineralDefinition in minerals:

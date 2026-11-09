@@ -1,11 +1,12 @@
 class_name MechSettingsMenu
 extends CanvasLayer
-## View preferences only. Simulation pause and input ownership stay in main.
+## 纯视图偏好设置；模拟暂停与输入归属权保留在 main。
 
 signal close_requested
 signal settings_applied(preferences: Dictionary)
 
 const CONFIG_PATH: String = "user://settings.cfg"
+## 可选帧率上限；0 表示不限制。
 const FRAME_CAPS: Array[int] = [60, 120, 144, 240, 0]
 const DEFAULTS: Dictionary = {
 	"fullscreen": false, "vsync": true, "max_fps": 120,
@@ -49,6 +50,7 @@ func _ready() -> void:
 	_edge_scroll.toggled.connect(_update_toggle_labels)
 
 
+## 当前生效偏好的拷贝。
 func preferences() -> Dictionary:
 	return _preferences.duplicate()
 
@@ -97,6 +99,7 @@ func _restore_defaults() -> void:
 	_status.text = "已恢复默认选项，点击“应用并返回”生效。"
 
 
+## 应用并保存设置；写盘失败时不生效并提示用户。
 func _apply_and_close() -> void:
 	var draft: Dictionary = {
 		"fullscreen": _fullscreen.selected == 1,
@@ -120,6 +123,7 @@ func _apply_and_close() -> void:
 	close_requested.emit()
 
 
+## 把偏好应用到引擎（帧率、全屏、垂直同步）；headless 环境跳过窗口设置。
 func _apply_runtime() -> void:
 	Engine.max_fps = _preferences["max_fps"]
 	if DisplayServer.get_name() == "headless":

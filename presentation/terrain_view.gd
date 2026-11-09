@@ -1,8 +1,8 @@
 @tool
 class_name MechTerrainView
 extends Node2D
-## Static terrain is rendered once into a native SubViewport texture.
-## Camera movement samples a Sprite2D instead of replaying all tile draw calls.
+## 静态地形一次性渲染进原生 SubViewport 纹理；
+## 镜头移动只采样一张 Sprite2D，而不重放全部瓦片绘制调用。
 
 var _map: Dictionary = {}
 var _font := SystemFont.new()
@@ -10,8 +10,11 @@ var _cache_viewport: SubViewport
 var _cache_sprite: Sprite2D
 var _painter: Node2D
 var _labels: Node2D
+## 已探索过一次的关键地标（主口、侧翼、初始腹地），解锁后常驻绘制。
 var _known_markers: Dictionary = {}
+## 缓存纹理向外扩的留白（像素），避免边缘被裁。
 const CACHE_MARGIN: float = 160.0
+## 缓存纹理单边上限（像素），超大地困自动降分辨率。
 const MAX_CACHE_SIDE: float = 4096.0
 
 @export var preview_map: MechMapDefinition:
@@ -26,6 +29,7 @@ func _ready() -> void:
 	_refresh_editor_preview()
 
 
+## 编辑器预览刷新：仅在编辑器环境下按 preview_map 重绘。
 func _refresh_editor_preview() -> void:
 	if not Engine.is_editor_hint():
 		return
@@ -40,6 +44,7 @@ func _init() -> void:
 	_font.font_names = PackedStringArray(["Microsoft YaHei UI", "Microsoft YaHei", "sans-serif"])
 
 
+## 接收地形快照并重建缓存纹理（懒创建 SubViewport 管线）。
 func present_map(map_state: Dictionary) -> void:
 	_map = map_state.duplicate(true)
 	_known_markers.clear()
@@ -76,6 +81,7 @@ func present_map(map_state: Dictionary) -> void:
 	_labels.queue_redraw()
 
 
+## 依据视野快照解锁关键地标的常驻标记。
 func present_vision(vision: Dictionary) -> void:
 	var cells: PackedByteArray = vision["cells"]
 	var dimensions: Vector2i = vision["dimensions"]
@@ -88,6 +94,7 @@ func present_vision(vision: Dictionary) -> void:
 		_labels.queue_redraw()
 
 
+## 地形绘制主体：底色棋盘格 → 水/风/崎岖/岩石瓦片 → 岩石立面 → 编辑器描边。
 func _paint_map() -> void:
 	if _map.is_empty():
 		return
@@ -138,21 +145,21 @@ func _paint_map() -> void:
 			elif kind == MechGridState.Terrain.ROUGH:
 				_painter.draw_line(center + Vector2(-11, 2), center + Vector2(-2, -3), Color("83816a"), 1.0, true)
 				_painter.draw_line(center + Vector2(3, 5), center + Vector2(13, 0), Color("83816a"), 1.0, true)
-	# Short rock facets on a second pass so later ground tiles never erase them.
+	# 岩石短立面放第二轮绘制，后续地面瓦片不会覆盖它们。
 	for diagonal: int in range(dimensions.x + dimensions.y - 1):
 		for x: int in range(maxi(0, diagonal - dimensions.y + 1), mini(dimensions.x, diagonal + 1)):
 			var y: int = diagonal - x
 			if playable[y * dimensions.x + x] != 0 and terrain[y * dimensions.x + x] == MechGridState.Terrain.OBSTACLE \
 					and (water.is_empty() or water[y * dimensions.x + x] == 0):
 				_draw_rock(MechIsoGeometry.cell_center(Vector2i(x, y)), x + y, boundary)
-	# A boundary stroke extends outside the fog polygon and leaks unexplored
-	# map edges. Keep that authoring guide in the editor only.
+	# 边界描边会伸出迷雾多边形、漏出未探索的地图边缘；该编辑辅助只在编辑器绘制。
 	if Engine.is_editor_hint():
 		var border: PackedVector2Array = boundary.duplicate()
 		border.append(border[0])
 		_painter.draw_polyline(border, Color("587b8c"), 2.0, true)
 
 
+## 绘制已解锁的地标圆圈与文字；编辑器内始终全量显示。
 func _draw_markers() -> void:
 	if _map.is_empty():
 		return
@@ -165,6 +172,7 @@ func _draw_markers() -> void:
 		_draw_marker(belly, "初始腹地", Color("72e9d0"))
 
 
+## 绘制单块岩石的两个短立面（按位置取变体高度），并按边界裁剪。
 func _draw_rock(center: Vector2, variation: int, boundary: PackedVector2Array) -> void:
 	var rise: float = 7.0 + float(variation % 3) * 2.0
 	var peak: Vector2 = center + Vector2(-3, -rise - 9.0)
@@ -180,6 +188,7 @@ func _draw_rock(center: Vector2, variation: int, boundary: PackedVector2Array) -
 			_painter.draw_polyline(segment, Color("637783"), 1.0, true)
 
 
+## 绘制单个地标：圆圈加右侧文字。
 func _draw_marker(cell: Vector2i, text: String, color: Color) -> void:
 	var point: Vector2 = MechIsoGeometry.cell_center(cell)
 	_labels.draw_arc(point, 22.0, 0.0, TAU, 32, color, 2.0, true)

@@ -1,12 +1,15 @@
 class_name MechMapCamera
 extends Camera2D
-## Native Camera2D with view-only controls; never reads or writes sim internals.
+## 原生 Camera2D 的只读视图控制；绝不读写模拟内部状态。
 
+## 常规战术缩放下限；全图总览是另一模式，可缩到更小。
 const MIN_ZOOM: float = 0.5
 const OVERVIEW_MIN_ZOOM: float = 0.12
 const MAX_ZOOM: float = 2.0
+## 底部 HUD 预留高度（像素），镜头可视区据此裁剪。
 const HUD_BOTTOM: float = 280.0
 const PAN_SPEED: float = 850.0
+## 边缘滚屏触发宽度（像素）。
 const EDGE_WIDTH: float = 16.0
 
 @export_range(0.5, 2.0, 0.01) var initial_zoom: float = 0.70
@@ -16,6 +19,7 @@ var _focus := Vector2.ZERO
 var _dragging: bool = false
 var _last_drag_position := Vector2.ZERO
 var _mouse_inside: bool = false
+## 外部手势占用期间（框选、墙线等）镜头停用手动输入。
 var _external_gesture: bool = false
 var pan_speed_factor: float = 1.0
 var zoom_speed_factor: float = 1.0
@@ -27,6 +31,7 @@ var input_blocked: bool = false:
 			_stop_drag()
 
 
+## 通知镜头外部手势的占用状态；占用期间停用拖拽。
 func set_external_gesture(active: bool) -> void:
 	_external_gesture = active
 	if active:
@@ -42,6 +47,7 @@ func _ready() -> void:
 	get_viewport().size_changed.connect(_clamp_position)
 
 
+## 按地图包围盒与主脑焦点初始化镜头。
 func configure(bounds: Rect2, focus: Vector2) -> void:
 	_bounds = bounds.grow(100.0)
 	_focus = focus
@@ -55,6 +61,7 @@ func focus_mainbrain() -> void:
 	_clamp_position()
 
 
+## 全图总览：缩放并居中到整张地图。
 func fit_map() -> void:
 	_stop_drag()
 	var visible: Vector2 = _play_area_size() - Vector2(80.0, 80.0)
@@ -64,6 +71,7 @@ func fit_map() -> void:
 	_clamp_position()
 
 
+## 当前可视的世界坐标矩形（扣除 HUD 区域）。
 func visible_world_rect() -> Rect2:
 	var half: Vector2 = _play_area_size() / zoom * 0.5
 	return Rect2(position - half, half * 2.0)
@@ -75,6 +83,7 @@ func focus_world(world_position: Vector2) -> void:
 	_clamp_position()
 
 
+## 处理中键拖拽与滚轮缩放；返回是否消费了该事件。
 func handle_event(event: InputEvent) -> bool:
 	if input_blocked or _external_gesture:
 		return false
@@ -84,8 +93,7 @@ func handle_event(event: InputEvent) -> bool:
 			_last_drag_position = event.position
 			return true
 		if event.pressed and event.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
-			# Whole-map overview is a separate mode. Scrolling out must never
-			# jump inward to the regular tactical minimum.
+			# 全图总览是独立模式；向外滚动绝不反向跳回常规战术最小缩放。
 			if zoom.x < MIN_ZOOM and event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 				return true
 			var before: Vector2 = get_global_mouse_position()
@@ -101,8 +109,7 @@ func handle_event(event: InputEvent) -> bool:
 
 
 func _input(event: InputEvent) -> void:
-	# Capture a world-originated middle drag even when it moves over the HUD.
-	# Left-button selection and building gestures belong to the input owner.
+	# 即使中键拖拽移入 HUD 区域也持续接管；左键选择与建造手势归输入属主。
 	if input_blocked or not _dragging:
 		return
 	if event is InputEventMouseMotion:
@@ -115,6 +122,7 @@ func _input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 
+## 每帧处理方向键平移与边缘滚屏。
 func _process(delta: float) -> void:
 	if input_blocked or _dragging or _external_gesture or not get_window().has_focus():
 		return
@@ -143,6 +151,7 @@ func _process(delta: float) -> void:
 		_clamp_position()
 
 
+## 把镜头位置钳制在地图包围盒内。
 func _clamp_position() -> void:
 	_update_view_offset()
 	if _bounds.size.is_zero_approx():
@@ -155,13 +164,14 @@ func _clamp_position() -> void:
 	force_update_scroll()
 
 
+## 扣除底部 HUD 后的实际游玩区尺寸。
 func _play_area_size() -> Vector2:
 	var extent: Vector2 = get_viewport_rect().size
 	return Vector2(extent.x, maxf(240.0, extent.y - HUD_BOTTOM))
 
 
+## 保持焦点位于指令坞上方战场的中心。
 func _update_view_offset() -> void:
-	# Keep the focus in the centre of the battlefield above the command dock.
 	offset = Vector2(0.0, (get_viewport_rect().size.y - _play_area_size().y) * 0.5 / zoom.y)
 
 

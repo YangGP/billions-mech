@@ -1,15 +1,16 @@
 class_name MechUnitSystem
 extends RefCounted
-## Player orders and the M4 static-target combat loop. No scene dependencies.
-## Enemy hits return as results; SimCore applies damage so the prototype's
-## electromagnetic shelter funnels through one entry point.
+## 玩家指令与 M4 静态目标战斗循环。无场景依赖。
+## 对敌人的命中以结果返回；伤害由 SimCore 统一应用，
+## 使原型机的电磁庇护等效果经由同一入口生效。
 
-## Combat-level noise emitter (set by SimCore); fired at each shot's impact point.
+## 战斗级噪声发射器（由 SimCore 设置）；每次开火的命中点都会触发。
 var combat_noise: Callable = Callable()
 var _formations := MechFormationPlanner.new()
 var _formation_sequence: int = 0
 
 
+## 创建玩家单位实体并按定义初始化 HP。
 func create(registry: MechEntityRegistry, rules: MechUnitDefinition, cell: Vector2i) -> int:
 	var id: int = registry.create(rules.unit_id, rules.display_name, Vector2(cell) + Vector2(0.5, 0.5), rules.move_speed)
 	var unit: MechEntityState = registry.get_entity(id)
@@ -19,6 +20,7 @@ func create(registry: MechEntityRegistry, rules: MechUnitDefinition, cell: Vecto
 	return id
 
 
+## 统计存活玩家单位占用的总容量。
 func capacity_used(registry: MechEntityRegistry) -> int:
 	var total: int = 0
 	for entity: MechEntityState in registry.all():
@@ -27,6 +29,7 @@ func capacity_used(registry: MechEntityRegistry) -> int:
 	return total
 
 
+## 校验并规划一条玩家指令；失败返回原因，成功返回含路径与编队信息的计划。
 func plan_order(ids: Array, kind: StringName, goal: Vector2, target_id: int, registry: MechEntityRegistry, grid: MechGridState, navigation: MechGridNavigation) -> Dictionary:
 	if not kind in [&"move", &"attack_move", &"attack"]:
 		return {"ok": false, "reason": "未知单位指令"}
@@ -67,6 +70,7 @@ func plan_order(ids: Array, kind: StringName, goal: Vector2, target_id: int, reg
 		"goal": goal, "target_id": target_id, "paths": paths, "formation": formation}
 
 
+## 将计划写入各单位的实体状态：指令、目标、编队槽位与路径。
 func apply_order(plan: Dictionary, registry: MechEntityRegistry) -> void:
 	_formation_sequence += 1
 	var formation: Dictionary = plan.get("formation", {})
@@ -93,6 +97,7 @@ func apply_order(plan: Dictionary, registry: MechEntityRegistry) -> void:
 			unit.set_move_path(PackedVector2Array())
 
 
+## 在建筑周边找一个可走空格生成单位，并朝集结点下达移动指令。
 func spawn(building: MechBuildingState, rally: Vector2i, rules: MechUnitDefinition, registry: MechEntityRegistry, grid: MechGridState, navigation: MechGridNavigation) -> bool:
 	var occupied: Dictionary = {}
 	for entity: MechEntityState in registry.all():
@@ -120,10 +125,12 @@ func spawn(building: MechBuildingState, rally: Vector2i, rules: MechUnitDefiniti
 	return true
 
 
+## 推进一步玩家单位的战斗循环；返回对敌人的命中，由 SimCore 应用伤害。
 func advance(registry: MechEntityRegistry, grid: MechGridState, navigation: MechGridNavigation, hz: int, vision: MechVisionSystem) -> Dictionary:
 	var enemy_hits: Array[Dictionary] = []
 	var enemies: Dictionary[Vector2i, Array] = {}
 	for entity: MechEntityState in registry.all():
+		# 索敌桶只收录玩家视野内的敌人。
 		if entity.team == 2 and entity.hp > 0 and vision.is_visible(entity.position):
 			var cell := Vector2i(entity.position.floor())
 			if not enemies.has(cell):
@@ -144,7 +151,7 @@ func advance(registry: MechEntityRegistry, grid: MechGridState, navigation: Mech
 			continue
 		var target: MechEntityState = registry.get_entity(unit.attack_target_id)
 		if target != null and not vision.is_visible(target.position):
-			# Search the last observed position, never follow a hidden entity ID.
+			# 只朝最后观察到的位置搜索，绝不跟随已隐身的实体 ID。
 			unit.set_move_path(PackedVector2Array())
 			unit.repath_ticks = 0
 			unit.attack_target_id = 0
@@ -159,8 +166,8 @@ func advance(registry: MechEntityRegistry, grid: MechGridState, navigation: Mech
 			unit.attack_target_id = 0
 			if unit.order == &"attack":
 				unit.order = &"idle"
-		# An idle unit can fire from its position, but never leave its slot to
-		# chase or obtain LOS. Revalidate retained targets as well as new ones.
+		# 待机单位可原地开火，但绝不离开卡位去追击或争取视线。
+		# 对保留目标与新目标都要重新校验。
 		if target != null and unit.order == &"idle" and not _can_hit(unit, target, grid):
 			unit.attack_target_id = 0
 			unit.set_move_path(PackedVector2Array())
@@ -180,12 +187,15 @@ func advance(registry: MechEntityRegistry, grid: MechGridState, navigation: Mech
 				if unit.cooldown_ticks == 0:
 					enemy_hits.append({"id": target.entity_id, "damage": unit.unit_definition.damage})
 					unit.cooldown_ticks = maxi(1, ceili(unit.unit_definition.attack_seconds * hz))
+					# shot_ticks 仅用于表现层的开火闪烁时长（0.1 秒）。
 					unit.shot_ticks = maxi(1, ceili(0.1 * hz))
 					unit.shot_target = target.position
 					if combat_noise.is_valid():
 						combat_noise.call(target.position)
+			# 射程外则重寻接近路径：仅在路径缺失、终点过远或视线受阻时重算。
 			elif unit.order != &"idle" and unit.repath_ticks == 0 and (not unit.has_move_order or unit.move_target.distance_to(target.position) > unit.unit_definition.attack_range or not _line_clear(unit.move_target, target.position, grid)):
 				unit.set_move_path(_attack_path(unit, target, registry, grid, navigation))
+				# 追击路径每 0.5 秒重算一次。
 				unit.repath_ticks = maxi(1, hz / 2)
 		else:
 			if unit.order == &"attack_move" and not unit.has_move_order:
@@ -194,6 +204,7 @@ func advance(registry: MechEntityRegistry, grid: MechGridState, navigation: Mech
 	return {"enemy_hits": enemy_hits}
 
 
+## 就近索敌：待机时用射程且要求视线通畅，行军时用更大的索敌半径。
 func _nearest_enemy(unit: MechEntityState, buckets: Dictionary, grid: MechGridState) -> MechEntityState:
 	var center := Vector2i(unit.position.floor())
 	var range_cells: float = unit.unit_definition.attack_range if unit.order == &"idle" else unit.unit_definition.acquisition_range
@@ -219,6 +230,7 @@ func _line_clear(from: Vector2, to: Vector2, grid: MechGridState) -> bool:
 	return grid.terrain_line_clear(from, to)
 
 
+## 求进入目标射程的接近路径：目标周边射击位按距离排序，取首个可达者。
 func _attack_path(unit: MechEntityState, target: MechEntityState, registry: MechEntityRegistry, grid: MechGridState, navigation: MechGridNavigation) -> PackedVector2Array:
 	var center := Vector2i(target.position.floor())
 	var radius: int = ceili(unit.unit_definition.attack_range)
@@ -227,6 +239,7 @@ func _attack_path(unit: MechEntityState, target: MechEntityState, registry: Mech
 	for other: MechEntityState in registry.all():
 		if other.entity_id != unit.entity_id and other.rvo_speed > 0.0:
 			occupied.append(Vector2i(other.position.floor()))
+			# 攻击同一目标的友军若在移动，其移动终点也视为占位（预订射击位）。
 			if other.attack_target_id == target.entity_id and other.has_move_order:
 				occupied.append(Vector2i(other.move_target.floor()))
 	for y: int in range(center.y - radius, center.y + radius + 1):
@@ -237,13 +250,14 @@ func _attack_path(unit: MechEntityState, target: MechEntityState, registry: Mech
 				candidates.append(cell)
 	candidates.sort_custom(func(a: Vector2i, b: Vector2i) -> bool: return Vector2(a).distance_squared_to(unit.position) < Vector2(b).distance_squared_to(unit.position))
 	for cell: Vector2i in candidates:
-		# Allies reserve firing positions, not whole transit cells in a narrow lane.
+		# 友军只预订射击位，而非整条窄道中的通行格。
 		var path: PackedVector2Array = navigation.find_path(unit.position, cell)
 		if not path.is_empty():
 			return path
 	return PackedVector2Array()
 
 
+## 恢复指令路径：抵达则转待机并朝向，否则按原目标重寻路。
 func _resume_order_path(unit: MechEntityState, navigation: MechGridNavigation, hz: int) -> void:
 	if unit.position.distance_to(unit.order_goal) <= MechEntityState.ARRIVAL_TOLERANCE:
 		unit.order = &"idle"
@@ -251,12 +265,13 @@ func _resume_order_path(unit: MechEntityState, navigation: MechGridNavigation, h
 		return
 	if unit.repath_ticks > 0:
 		return
-	# An interrupted/empty route is not completion. Retry the original goal,
-	# including after displacement, without choosing a nearby substitute.
+	# 被打断/空路径不算抵达。重试原目标点（包括被挤出后），
+	# 不就近替换目标。
 	unit.set_move_path(navigation.find_path_to_point(unit.position, unit.order_goal))
 	unit.repath_ticks = hz
 
 
+## 卡位重寻路：被阻挡满一秒且仍有移动指令时，按原目标重算路径。
 func _repath_blocked(unit: MechEntityState, navigation: MechGridNavigation, hz: int) -> void:
 	if unit.blocked_ticks < hz or not unit.has_move_order or unit.repath_ticks > 0:
 		return

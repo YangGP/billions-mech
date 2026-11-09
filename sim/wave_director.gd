@@ -1,16 +1,16 @@
 class_name MechWaveDirector
 extends RefCounted
-## Wave scheduling per waves-enemies.md §2–§6 and values.md §2/§12: silence or
-## development triggers the first wave, budget B(n) = first × growth^(n-1),
-## announcements carry a qualitative tier plus a coarse edge direction. TAB-style
-## release: each wave streams in from the edge band (outside the player's view)
-## across a release window, entries ordered and staggered evenly. Composition is
-## act-one: builders fill the budget, one prototype joins from WAVE 3. Spawns are
-## returned as requests; MechEnemySystem owns entity creation. With a positive
-## total_waves the director stops scheduling after that wave (first-slice
-## victory gate); 0 keeps the endless act loop.
+## 波次调度（依据 waves-enemies.md §2–§6 与 values.md §2/§12）：静默期或
+## 发展度触发首波，预算 B(n) = 首波 × growth^(n-1)，预告附带定性规模
+## 等级与粗略的进攻边缘方向。TAB 式投放：每波从边缘带（玩家视野外）
+## 跨投放窗口连续流入，条目有序且均匀错峰。编成为第一幕策略：
+## 建造者填满预算，原型机自 WAVE 3 起加入一个。生成以请求形式返回；
+## 实体创建由 MechEnemySystem 负责。total_waves 为正时导演在该波后
+## 停止排程（首切片胜利门槛）；为 0 则保持无尽幕循环。
 
+## "计算节点"建筑编号，用于发展度触发的节点计数。
 const NODE_ID: StringName = &"compute_node"
+## 原型机从第几波起加入编成。
 const PROTOTYPE_FROM_WAVE: int = 3
 
 var _active: bool = false
@@ -47,6 +47,7 @@ var _edge_name: String = ""
 var _pending: Array[Dictionary] = []
 
 
+## 校验并装载敌种定义与波次参数，返回错误信息（空串表示成功）。
 func configure(settings: MechFoundationSettings) -> String:
 	_defs.clear()
 	for rules: MechEnemyDefinition in settings.enemy_definitions:
@@ -77,6 +78,7 @@ func configure(settings: MechFoundationSettings) -> String:
 	return ""
 
 
+## 重置导演状态并按地图定义收集边缘出生带。
 func reset(grid: MechGridState, map_definition: MechMapDefinition, active: bool, hz: int) -> void:
 	_active = active
 	_tick_rate = maxi(1, hz)
@@ -94,12 +96,13 @@ func reset(grid: MechGridState, map_definition: MechMapDefinition, active: bool,
 	_collect_bands(grid, map_definition)
 
 
+## 推进一步：先清空流式投放队列，再按相位时钟（静默→预告→投放）推进。
 func advance(grid: MechGridState, buildings: Array[MechBuildingState]) -> Array[Dictionary]:
 	if not _active or grid == null:
 		return []
 	_tick_counter += 1
 	var requests: Array[Dictionary] = []
-	# Streaming release drains first, independent of the phase clock below.
+	# 流式投放先行清空 _pending，与下方的相位时钟无关。
 	if not _pending.is_empty():
 		var remaining: Array[Dictionary] = []
 		for entry: Dictionary in _pending:
@@ -123,12 +126,13 @@ func advance(grid: MechGridState, buildings: Array[MechBuildingState]) -> Array[
 			if _tick_counter >= _announce_delay_ticks:
 				_queue_wave()
 		&"active":
-			# The interval measures release-to-release; announce within that span.
+			# 间隔按投放到投放计量；预告需在该跨度内发出。
 			if _tick_counter >= maxi(1, _wave_interval_ticks - _announce_delay_ticks):
 				_announce()
 	return requests
 
 
+## 战役模式请求终波：改为全线进攻；非战役模式或已请求/已结束则拒绝。
 func request_final_wave() -> bool:
 	if not _campaign_mode or _final_requested or _phase == &"done":
 		return false
@@ -145,9 +149,11 @@ func set_campaign_stage(stage: int) -> void:
 	_campaign_stage = clampi(stage, 1, 3)
 
 
+## 导出 HUD 所需的导演状态快照：相位、倒计时、下一波编号与进攻边缘等。
 func state() -> Dictionary:
 	var seconds_remaining: float = 0.0
 	var next_event: StringName = &"done"
+	# 结束相位显示已完成波数，否则显示即将到来的波号。
 	var wave_number: int = _wave_index if _phase == &"done" else _wave_index + 1
 	var next_wave_number: int = _wave_index + 1
 	var next_edge: StringName = _main_edge
@@ -184,16 +190,18 @@ func state() -> Dictionary:
 		"total_waves": _total_waves, "exhausted": exhausted()}
 
 
-## First-slice victory gate (development-plan M6): every scheduled wave has
-## queued and its streaming release has fully drained.
+## 首切片胜利门槛（开发计划 M6）：所有排定的波都已入队，
+## 且其流式投放已全部流完。
 func exhausted() -> bool:
 	return _phase == &"done" and _pending.is_empty()
 
 
+## 预告下一波：确定规模等级与进攻边缘，切换到 announced 相位。
 func _announce() -> void:
-	# The upcoming wave number is the current index + 1 (values.md §12 curve).
+	# 即将到来的波号为当前索引 + 1（数值曲线见 values.md §12）。
 	var wave_number: int = _wave_index + 1
 	var budget: float = _budget_for(wave_number)
+	# 规模等级按预算阈值划分：小股 <40，常规 <80，其余为大量。
 	_tier_label = "小股" if budget < 40.0 else ("常规" if budget < 80.0 else "大量")
 	if _final_requested and wave_number >= _total_waves:
 		_edge = &"all"
@@ -208,25 +216,28 @@ func _announce() -> void:
 	_tick_counter = 0
 
 
+## 编成并入队下一波：按预算挑选敌种、按边缘带排布流式投放条目。
 func _queue_wave() -> void:
 	var wave_number: int = _wave_index + 1
 	var budget: float = _budget_for(wave_number)
 	var builder: MechEnemyDefinition = _defs[&"builder"]
 	var band: Array[Vector2i] = _flank_band if wave_number % _flank_every == 0 and not _flank_band.is_empty() else _main_band
+	# 终波改从全部边缘带入场。
 	if _final_requested and wave_number >= _total_waves and not _all_bands.is_empty():
 		band = _all_bands
 	if band.is_empty():
 		band = _main_band
 	if band.is_empty():
 		return
-	# Composition: prototype first from WAVE 3, recyclers from the II-stage
-	# slice, builders fill the remaining budget.
+	# 编成：原型机自 WAVE 3 起优先加入，回收者来自第二阶段切片，
+	# 剩余预算由建造者填满。
 	var entries: Array[StringName] = []
 	if wave_number >= PROTOTYPE_FROM_WAVE:
 		entries.append(&"prototype")
 		budget -= _defs[&"prototype"].threat_cost
 	var recycler: MechEnemyDefinition = _defs.get(&"recycler")
 	if recycler != null and (wave_number >= 2 or (_campaign_mode and _campaign_stage >= 2)):
+		# 回收者最多占用四分之一预算。
 		var recycler_budget: float = budget * 0.25
 		var recyclers: int = maxi(0, floori(recycler_budget / recycler.threat_cost))
 		for index: int in range(recyclers):
@@ -235,8 +246,8 @@ func _queue_wave() -> void:
 	var builders: int = maxi(0, floori(budget / builder.threat_cost))
 	for index: int in range(builders):
 		entries.append(&"builder")
-	# TAB-style trickle: entries stream from the band across the release window,
-	# first entry due immediately, the rest staggered evenly after it.
+	# TAB 式细流：条目跨投放窗口从边缘带依次流出，
+	# 首条立即生效，其余在其后均匀错峰。
 	var spacing: float = float(_release_window_ticks) / maxi(1, entries.size() - 1) if entries.size() > 1 else float(_release_window_ticks)
 	for index: int in range(entries.size()):
 		var cell: Vector2i = band[index % band.size()]
@@ -247,19 +258,22 @@ func _queue_wave() -> void:
 	_wave_index = wave_number
 	_phase = &"active"
 	_tick_counter = 0
-	# First-slice victory gate: once the last scheduled wave has queued, the
-	# director goes quiet for good; the drained pending list finishes the wave.
+	# 首切片胜利门槛：最后一个排定的波入队后导演永久静默；
+	# _pending 清空即视为该波结束。
 	if _total_waves > 0 and _wave_index >= _total_waves:
 		_phase = &"done"
 
 
+## 波次预算：B(n) = 首波 × 阶段倍率 × growth^(n-1)；终波使用固定预算。
 func _budget_for(wave_number: int) -> float:
 	if _final_requested and wave_number >= _total_waves:
 		return _final_wave_budget
+	# 战役各阶段的预算倍率（一/二/三幕分别为 1.0/1.5/2.2）。
 	var stage_multiplier: float = [1.0, 1.5, 2.2][_campaign_stage - 1] if _campaign_mode else 1.0
 	return _first_wave_budget * stage_multiplier * pow(_budget_growth, wave_number - 1)
 
 
+## 发展度评分：运行中的建筑按净容量、产兵与科技等级累加。
 func _development_progress(buildings: Array[MechBuildingState]) -> int:
 	var score: int = 0
 	for building: MechBuildingState in buildings:
@@ -280,9 +294,8 @@ func _operating_nodes(buildings: Array[MechBuildingState]) -> int:
 	return count
 
 
-## Edge spawn bands: walkable border-ring cells grouped by side; the band nearest
-## the map's main-gate marker is the default, the one nearest the flank marker
-## carries the minority of waves (map-terrain.md §2/§5).
+## 边缘出生带：按侧分组的可走边界环格子；最靠近地图主门标记的一侧为
+## 默认带，最靠近侧翼标记的一侧承担少数波次（map-terrain.md §2/§5）。
 func _collect_bands(grid: MechGridState, map_definition: MechMapDefinition) -> void:
 	var sides: Dictionary = {}
 	for cell: Vector2i in grid.boundary_cells():

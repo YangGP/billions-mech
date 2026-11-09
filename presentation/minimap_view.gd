@@ -1,9 +1,8 @@
 class_name MechMinimapView
 extends Control
-## Minimap read model: terrain/fog textures plus snapshot dots and the camera
-## frame. All data arrives through present_* calls; the view never reads the
-## simulation. Fullscreen mode is reserved as the region-management surface,
-## so everything is computed from the current control size.
+## 小地图只读模型：地形/迷雾纹理 + 快照圆点 + 镜头取景框。
+## 全部数据经 present_* 到达；视图绝不读取模拟层。
+## 全屏模式兼作区域管理操作面，因此一切按当前控件尺寸计算。
 
 signal focus_requested(world_position: Vector2)
 signal region_selected(cells: Array[Vector2i])
@@ -38,6 +37,7 @@ var _map_offset := Vector2.ZERO
 var _polygon := PackedVector2Array()
 var _uvs := PackedVector2Array()
 var _dragging: bool = false
+## 区域框选模式：左键拖出一个格子矩形并发出 region_selected。
 var _region_mode: bool = false
 var _region_start := Vector2.ZERO
 var _region_end := Vector2.ZERO
@@ -137,8 +137,7 @@ func _draw() -> void:
 		draw_colored_polygon(_footprint_local(mineral["cell"], Vector2i.ONE), MINERAL)
 	if _fog_texture != null:
 		draw_polygon(_polygon, PackedColorArray([Color.WHITE]), _uvs, _fog_texture)
-	# Authorized dispatch regions: tinted cell footprints, above fog and below
-	# entity dots. Disabled regions stay visible but dimmed.
+	# 已授权的调度区域：以着色格子足迹绘制，位于迷雾之上、实体圆点之下；停用区域保持可见但变暗。
 	for region: Dictionary in _state.get("dispatch", {}).get("regions", []):
 		var fill: Color = REGION_ENABLED if region.get("enabled", false) else REGION_DISABLED
 		if int(region["id"]) == int(_state.get("dispatch", {}).get("selected_region_id", 0)):

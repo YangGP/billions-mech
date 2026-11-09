@@ -1,13 +1,13 @@
 class_name MechEconomySystem
 extends RefCounted
-## Integer ledger and reservations; shortages do not freeze existing facilities.
+## 整数账本与各项预留；短缺不冻结既有设施。
 
 var _resources: Dictionary[StringName, int] = MechResources.empty()
 var _capacity_used: int = 0
 var _capacity_supply: int = 0
 var _capacity_total: int = 0
 var _capacity_system_reserved: int = 0
-## Cooling is stored as integer tenths for future 20% load-balancing reductions.
+## 冷却按十分之一整数存储，为将来的 20% 负载均衡削减保留精度。
 var _cooling_reserved: int = 0
 var _cooling_supply: int = 0
 var _power_reserved: int = 0
@@ -17,6 +17,7 @@ var repair_authorized: Callable
 var repair_paid: Callable
 
 
+## 按开局资源重置账本与全部预留。
 func reset(starting_resources: Dictionary) -> void:
 	_resources = MechResources.copy(starting_resources)
 	_capacity_used = 0
@@ -34,10 +35,13 @@ func coins() -> int:
 	return _resources[&"coins"]
 
 
+## 当前资源余额的拷贝。
 func balance() -> Dictionary[StringName, int]:
 	return MechResources.copy(_resources)
 
 
+## 校验一笔支出是否可付；返回中文错误描述，空字符串表示可付。
+## available 非空时按该虚拟钱包校验（不影响真实账本）。
 func spend_error(amount: Dictionary, available: Dictionary = {}) -> String:
 	if not MechResources.valid(amount):
 		return "资源造价无效"
@@ -51,6 +55,7 @@ func spend_error(amount: Dictionary, available: Dictionary = {}) -> String:
 	return ""
 
 
+## 原子扣款：任一资源不足即整体失败。
 func try_spend(amount: Dictionary) -> bool:
 	if not spend_error(amount).is_empty():
 		return false
@@ -58,11 +63,13 @@ func try_spend(amount: Dictionary) -> bool:
 	return true
 
 
+## 入账（金额无效时静默忽略）。
 func credit(amount: Dictionary) -> void:
 	if MechResources.valid(amount):
 		_resources = MechResources.add(_resources, amount)
 
 
+## 依据建筑列表重算覆盖、容量、电力、冷却与收入速率的全部供给与预留。
 func recompute(buildings: Array[MechBuildingState], grid: MechGridState, unit_capacity: int = 0, queued_capacity: int = 0) -> void:
 	_capacity_used = unit_capacity + queued_capacity
 	_capacity_supply = 0
@@ -82,7 +89,7 @@ func recompute(buildings: Array[MechBuildingState], grid: MechGridState, unit_ca
 		_power_reserved += rules.power_cost
 		_cooling_reserved += roundi(float(rules.cooling_cost * 10 * building.cooling_multiplier_percent) / 100.0)
 		if building.upgrade_target != null:
-			# Reserve only the positive delta while the old level keeps serving.
+			# 升级期间旧等级持续服务，只为正增量部分预留。
 			_capacity_used += maxi(0, building.upgrade_target.capacity_cost - rules.capacity_cost)
 			_power_reserved += maxi(0, building.upgrade_target.power_cost - rules.power_cost)
 			_cooling_reserved += maxi(0, roundi(float(
@@ -102,6 +109,7 @@ func recompute(buildings: Array[MechBuildingState], grid: MechGridState, unit_ca
 			_income_rate += rules.income_per_minute * building.income_multiplier_percent / 100
 
 
+## 合同下单校验：算力超载禁新单，容量不足或造价不足均给出中文原因。
 func contract_error(capacity_cost: int, price: Dictionary) -> String:
 	if _capacity_used > _capacity_supply:
 		return "算力超载，禁止新增合同"
@@ -110,6 +118,8 @@ func contract_error(capacity_cost: int, price: Dictionary) -> String:
 	return spend_error(price)
 
 
+## 建造下单校验：电力、冷却、算力容量（超载时仅放行零占容的恢复设施）
+## 与造价逐项检查；available 可传入虚拟钱包。
 func reservation_error(rules: MechBuildingDefinition, available: Dictionary = {}, cost_override: Dictionary = {}, cooling_multiplier: float = 1.0) -> String:
 	if rules.power_cost > 0 and _power_reserved + rules.power_cost > _power_supply:
 		return "电力余量不足"
@@ -123,6 +133,7 @@ func reservation_error(rules: MechBuildingDefinition, available: Dictionary = {}
 	return spend_error(rules.cost if cost_override.is_empty() else cost_override, available)
 
 
+## 升级下单校验：只对容量/电力/冷却的正增量检查预留。
 func upgrade_error(current: MechBuildingDefinition, target: MechBuildingDefinition, cost: Dictionary, cooling_multiplier: float = 1.0) -> String:
 	if current == null or target == null:
 		return "升级目标无效"
@@ -139,6 +150,7 @@ func upgrade_error(current: MechBuildingDefinition, target: MechBuildingDefiniti
 	return spend_error(cost)
 
 
+## 生产下单校验：算力超载禁新单，队列下单即占容。
 func production_error(capacity_cost: int, cost: Dictionary) -> String:
 	if _capacity_used > _capacity_supply:
 		return "算力超载，禁止新增生产"
@@ -147,6 +159,7 @@ func production_error(capacity_cost: int, cost: Dictionary) -> String:
 	return spend_error(cost)
 
 
+## 推进算力币收入：每分钟产量按 tick 累加余数，攒够整数才入账。
 func advance_income(buildings: Array[MechBuildingState], hz: int) -> void:
 	var denominator: int = hz * 60
 	for building: MechBuildingState in buildings:
@@ -159,6 +172,8 @@ func advance_income(buildings: Array[MechBuildingState], hz: int) -> void:
 			building.income_remainder %= income_denominator
 
 
+## 推进材料维修：默认 4 HP/s，材料消耗为有效配方 × 25% 摊到整段维修，
+## 各资源以 分子/(4*max_hp) 的分数形式保留进度。
 func advance_repairs(buildings: Array[MechBuildingState], hz: int) -> void:
 	for building: MechBuildingState in buildings:
 		if not building.repairing or building.phase != MechBuildingState.Phase.OPERATING:
@@ -167,14 +182,13 @@ func advance_repairs(buildings: Array[MechBuildingState], hz: int) -> void:
 			building.repairing = false
 			building.repair_hp_accumulator = 0
 			continue
-		# In combat (building-economy.md §4.2): healing halts without spending
-		# or accumulating unpaid repair until the site is clear of enemies.
+		# 交战中（building-economy.md §4.2）：不扣材料也不累积未付维修，
+		# 直到现场无敌才恢复。
 		if building.threatened:
 			building.repair_waiting_for_funds = false
 			building.repair_hp_accumulator = 0
 			continue
-		# 4 HP/s; material cost is the effective build recipe × 25% over a full
-		# repair. Fractions are kept per resource as numerator / (4*max_hp).
+		# 基础 4 HP/s；repair_rate_override 可被外部覆盖（如维修站加成）。
 		building.repair_hp_accumulator += roundi(building.repair_rate_override if building.repair_rate_override > 0.0 else 4.0)
 		if building.repair_hp_accumulator < hz:
 			continue
@@ -195,7 +209,7 @@ func advance_repairs(buildings: Array[MechBuildingState], hz: int) -> void:
 			building.repair_hp_accumulator = 0
 			continue
 		if not due.is_empty() and not try_spend(due):
-			# Do not commit fractions or HP when the material step cannot be paid.
+			# 材料步骤付不起时不提交分数与 HP。
 			building.repair_waiting_for_funds = true
 			building.repair_hp_accumulator = 0
 			continue
@@ -210,6 +224,7 @@ func advance_repairs(buildings: Array[MechBuildingState], hz: int) -> void:
 			building.repair_hp_accumulator = 0
 
 
+## 导出账本与供需余量的只读快照（含超载/缺口标志）。
 func snapshot() -> Dictionary:
 	return {"resources": MechResources.copy(_resources), "coins": coins(),
 		"capacity_used": _capacity_used, "capacity_supply": _capacity_supply,

@@ -1,29 +1,30 @@
 class_name MechGridState
 extends RefCounted
-## Terrain and occupancy are separate authoritative layers.
+## 地形与占用是两个相互独立的权威层。
 
 enum Terrain { OPEN, ROUGH, OBSTACLE }
 
+## 移动实体（机器人）的碰撞圆半径，须与原生 RVO 圆保持一致。
 const MOBILE_RADIUS: float = 0.22
 
 var _dimensions: Vector2i = Vector2i.ZERO
 var _terrain := PackedByteArray()
 var _occupancy := PackedInt32Array()
 var _pass_through: Dictionary[int, bool] = {}
-## Player-only pass-through (gates); enemy path validation must not use it.
+## 仅玩家可用的穿越表（闸门类）；敌方路径校验不得使用它。
 var _friendly_pass: Dictionary[int, bool] = {}
 var _coverage := PackedByteArray()
-## Explicit environment layers; water is also obstacle terrain, wind is not.
+## 显式环境层：水面同时也是障碍地形，风区不是。
 var _wind := PackedByteArray()
 var _water := PackedByteArray()
-## Per-cell coverage change marker, independent from the occupancy revision.
+## 逐格覆盖变更标记，与占用层修订号相互独立。
 var _coverage_changes: Dictionary[int, int] = {}
 var _rough_weight: float = 2.0
 var _revision: int = 0
 var _terrain_revision: int = 0
 var _coverage_revision: int = 0
-## Last change per occupied/cleared cell; bounded by map size, independently
-## consumed by A* and RVO without clearing another consumer's dirty cells.
+## 逐格占用变更序号；上限为地图尺寸，A* 与 RVO 各自独立消费，
+## 互不清除对方的脏格标记。
 var _navigation_changes: Dictionary[int, int] = {}
 var _playable := PackedByteArray()
 var _outline := PackedVector2Array()
@@ -89,8 +90,8 @@ func navigation_changes_since(since: int) -> Array[Vector2i]:
 	return cells
 
 
-## Independent immutable input for background path-data construction. The
-## worker never reads the live grid while commands mutate its occupancy.
+## 供后台路径数据构建使用的独立不可变副本：
+## 工作线程绝不读取活网格，避免与命令写入占用层产生竞争。
 func navigation_copy() -> MechGridState:
 	var copy := MechGridState.new()
 	copy._dimensions = _dimensions
@@ -173,8 +174,8 @@ func footprint_covered(origin: Vector2i, footprint: Vector2i) -> bool:
 	return true
 
 
-## Legacy single-source coverage used by the settings validator and existing
-## vision fixtures. Runtime coverage goes through recompute_coverage().
+## 旧版单源覆盖，仅供设置校验器与既有视野夹具使用；
+## 运行时覆盖一律经 recompute_coverage() 计算。
 func set_core_coverage(origin: Vector2i, footprint: Vector2i, radius: int) -> void:
 	var mask := PackedByteArray()
 	mask.resize(_coverage.size())
@@ -185,9 +186,8 @@ func set_core_coverage(origin: Vector2i, footprint: Vector2i, radius: int) -> vo
 	_revision += 1
 
 
-## Connected coverage rooted at the mainbrain. A relay only extends the mask
-## when its own cell is already covered by the root or another connected relay;
-## isolated loops and disconnected relays never self-power.
+## 以主脑为根的连通覆盖。中继只有当自身格子已被根或另一连通中继覆盖时
+## 才扩展覆盖；孤立回路与失连中继绝不自行供电。
 func recompute_coverage(buildings: Array[MechBuildingState]) -> Array[Vector2i]:
 	var root: MechBuildingState = null
 	var relays: Array[MechBuildingState] = []
@@ -256,9 +256,8 @@ func release(entity_id: int) -> void:
 	_friendly_pass.erase(entity_id)
 
 
-## Pass-through occupants keep their cells (placement checks and mineral
-## bindings still see them) while pathfinding, RVO obstacles and movement
-## validation treat the cells as open ground — used by destroyed bases.
+## 穿越占用者保留其格子（放置校验与矿点绑定仍然可见），
+## 而寻路、RVO 障碍与移动校验把格子视为空地——用于被摧毁的基座。
 func set_pass_through(entity_id: int, enabled: bool) -> void:
 	if _pass_through.has(entity_id) == enabled:
 		return
@@ -296,7 +295,7 @@ func _blocks_path(occupant: int) -> bool:
 	return occupant != 0 and not _pass_through.has(occupant)
 
 
-## True when the cell is held by a pass-through occupant (destroyed base).
+## 该格是否被穿越占用者持有（被摧毁的基座）。
 func is_pass_through(cell: Vector2i) -> bool:
 	var occupant: int = occupant_at(cell)
 	return occupant != 0 and _pass_through.has(occupant)
@@ -305,7 +304,7 @@ func is_pass_through(cell: Vector2i) -> bool:
 func mobile_position_clear(point: Vector2, ignored_occupants: Dictionary = {}, friendly_pass: bool = false) -> bool:
 	if not point_inside(point):
 		return false
-	# Match the native RVO circle, including at building corners.
+	# 与原生 RVO 圆保持一致，含建筑拐角处的判定。
 	var low := Vector2i((point - Vector2.ONE * MOBILE_RADIUS).floor())
 	var high := Vector2i((point + Vector2.ONE * MOBILE_RADIUS).floor())
 	for y: int in range(low.y, high.y + 1):
@@ -332,9 +331,8 @@ func movement_weight(cell: Vector2i) -> float:
 
 
 func terrain_line_clear(from: Vector2, to: Vector2, reveal_blocker: bool = false) -> bool:
-	# Supercover traversal: diagonal cracks between rocks never leak vision.
-	# A visibility ray reveals its first blocking tile; combat rays cannot hit
-	# through it. Buildings and rough terrain do not block either kind of ray.
+	# 超覆盖遍历：岩石间的对角缝隙绝不漏视野。视线束照亮其首个阻挡格；
+	# 战斗射线无法穿透该格。建筑与崎岖地形不阻挡任何一类射线。
 	var cell := Vector2i(from.floor())
 	var goal := Vector2i(to.floor())
 	if not contains(cell) or not contains(goal):
@@ -385,7 +383,7 @@ func preview_footprint(origin: Vector2i, footprint: Vector2i) -> Dictionary:
 		return {"ok": false, "reason": "占地尺寸无效", "cells": cells, "origin": origin, "footprint": footprint}
 	if not bounds.encloses(Rect2i(origin, footprint)):
 		reason = "超出地图边界"
-	# Global ordering: all terrain errors precede all overlap errors.
+	# 全局排序：所有地形错误优先于所有占用冲突错误。
 	for y: int in range(footprint.y):
 		for x: int in range(footprint.x):
 			var cell: Vector2i = origin + Vector2i(x, y)

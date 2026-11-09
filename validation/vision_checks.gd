@@ -1,5 +1,5 @@
 extends SceneTree
-## Run: godot --headless --path . --script validation/vision_checks.gd
+## 视野系统回归检查脚本。运行方式：godot --headless --path . --script validation/vision_checks.gd
 
 var _checks: int = 0
 var _failures: int = 0

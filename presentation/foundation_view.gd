@@ -1,7 +1,7 @@
 @tool
 class_name MechFoundationView
 extends Node2D
-## Disposable projection of snapshots; never writes simulation state.
+## 快照的一次性投影视图；绝不回写模拟状态。
 
 const CYAN := Color("72e9d0")
 const MAINBRAIN_REFERENCE_SIZE := Vector2(3, 3)
@@ -188,8 +188,7 @@ func _draw_enemy(entity: Dictionary, point: Vector2) -> void:
 		_draw_shelter_mark(point)
 
 
-## Prototype: a distinct heavy silhouette so "focus-fire it" reads at a glance
-## (waves-enemies.md §8.2); it also carries its own shelter aura marker.
+## 原型机：采用醒目的重型剪影，让"集火它"一眼可读（waves-enemies.md §8.2）；它还自带庇护光环标记。
 func _draw_prototype(entity: Dictionary, point: Vector2) -> void:
 	_draw_shadow(point, Vector2(26, 13))
 	var body := PackedVector2Array([point + Vector2(-18, -6), point + Vector2(-18, -34),
@@ -206,8 +205,7 @@ func _draw_prototype(entity: Dictionary, point: Vector2) -> void:
 		_draw_shelter_mark(point)
 
 
-## Enemies under an active shelter get a faint ring so the 50% reduction is
-## visible before the player commits fire.
+## 处于激活庇护下的敌人带一圈淡色圆环，让玩家在开火前就能看到 50% 减伤。
 func _draw_shelter_mark(point: Vector2) -> void:
 	draw_arc(point + Vector2(0, -10), 20.0, PI * 0.15, PI * 0.85, 16, Color("c9a0e8", 0.55), 2.0, true)
 
@@ -282,8 +280,7 @@ func _draw_cursor() -> void:
 
 
 func _draw_ruin(building: Dictionary, footprint: Vector2i) -> void:
-	# Destroyed base: a flat slab with cross marks; keeps the site clickable and
-	# clearly distinct from a live building. Skips body, bars and wall lines.
+	# 被摧毁的基地：带叉号标记的扁平底座，保持点位可点击，并与存活建筑明显区分；跳过主体、状态条与墙体连线。
 	var polygon: PackedVector2Array = MechIsoGeometry.footprint_polygon(building["origin"], footprint)
 	draw_colored_polygon(polygon, Color("3c4a53"))
 	draw_polyline(PackedVector2Array([polygon[0], polygon[2]]), Color("f27c78"), 2.0, true)

@@ -1,6 +1,6 @@
 class_name MechSimCore
 extends RefCounted
-## Authoritative session. Commands commit all state before notifying views.
+## 权威会话核心。命令先提交全部状态，然后才通知视图。
 
 signal state_changed
 
@@ -22,10 +22,10 @@ var _vision := MechVisionSystem.new()
 var _enemy_defs: Dictionary = {}
 var _tick_counter: int = 0
 
-## Marching player units emit weak movement noise every two seconds (staggered).
+## 行军中的玩家单位每两秒发一次微弱移动噪声（按实体错峰）。
 const MOVEMENT_NOISE_SECONDS: float = 2.0
-## Combat-state rescan interval: attacked buildings leave combat once no
-## enemy remains within MechBuildingState.THREAT_RADIUS (twice per second).
+## 交战状态复扫间隔：受击建筑在脚印 MechBuildingState.THREAT_RADIUS
+## 范围内无敌后才脱离交战（每秒两次）。
 const COMBAT_SCAN_SECONDS: float = 0.5
 var _settings: MechFoundationSettings
 var _unit_definitions: Dictionary[StringName, MechUnitDefinition] = {}
@@ -59,8 +59,8 @@ var _outcome: StringName = &"ongoing"
 var _alert: Dictionary = {}
 var _alert_sequence: int = 0
 
-# --perf stage accounting. Every value is microseconds; only updated while
-# profiling is enabled, so normal play pays no timer or dictionary cost.
+# --perf 阶段统计。所有数值单位为微秒；仅在启用性能分析时更新，
+# 正常游玩不承担任何计时器或字典开销。
 var _profile_tick_start: int = 0
 var _profile_mark_at: int = 0
 var _profile_tick_stages: Dictionary = {}
@@ -84,9 +84,8 @@ func shutdown() -> void:
 
 
 func _on_movement_finished() -> void:
-	# The registry emits once after the complete native batch, not per unit.
-	# Publish sight at the committed positions, including the last frame before
-	# pausing; source caching makes unchanged updates inexpensive.
+	# 注册表在整批原生移动完成后只发一次信号，而非每实体一次。
+	# 在已提交的位置发布视野（含暂停前的最后一帧）；源缓存让无变化的更新几乎零开销。
 	_finish_garrison_arrivals()
 	_sync_vision()
 	state_changed.emit()
@@ -125,9 +124,8 @@ func _profile_end() -> void:
 		_profile_worst = {"total_usec": total, "stages": _profile_tick_stages.duplicate()}
 
 
-## Returns and clears the accumulated stage breakdown for the presentation
-## perf line. The worst simulation tick is kept with its full stage split so a
-## remaining spike can be attributed without another run.
+## 取走并清空表现层性能行所需的累计阶段数据。最差模拟 tick 连同其完整
+## 阶段拆分一并保留，无需重跑即可归因残留的耗时尖峰。
 func consume_profile() -> Dictionary:
 	if not profiling_enabled or _profile_ticks == 0:
 		return {}
@@ -173,6 +171,7 @@ func tick_rate() -> int:
 	return _tick_rate
 
 
+## 装配全局设置并重置开局；返回配置是否成功（失败时进入错误态）。
 func configure(settings: MechFoundationSettings) -> bool:
 	var settings_error: String = _settings_error(settings)
 	if not settings_error.is_empty():
@@ -192,7 +191,7 @@ func configure(settings: MechFoundationSettings) -> bool:
 	_enemy_defs.clear()
 	for rules: MechEnemyDefinition in settings.enemy_definitions:
 		_enemy_defs[rules.enemy_id] = rules
-	# Combat noise flows to the threat system from every firing side.
+	# 每个开火方的战斗噪声都汇入威胁系统。
 	_enemies.configure_noise(_threat.note_combat)
 	_enemies.profiling_enabled = profiling_enabled
 	_units.combat_noise = _threat.note_combat
@@ -205,13 +204,13 @@ func configure(settings: MechFoundationSettings) -> bool:
 	return true
 
 
+## 执行一条命令：先校验，再按类型提交状态变更，最后统一刷新并广播。
 func execute_command(command: MechCommand, cancel_motion: bool = true) -> Dictionary:
 	var result: Dictionary = validate_command(command)
 	if not result["ok"]:
 		return result
-	# Player commands invalidate native avoidance submitted before the change.
-	# Automation keeps the current RVO batch so a 1s build/queue tick does not
-	# stutter every moving unit.
+	# 玩家命令使变更前提交的原生避让失效；自动化保留当前 RVO 批次，
+	# 避免每秒一次的建造/队列 tick 让所有移动单位卡顿。
 	if cancel_motion:
 		_registry.cancel_pending_motion()
 	match command.type:
@@ -278,8 +277,7 @@ func execute_command(command: MechCommand, cancel_motion: bool = true) -> Dictio
 			var building: MechBuildingState = _construction.get_building(command.payload["entity_id"])
 			var clearing: bool = building.phase == MechBuildingState.Phase.RUINED
 			if clearing:
-				# Clearing a base never refunds (values.md §7); paid_cost zero makes
-				# the demolition-completion refund path come out empty.
+				# 清基座绝不退款（values.md §7）；paid_cost 置零让拆除完成的退款路径自然为空。
 				building.paid_cost = MechResources.empty()
 			building.phase = MechBuildingState.Phase.DEMOLISHING
 			building.elapsed_demolition_ticks = 0
@@ -332,8 +330,7 @@ func execute_command(command: MechCommand, cancel_motion: bool = true) -> Dictio
 			building.built_hp = 1
 			building.waiting_for_clearance = false
 			building.reset_repair_state()
-			# A rebuild is fresh construction, but passable facilities must stay
-			# passable for their whole lifecycle.
+			# 重建是全新的施工，但可穿越设施在其整个生命周期内必须保持可穿越。
 			var passable: bool = building.definition.trap_kind != "none" or building.definition.slow_fence_ratio < 1.0
 			_grid.set_pass_through(building.entity_id, passable)
 			if building.definition.is_gate:
@@ -447,8 +444,8 @@ func execute_command(command: MechCommand, cancel_motion: bool = true) -> Dictio
 						if building.origin + Vector2i(x, y) in cells:
 							building.repair_manual_hold = false
 			result = {"ok": true, "reason": "", "region_id": region_id}
-	# Only commands that change occupancy, phase or vision sources need the
-	# fog/navigation refresh. Pause, move, production and repair toggles do not.
+	# 只有改变占用、阶段或视野源的命令才需要迷雾/导航刷新；
+	# 暂停、移动、生产与维修开关不需要。
 	if command.type in [
 		MechCommand.Type.PLACE_BUILDING, MechCommand.Type.PLACE_WALL_LINE,
 		MechCommand.Type.CANCEL_CONSTRUCTION, MechCommand.Type.DEMOLISH,
@@ -457,12 +454,13 @@ func execute_command(command: MechCommand, cancel_motion: bool = true) -> Dictio
 		_sync_navigation()
 		_sync_vision()
 	state_changed.emit()
-	# Internal pathfinding data never needs to leave the command executor.
+	# 内部寻路数据绝不外泄到命令执行器之外。
 	result.erase("path")
 	result.erase("origins")
 	return result
 
 
+## 纯校验入口：复用 execute_command 的前置检查但不产生任何变更。
 func validate_command(command: MechCommand) -> Dictionary:
 	if session_ended() and command.type not in [MechCommand.Type.RESET_SESSION, MechCommand.Type.LOAD_SCENARIO]:
 		return _reject("本局已结束，请重新开始或切换场景")
@@ -547,13 +545,14 @@ func validate_command(command: MechCommand) -> Dictionary:
 	return {"ok": true, "reason": ""}
 
 
+## 推进一个固定步长 tick：收入 → 施工 → 生产 → 敌我战斗 → 炮塔 → 移动 → 结算。
 func advance_one_tick() -> void:
 	if session_ended() or not _clock.advance():
 		return
 	_in_tick = true
 	if profiling_enabled:
 		_profile_begin()
-	# Income precedes completions: newly finished nodes start accruing next tick.
+	# 收入先于完工结算：新完工的节点从下一 tick 开始计息。
 	_economy.advance_income(_construction.all(), _tick_rate)
 	_minerals.advance(_construction.all(), _economy, _tick_rate)
 	_profile_mark(&"income")
@@ -597,11 +596,9 @@ func advance_one_tick() -> void:
 	_release_enemies()
 	_sync_vision()
 	_profile_mark(&"vision_pre")
-	# Noise emitted last tick reaches wanderers this tick (combat during the
-	# units/enemies passes below lands next tick).
+	# 上一 tick 发出的噪声本 tick 到达游荡敌（下方单位/敌人阶段中的战斗噪声则落在下一 tick）。
 	var noises: Array[Dictionary] = _threat.noises()
-	# Shelter sources are gathered once per tick; the damage entry re-checks hp
-	# so a prototype killed by earlier fire stops shielding later hits.
+	# 庇护源每 tick 收集一次；伤害入口复核 hp，被先手火力击杀的原型机不再庇护后续命中。
 	var shelters: Array[MechEntityState] = _collect_shelter_sources()
 	var unit_result: Dictionary = _units.advance(_registry, _grid, _navigation, _tick_rate, _vision)
 	for hit: Dictionary in unit_result["enemy_hits"]:
@@ -611,7 +608,7 @@ func advance_one_tick() -> void:
 	for hit: Dictionary in enemy_result["building_hits"]:
 		damage_building(hit["id"], hit["damage"])
 	for id: int in enemy_result["dead_units"]:
-		# Units destroyed by enemies feed infection at the wreck (values.md §14).
+		# 被敌人摧毁的单位在残骸处喂入感疫（values.md §14）。
 		var dead: MechEntityState = _registry.get_entity(id)
 		if dead != null and dead.unit_definition != null:
 			_infect_asset(dead.unit_definition.cost, dead.position)
@@ -622,12 +619,10 @@ func advance_one_tick() -> void:
 	if _trigger_traps():
 		_recompute_economy()
 	_profile_mark(&"enemies")
-	# Building deaths in this pass changed pass-through/occupancy; settle one
-	# navigation refresh for the whole batch instead of one per hit.
+	# 本阶段批量建筑死亡已改变穿越/占用；整批结算一次导航刷新，而非逐命中刷新。
 	_sync_navigation()
 	_profile_mark(&"nav_combat")
-	# Finish removal bookkeeping for this combat pass, but never fire towers or
-	# submit a new native movement batch after the core has fallen.
+	# 完成本战斗阶段的移除记账，但主脑陷落后绝不再开火或提交新的原生移动批次。
 	if session_ended():
 		_sync_vision()
 		_profile_mark(&"vision_post")
@@ -635,8 +630,7 @@ func advance_one_tick() -> void:
 		_in_tick = false
 		state_changed.emit()
 		return
-	# Towers fire after enemy movement; hits return as results and share the
-	# unit-kill removal bookkeeping (grid release, economy, navigation).
+	# 炮塔在敌方移动后开火；命中以结果返回，与单位击杀共用移除记账（释放格子、经济、导航）。
 	_sync_vision()
 	_profile_mark(&"vision_post")
 	var tower_hits: Array[Dictionary] = _towers.advance(_registry, _construction.all(), _tick_rate, _grid, _vision)
@@ -650,7 +644,7 @@ func advance_one_tick() -> void:
 	_profile_mark(&"towers")
 	_registry.step(_clock.step_seconds(), _grid)
 	_profile_mark(&"step")
-	# Marching units hum: the expansion itself attracts wanderers (values.md §13).
+	# 行军单位嗡鸣：扩张本身就会吸引游荡敌（values.md §13）。
 	_tick_counter += 1
 	var movement_noise_ticks: int = maxi(1, ceili(MOVEMENT_NOISE_SECONDS * _tick_rate))
 	for entity: MechEntityState in _registry.all():
@@ -661,10 +655,9 @@ func advance_one_tick() -> void:
 	_in_tick = false
 
 
-## First-slice victory gate (development-plan M6): every scheduled wave has
-## released, no wave enemy remains and nobody is still fighting — wandering
-## stragglers alone do not hold the session open. Infection builders count as
-## wave enemies; the training ground never schedules waves.
+## 首切片胜利门槛（development-plan M6）：所有排程波次已投放完毕、
+## 无波次敌人存活且无人交战——落单的游荡敌不阻止结算。
+## 感疫建造者计入波次敌人；训练场不排程波次。
 func _check_victory() -> void:
 	if _outcome != &"ongoing" or not _waves.exhausted():
 		return
@@ -677,18 +670,18 @@ func _check_victory() -> void:
 	_clock.set_paused(true)
 	_registry.suspend_motion()
 	print("[Billions Mech] session ended: victory; tick=", _clock.snapshot()["tick"])
-	# This runs at the very end of the tick, past every other emit; publish so
-	# the presentation layer opens the victory panel on this frame.
+	# 在 tick 最末尾、所有其他信号之后执行；立即发布让表现层在本帧打开胜利面板。
 	state_changed.emit()
 
 
 func spawn_diagnostic_enemy(enemy_id: StringName, position: Vector2) -> int:
-	# Performance-diagnostic entry point; normal gameplay only spawns via waves.
+	# 性能诊断入口；正常游玩只经波次生成敌人。
 	if not _enemy_defs.has(enemy_id):
 		return 0
 	return _enemies.create(_registry, _enemy_defs[enemy_id], position)
 
 
+## 导出整局只读快照（经济、可见实体、建筑、区域、波次与告警等），供表现层轮询。
 func snapshot() -> Dictionary:
 	var entities: Array[Dictionary] = []
 	var garrisoned_unit_ids: Array[int] = []
@@ -909,7 +902,7 @@ func _prepare_repair_stations() -> void:
 		if not _repair_stations_dirty:
 			return
 	var all: Array[MechBuildingState] = _construction.all()
-	# Reassignment is event-driven: damage, structural changes, or target full.
+	# 重分配由事件驱动：受击、结构变化或目标满员。
 	for building: MechBuildingState in all:
 		if building.repair_auto_source > 0:
 			building.repairing = false
@@ -1101,8 +1094,7 @@ func _validate_contract(command: MechCommand) -> Dictionary:
 	if command.type == MechCommand.Type.ACCEPT_CONTRACT:
 		var error: String = _contract_offer_error(dock)
 		return {"ok": true, "reason": ""} if error.is_empty() else _reject(error)
-	# Cancelling an existing paid order must remain possible after power or
-	# prerequisites are lost, including while demolition is pending.
+	# 断电或失去前置后仍必须可取消已付费订单，包括拆除待定期间。
 	if dock == null or dock.contract_unit_id == &"":
 		return _reject("没有未交付合同")
 	return {"ok": true, "reason": ""}
@@ -1205,8 +1197,7 @@ func _eject_all_garrison(bunker: MechBuildingState, forced: bool = false, infect
 			continue
 		var cell: Vector2i = _garrison_eject_cell(bunker)
 		if cell.x < 0:
-			# A voluntary exit waits for space; a destroyed/removed bunker cannot
-			# keep units hidden or teleport them across a surrounding wall.
+			# 主动撤离等待空位；被摧毁/移除的碉堡不能藏匿单位，也不能隔墙传送。
 			if forced:
 				if infect_losses:
 					_infect_asset(unit.unit_definition.cost, unit.position)
@@ -1260,7 +1251,7 @@ func _advance_dispatch_automation() -> void:
 		var cells: Dictionary = {}
 		for cell: Vector2i in region.get("cells", []):
 			cells[cell] = true
-		# Release tasks whose target is full, gone, or manually taken over.
+		# 释放目标满员、消失或被手动接管的任务。
 		for task_id: String in region.get("tasks", {}).keys():
 			if not task_id.begins_with("repair:"):
 				continue
@@ -1389,9 +1380,8 @@ func _upgrade_error_for(building: MechBuildingState) -> String:
 
 
 func _recompute_economy() -> void:
-	# Coverage is a connected-root graph, updated before economy reads it.
-	# Coverage revision is independent from occupancy/navigation revision, and
-	# production/unit changes never dirty it.
+	# 覆盖是以主脑为根的连通图，先于经济读取更新；覆盖修订号独立于占用/导航修订号，
+	# 生产与单位变化绝不弄脏它。
 	if _coverage_dirty:
 		var coverage_changes: Array[Vector2i] = _grid.recompute_coverage(_construction.all())
 		_coverage_dirty = false
@@ -1493,6 +1483,7 @@ func _spawn_unit(building: MechBuildingState, rally: Vector2i, unit_id: StringNa
 	return _units.spawn(building, rally, _unit_definitions[unit_id], _registry, _grid, _navigation)
 
 
+## 导出全部单位定义的只读快照，供 HUD 组装生产菜单。
 func _unit_catalog() -> Dictionary:
 	var result: Dictionary = {}
 	for id: StringName in _unit_definitions:
@@ -1500,9 +1491,8 @@ func _unit_catalog() -> Dictionary:
 	return result
 
 
-## Wave releases, wanderer backfill and infection arrive as spawn requests;
-## creation stays in the enemy system so definitions, teams and march orders
-## live in one place.
+## 波次投放、游荡敌补充与感疫都以生成请求到达；实体创建留在敌人系统，
+## 使定义、队伍与行军指令集中一处。
 func _release_enemies() -> void:
 	var requests: Array[Dictionary] = []
 	if _settings.campaign_mode:
@@ -1526,8 +1516,7 @@ func _infect_asset(cost: Dictionary, position: Vector2) -> void:
 	if requests.is_empty():
 		return
 	_release_spawns(requests)
-	# Terrain blind spots must not silently hide an infection event. Report a
-	# qualitative direction without exposing enemy counts or hidden positions.
+	# 地形盲区绝不能默默吞掉感疫事件；只报告定性方向，不暴露敌人数量或隐匿位置。
 	var center: Vector2 = Vector2(_map_definition.mainbrain_origin) + Vector2(_map_definition.mainbrain_footprint) * 0.5
 	var offset: Vector2 = position - center
 	var delta := Vector2(offset.x - offset.y, (offset.x + offset.y) * 0.5)
@@ -1592,8 +1581,8 @@ func _remove_entity(id: int) -> void:
 	_registry.remove(id)
 
 
-## Live shelter providers for this tick (prototype electromagnetic shelter,
-## waves-enemies.md §8.2); usually empty or a single prototype.
+## 本 tick 的活跃庇护源（原型机电磁庇护，waves-enemies.md §8.2）；
+## 通常为空或只有一台原型机。
 func _collect_shelter_sources() -> Array[MechEntityState]:
 	var sources: Array[MechEntityState] = []
 	for entity: MechEntityState in _registry.all():
@@ -1602,9 +1591,9 @@ func _collect_shelter_sources() -> Array[MechEntityState]:
 	return sources
 
 
-## Single damage entry for enemies (unit and tower fire alike): applies the
-## shelter reduction once per hit, then settles deaths through the shared
-## removal path. Infection never fires here; it only covers player assets.
+## 敌人的唯一伤害入口（单位与炮塔火力同样适用）：每次命中只应用一次
+## 庇护减伤，随后经共享移除路径结算死亡。感疫绝不在此触发；
+## 它只覆盖玩家资产。
 func _damage_enemy(entity_id: int, damage: int, shelters: Array[MechEntityState]) -> void:
 	var entity: MechEntityState = _registry.get_entity(entity_id)
 	if entity == null or entity.hp <= 0:
@@ -1615,13 +1604,11 @@ func _damage_enemy(entity_id: int, damage: int, shelters: Array[MechEntityState]
 	entity.hp = maxi(0, entity.hp - damage)
 	if entity.hp > 0:
 		return
-	# Enemies do not own grid cells or economy capacity; only the registry
-	# changes. Building deaths are settled by the caller's batched pass.
+	# 敌人不持有格子或经济容量；只有注册表变化。建筑死亡由调用方的批量阶段结算。
 	_remove_entity(entity_id)
 
 
-## The live shelter provider covering this entity, if any (first match wins;
-## overlapping shelters never stack).
+## 覆盖该实体的活跃庇护源（若有）；首个命中即生效，重叠庇护绝不叠加。
 func _sheltered_by(entity: MechEntityState, shelters: Array[MechEntityState]) -> MechEntityState:
 	for source: MechEntityState in shelters:
 		if source.hp > 0 and entity.position.distance_to(source.position) <= source.enemy_definition.shelter_radius:
@@ -1729,8 +1716,9 @@ func building_action_error(type: MechCommand.Type, entity_id: int) -> String:
 	return validate_command(MechCommand.new(type, {"entity_id": entity_id})).get("reason", "")
 
 
+## 敌方对建筑造成伤害的唯一权威入口；含交战、摧毁、感疫与废墟结算。
 func damage_building(entity_id: int, amount: int) -> Dictionary:
-	# Simulation-side hook for enemy attacks, not a player damage/debug command.
+	# 模拟侧的敌方攻击入口，不是玩家的伤害/调试命令。
 	if session_ended():
 		return _reject("本局已结束")
 	var building: MechBuildingState = _construction.get_building(entity_id)
@@ -1741,29 +1729,23 @@ func damage_building(entity_id: int, amount: int) -> Dictionary:
 	building.hp = maxi(0, building.hp - amount)
 	_repair_stations_dirty = true
 	_dispatch_dirty = true
-	# Any hit puts the building into combat: repairs stay suspended while
-	# enemies remain within THREAT_RADIUS (building-economy.md §4.2).
+	# 任何命中都使建筑进入交战：敌人在 THREAT_RADIUS 内时维修持续暂停（building-economy.md §4.2）。
 	building.threatened = true
 	if building.hp == 0:
-		# Infection: capacity-bearing assets destroyed by enemies spawn builders at
-		# the wreck plus a combat pulse (values.md §14). Demolish/cancel paths never
-		# pass through here, so controlled teardown stays infection-free.
+		# 感疫：带容量的资产被敌人摧毁时在残骸处生成建造者并发一次战斗脉冲（values.md §14）。
+		# 拆除/取消路径绝不经过这里，受控拆除不产生感疫。
 		var rules: MechBuildingDefinition = building.definition
 		if not rules.is_core and rules.infectable:
 			_infect_asset(rules.cost, Vector2(building.origin) + Vector2(rules.footprint) * 0.5)
 		if rules.is_core:
 			_remove_building(entity_id, MechResources.empty())
 		elif building.phase == MechBuildingState.Phase.CONSTRUCTING:
-			# Under-construction losses leave no base: nothing has sunk
-			# into the site yet, so it is removed outright.
+			# 施工中损失不留基座：尚未投入任何资源，直接整体移除。
 			_remove_building(entity_id, MechResources.empty())
 		else:
-			# Finished buildings leave an occupying base (building-economy.md
-			# §4.1): cells and the mineral binding stay held, but the base
-			# itself never blocks movement.
+			# 完工建筑留下占位基座（building-economy.md §4.1）：格子与矿点绑定保持持有，但基座绝不阻挡移动。
 			_ruin_building(building)
-	# Combat passes settle several hits in a row; direct callers outside the
-	# tick still get an immediate refresh, while the tick batches it once.
+	# 战斗阶段会连续结算多次命中；tick 外的直接调用方仍获得即时刷新，tick 内则批量结算一次。
 	if not _in_tick:
 		_sync_navigation()
 		_sync_vision()
@@ -1779,10 +1761,9 @@ func _ruin_building(building: MechBuildingState) -> void:
 	building.contract_paid = {}
 	building.contract_delivery_ticks = 0
 	building.mark_ruined()
-	# Destroyed factories lose their queue without refunds (building-economy.md §5).
+	# 被摧毁的工厂失去队列且不退款（building-economy.md §5）。
 	_economy.credit(_production.remove_factory(building.entity_id, false))
-	# The base keeps its cells for placement and mineral binding but never
-	# blocks movement (building-economy.md §4.1).
+	# 基座为放置与矿点绑定保留格子，但绝不阻挡移动（building-economy.md §4.1）。
 	_grid.set_pass_through(building.entity_id, true)
 	if _affects_coverage(building.definition):
 		_coverage_dirty = true
@@ -1795,9 +1776,8 @@ func _ruin_building(building: MechBuildingState) -> void:
 
 
 func _scan_combat_threat() -> void:
-	# Attacked buildings leave the combat state only once no enemy remains
-	# within THREAT_RADIUS of their footprint (building-economy.md §4.2).
-	# Enemies passing by later without attacking do not re-enter combat.
+	# 受击建筑只有在脚印 THREAT_RADIUS 范围内无敌后才脱离交战状态（building-economy.md §4.2）；
+	# 之后路过的敌人若未攻击，不会重新进入交战。
 	var radius_sq: float = MechBuildingState.THREAT_RADIUS * MechBuildingState.THREAT_RADIUS
 	for building: MechBuildingState in _construction.all():
 		if not building.threatened or building.hp <= 0:
@@ -1847,8 +1827,7 @@ func _place(id: StringName, origin: Vector2i) -> Dictionary:
 	if energy_type != &"none" and not _environment.reserve(
 		entity_id, energy_type, origin, rules.footprint
 	):
-		# Preview should have rejected this; keep the transaction atomic if the
-		# state raced between preview and commit.
+		# 预览本应拒绝；若预览与提交之间状态发生竞态，保持事务原子性。
 		_construction.remove(entity_id)
 		_grid.release(entity_id)
 		_minerals.release(entity_id)
@@ -1937,8 +1916,7 @@ func _validate_building_action(command: MechCommand) -> Dictionary:
 		MechCommand.Type.REBUILD:
 			if building.phase != MechBuildingState.Phase.RUINED:
 				return _reject("仅摧毁基座可重建")
-			# A base retains land/mineral ownership, but released its operational
-			# reservations. Rebuilding must reserve them again at its discounted cost.
+			# 基座保留土地/矿点所有权，但已释放运行预留；重建须按折扣价重新预留。
 			if not _grid.footprint_covered(building.origin, building.definition.footprint):
 				return _reject("超出供电覆盖")
 			if building.definition.requires_water and not _has_water_edge(building.definition, building.origin):
@@ -1973,8 +1951,7 @@ func _advance_upgrades() -> bool:
 		if building.upgrade_elapsed < building.upgrade_total:
 			continue
 		var target: MechBuildingDefinition = building.upgrade_target
-		# Smelter upgrades settle at the current burn-cycle boundary; the old
-		# recipe and power stay active until that cycle finishes.
+		# 冶炼站升级在当前燃烧周期边界结算；旧配方与发电保持到该周期结束。
 		if target.alloy_recipe != null and building.processing_active:
 			continue
 		var old_definition: MechBuildingDefinition = building.definition
@@ -2143,8 +2120,7 @@ func _repair_all_status() -> Dictionary:
 		return {"ok": false, "reason": "本局已结束", "count": 0}
 	var count: int = 0
 	for building: MechBuildingState in _construction.all():
-		# Any live building still in combat blocks the button; bases (hp == 0)
-		# are never attacked and never block.
+		# 任何仍在交战的存活建筑都会禁用按钮；基座（hp == 0）不会被攻击也不阻止。
 		if building.hp > 0 and building.threatened:
 			return {"ok": false, "reason": "有建筑交战中，周边 6 格内仍有敌军", "count": 0}
 		if building.phase == MechBuildingState.Phase.OPERATING and building.hp < building.definition.max_hp:
@@ -2190,9 +2166,7 @@ func _sync_navigation() -> void:
 			continue
 		if not unit["has_order"]:
 			continue
-		# Only re-run A* when the new occupancy actually cuts the remaining
-		# route. A wall built far away leaves the queued waypoints clear, so
-		# most moving units keep their path and avoid a per-building A* storm.
+		# 只有新占用真正切断剩余路线时才重跑 A*：远处建墙不影响已排队的路径点，大多数单位保留原路径，避免每次建墙引发全场 A* 风暴。
 		var path: PackedVector2Array = unit["path"]
 		if _path_is_blocked(position, path):
 			_profile_counter(&"nav_repath")
@@ -2225,7 +2199,7 @@ func _clear_building_footprint(building: MechBuildingState) -> bool:
 	var assignments: Dictionary[int, Vector2] = {}
 	var taken: Dictionary = {}
 	var displaced: Dictionary = {}
-	# Player units and wave enemies are both displaced on completion.
+	# 完工时玩家单位与波次敌人都会被挤出。
 	var movers: Array[MechEntityState] = []
 	for entity: MechEntityState in _registry.all():
 		if entity.hp > 0 and not entity.garrisoned and (entity.unit_definition != null or entity.enemy_definition != null):
@@ -2334,13 +2308,12 @@ func _reset() -> void:
 		target.hp = 200
 		target.max_hp = 200
 		_grid.try_occupy(id, cell, Vector2i.ONE)
-	# Reset vision before environment scoring so starting sources do not read a
-	# previous session's explored memory.
+	# 环境计分前先重置视野，避免开局视野源读到上一局的探索记忆。
 	_vision.reset(_grid)
 	_recompute_economy()
 	_navigation_revision = -1
 	_sync_navigation()
-	# Weighted march field toward the fixed mainbrain cell; rebuilt on building changes.
+	# 指向固定主脑格的加权行军场；建筑变化时重建。
 	_enemies.reset(_grid, _map_definition.mainbrain_origin + (brain.footprint - Vector2i.ONE) / 2, _construction.all())
 	_waves.reset(_grid, _map_definition, _settings.threat_enabled, _tick_rate)
 	_threat.reset(_grid, _map_definition, _settings.threat_enabled, _tick_rate)

@@ -1,6 +1,6 @@
 class_name MechFogView
 extends Node2D
-## One projected texture, rebuilt only when authoritative visibility changes.
+## 单张投影纹理，仅在权威可见性变化时重建。
 
 var _revision: int = -1
 var _generation: int = -1
@@ -9,6 +9,7 @@ var _polygon := PackedVector2Array()
 var _uvs := PackedVector2Array()
 
 
+## 依据视野快照重建迷雾纹理；修订号未变时直接跳过。
 func present(vision: Dictionary, generation: int, outline: PackedVector2Array) -> void:
 	if _revision == vision["revision"] and _generation == generation:
 		return
@@ -30,7 +31,7 @@ func present(vision: Dictionary, generation: int, outline: PackedVector2Array) -
 		_texture.update(image)
 	_polygon.clear()
 	_uvs.clear()
-	# Clip to the real map polygon, covering partial boundary tiles as well.
+	# 按真实地图多边形裁剪，同时覆盖不完整的边界格。
 	for point: Vector2 in outline:
 		_polygon.append(MechIsoGeometry.project(point))
 		_uvs.append(point / Vector2(dimensions))

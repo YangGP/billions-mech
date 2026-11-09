@@ -1,6 +1,6 @@
 class_name MechMapHud
 extends CanvasLayer
-## UI read models and intent signals; all authorization stays in sim.
+## HUD 的只读展示模型与意图信号；全部授权判定留在模拟层。
 
 signal pause_requested
 signal restart_requested

@@ -1,20 +1,23 @@
 class_name MechAlloyProcessing
 extends RefCounted
-## Thermal-smelter cycles. Fuel is paid atomically at start; metal is optional
-## once at start. A started cycle never takes more input and never refunds on
-## pause/coverage loss. Only an active demolition refunds the unspent cycle.
-## A completed cycle starts the next one in the same tick when fuel remains, so
-## a fueled smelter keeps continuous power instead of one-tick gaps.
+## 热能冶炼周期。燃料在开局一次性原子扣款；金属矿开局可选投入一次。
+## 已开始的周期不再接收投入，暂停或失去覆盖也不退款；
+## 只有主动拆除才退还未完成的周期投入。
+## 周期完成且燃料充足时在同一 tick 内开启下一周期，
+## 保证有燃料的冶炼站持续发电而不是隔 tick 断电。
 
+## 开局至今是否产出过合金（用于进度门槛判定）。
 var ever_produced_alloy: bool = false
 var produced_alloy: int = 0
 
 
+## 清空产出统计。
 func reset() -> void:
 	ever_produced_alloy = false
 	produced_alloy = 0
 
 
+## 尝试开启冶炼周期：一次性扣除燃料，金属充足时一并投入；任一不足则不开。
 func _try_start(building: MechBuildingState, recipe: MechAlloyRecipe, economy: MechEconomySystem, hz: int) -> bool:
 	if building.upgrade_target != null:
 		return false
@@ -35,6 +38,7 @@ func _try_start(building: MechBuildingState, recipe: MechAlloyRecipe, economy: M
 	return true
 
 
+## 推进所有冶炼站一个周期；返回是否有状态变化（触发快照刷新）。
 func advance(buildings: Array[MechBuildingState], economy: MechEconomySystem, hz: int) -> bool:
 	var changed: bool = false
 	for building: MechBuildingState in buildings:
@@ -66,7 +70,7 @@ func advance(buildings: Array[MechBuildingState], economy: MechEconomySystem, hz
 		building.processing_total = 0
 		building.processing_paid = MechResources.empty()
 		building.processing_power = 0
-		# A pending upgrade gets the next definition before any old-recipe cycle.
+		# 待升级的建筑先拿到新定义，避免再按旧配方开新周期。
 		if building.upgrade_target == null and _try_start(building, recipe, economy, hz):
 			pass
 		changed = true

@@ -1,17 +1,17 @@
 class_name MechTowerSystem
 extends RefCounted
-## Sentry-tower autofire (values.md §4/§11): an operating tower acquires the
-## nearest enemy in range only when its cooldown expires, amortizing the scan
-## cost to the firing moment. Hits return as results; SimCore applies damage,
-## removal and death bookkeeping. Only visible targets with terrain LOS qualify.
+## 哨戒炮塔自动开火（values.md §4/§11）：运行中的炮塔仅在冷却结束时才搜索
+## 射程内最近敌人，把扫描成本摊销到开火时刻。命中以结果列表返回；
+## 伤害、移除与死亡记账由 SimCore 统一执行。只有可见且地形通视的目标才有效。
 
-## Tracer lifetime in seconds; matches unit muzzle flashes.
+## 曳光弹显示时长（秒）；与单位枪口闪光保持一致。
 const SHOT_FLASH_SECONDS: float = 0.1
 
-## Combat-level noise emitter (set by SimCore); fired at each shot's impact point.
+## 战斗级噪声发射器（由 SimCore 注入）；每次命中的落点触发一次。
 var combat_noise: Callable = Callable()
 
 
+## 推进所有炮塔一个 tick，返回本 tick 的命中结果列表。
 func advance(registry: MechEntityRegistry, buildings: Array[MechBuildingState], hz: int, grid: MechGridState, vision: MechVisionSystem) -> Array[Dictionary]:
 	var hits: Array[Dictionary] = []
 	for building: MechBuildingState in buildings:
@@ -53,8 +53,7 @@ func advance(registry: MechEntityRegistry, buildings: Array[MechBuildingState], 
 
 
 func _nearest_enemy(registry: MechEntityRegistry, center: Vector2, range_cells: float, grid: MechGridState, vision: MechVisionSystem) -> MechEntityState:
-	# Team 2 covers wave enemies and practice targets; the training scenario
-	# doubles as the tower-fire test range.
+	# 队伍 2 同时覆盖波次敌人和练习靶；训练场景兼作炮塔火力的测试靶场。
 	var best: float = range_cells * range_cells
 	var result: MechEntityState
 	for entity: MechEntityState in registry.all():

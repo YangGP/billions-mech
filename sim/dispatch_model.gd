@@ -1,13 +1,15 @@
 class_name MechDispatchModel
 extends RefCounted
-## Pure-data region authorization model for P7a. It never mutates the world,
-## wallet or entity tables; automation consumers must issue normal commands.
+## P7a 的纯数据区域授权模型。绝不改动世界、钱包或实体表；
+## 自动化消费方必须通过常规命令生效。
 
 var _regions: Dictionary[int, Dictionary] = {}
 var _next_region_id: int = 1
+## 会话代号：重开局后旧授权全部失效。
 var _generation: int = 0
 
 
+## 清空全部区域并推进会话代号。
 func reset() -> void:
 	_regions.clear()
 	_next_region_id = 1
@@ -18,6 +20,7 @@ func generation() -> int:
 	return _generation
 
 
+## 创建区域并返回新 ID；预算上限、已提交与已花费各自独立记账。
 func create_region(cells: Array[Vector2i], budget_cap: Dictionary, name: String = "", enabled: bool = true) -> int:
 	var id: int = _next_region_id
 	_next_region_id += 1
@@ -45,8 +48,7 @@ func update_region(id: int, cells: Array[Vector2i], budget_cap: Dictionary, enab
 	_regions[id]["cells"] = cells.duplicate()
 	_regions[id]["budget_cap"] = MechResources.copy(budget_cap)
 	_regions[id]["enabled"] = enabled
-	# Re-authorizing does not erase already spent budget, otherwise toggling
-	# F8 would reset the cap and allow unbounded spending.
+	# 重新授权不抹除已花费预算，否则切换 F8 会重置上限、放开无限支出。
 	_regions[id]["spent"] = MechResources.copy(spent)
 	_regions[id]["failure_count"] = 0
 	_regions[id]["retry_at_tick"] = 0
@@ -62,10 +64,12 @@ func set_enabled(id: int, enabled: bool) -> bool:
 	return true
 
 
+## 失败后是否已到退避重试时间。
 func can_retry(id: int, tick: int) -> bool:
 	return _regions.has(id) and tick >= int(_regions[id].get("retry_at_tick", 0))
 
 
+## 记录一次失败并按指数退避安排重试（30 tick 起，上限 300）。
 func note_failure(id: int, tick: int) -> void:
 	if not _regions.has(id):
 		return
@@ -75,12 +79,14 @@ func note_failure(id: int, tick: int) -> void:
 	_regions[id]["retry_at_tick"] = tick + delay
 
 
+## 记录一次成功，清零失败计数与退避。
 func note_success(id: int) -> void:
 	if _regions.has(id):
 		_regions[id]["failure_count"] = 0
 		_regions[id]["retry_at_tick"] = 0
 
 
+## 预算提交：在 已花费＋已提交＋本次 上限内锁定一个任务；重复任务号拒绝。
 func commit(id: int, task_id: String, cost: Dictionary, generation: int) -> bool:
 	if not _regions.has(id) or not _regions[id]["enabled"] or generation != _generation or not MechResources.valid(cost):
 		return false
@@ -115,6 +121,7 @@ func rename_task(id: int, old_task: String, new_task: String) -> bool:
 	return true
 
 
+## 任务成交结算：提交转已花费，记录最近一次下单号与 tick。
 func settle(id: int, task_id: String, order_id: int = 0, tick: int = 0) -> bool:
 	if not _regions.has(id):
 		return false
@@ -135,6 +142,7 @@ func settle(id: int, task_id: String, order_id: int = 0, tick: int = 0) -> bool:
 	return true
 
 
+## 放弃任务：解除提交但不计为已花费（未成交）。
 func release(id: int, task_id: String) -> bool:
 	if not _regions.has(id):
 		return false
@@ -187,8 +195,8 @@ func snapshot() -> Dictionary:
 	return {"generation": _generation, "regions": regions}
 
 
-## Repair reservations are consumed only by a successful wallet transaction.
-## Extra damage may require a top-up; authorize it against the same cap.
+## 维修预留只在钱包交易成功时才消耗。额外损伤可能需要补价；
+## 补价部分仍按同一上限授权。
 func can_consume(id: int, task_id: String, cost: Dictionary) -> bool:
 	if not _regions.has(id) or not _regions[id]["enabled"] or not MechResources.valid(cost):
 		return false
@@ -204,6 +212,7 @@ func can_consume(id: int, task_id: String, cost: Dictionary) -> bool:
 	return true
 
 
+## 消耗维修预留：实际花费超出预留的部分计入已花费。
 func consume(id: int, task_id: String, cost: Dictionary) -> bool:
 	if not can_consume(id, task_id, cost):
 		return false
@@ -218,6 +227,7 @@ func consume(id: int, task_id: String, cost: Dictionary) -> bool:
 	return true
 
 
+## 退款冲减已花费（拆除退款回流区域预算）。
 func refund_spent(id: int, refund: Dictionary) -> void:
 	if not _regions.has(id) or not MechResources.valid(refund):
 		return
