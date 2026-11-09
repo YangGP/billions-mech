@@ -301,6 +301,18 @@ func is_pass_through(cell: Vector2i) -> bool:
 	return occupant != 0 and _pass_through.has(occupant)
 
 
+## 敌方碰撞的单次格查询：0可穿越，正数为建筑/占用者，-1为地形或界外。
+## 与occupant_at→terrain_at→is_pass_through相同优先级，不豁免玩家专用闸门。
+func enemy_blocker_at(cell: Vector2i) -> int:
+	if not contains(cell):
+		return -1
+	var index: int = _index(cell)
+	var occupant: int = _occupancy[index]
+	if occupant != 0:
+		return 0 if _pass_through.has(occupant) else occupant
+	return -1 if _terrain[index] == Terrain.OBSTACLE else 0
+
+
 func mobile_position_clear(point: Vector2, ignored_occupants: Dictionary = {}, friendly_pass: bool = false) -> bool:
 	if not point_inside(point):
 		return false

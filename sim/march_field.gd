@@ -25,10 +25,14 @@ var _cost := PackedFloat32Array()
 var _dist := PackedFloat32Array()
 ## 每格连通到的源格索引（局部场用于边界出口溯源）。
 var _source := PackedInt32Array()
+## 积分结果发布后不再修改；主线程按需记住每格相同的方向，避免逐单位重复扫8邻域。
+## 后台构建/边界积分只读取cost_at，不访问本缓存。
+var _flow_cache: Dictionary = {}
 
 
 ## 重建指向 goal 的全局静态场：只用地形，不含建筑与占用。
 func rebuild(grid: MechGridState, goal: Vector2i) -> void:
+	_flow_cache.clear()
 	_dimensions = grid.dimensions()
 	_goal = goal
 	_bounds = Rect2i(Vector2i.ZERO, _dimensions)
@@ -44,6 +48,7 @@ func rebuild(grid: MechGridState, goal: Vector2i) -> void:
 ## 局部场遵守实时占用，只分配自己的边界。
 ## 可选的 source_values 把边界出口接到静态全局场上。
 func rebuild_local(grid: MechGridState, bounds: Rect2i, sources: Array[Vector2i], source_values: Dictionary = {}, ignored_occupants: Dictionary = {}) -> void:
+	_flow_cache.clear()
 	_bounds = bounds.intersection(Rect2i(Vector2i.ZERO, grid.dimensions()))
 	_dimensions = _bounds.size
 	var count: int = _dimensions.x * _dimensions.y
@@ -87,6 +92,14 @@ func is_reachable(cell: Vector2i) -> bool:
 ## 从 cell 指向其距离最小的 8 邻域的单位方向。在目标格、不可达格
 ## 或没有严格更低邻居时返回 ZERO。
 func flow_at(cell: Vector2i) -> Vector2:
+	if _flow_cache.has(cell):
+		return _flow_cache[cell]
+	var direction: Vector2 = _calculate_flow(cell)
+	_flow_cache[cell] = direction
+	return direction
+
+
+func _calculate_flow(cell: Vector2i) -> Vector2:
 	var here: float = cost_at(cell)
 	if not is_finite(here) or here <= 0.0:
 		return Vector2.ZERO

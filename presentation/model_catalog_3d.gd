@@ -122,7 +122,8 @@ func _building(id: String, footprint: Vector2, level: int, connections: int) -> 
 			_block(Vector3(0.78, 0.28 if fence else 0.65, 0.3), Vector3(0, 0.3 if fence else 0.48, 0), metal)
 			for direction: int in range(4):
 				if (connections & (1 << direction)) != 0:
-					var offset: Vector2 = [Vector2.UP, Vector2.RIGHT, Vector2.DOWN, Vector2.LEFT][direction]
+					# 快照位序为左、上、右、下，与地图XZ坐标一致。
+					var offset: Vector2 = [Vector2.LEFT, Vector2.UP, Vector2.RIGHT, Vector2.DOWN][direction]
 					_block(Vector3(0.3 if offset.x == 0 else 0.55, 0.22 if fence else 0.6, 0.55 if offset.x == 0 else 0.3), Vector3(offset.x * 0.3, 0.4, offset.y * 0.3), metal)
 			if fence:
 				_block(Vector3(0.8, 0.07, 0.08), Vector3(0, 0.55, 0), CYAN)

@@ -264,3 +264,9 @@ Agent-Reach 不可用，使用网页检索。先核对高星候选 [Mindustry](h
 继续检索[官方Godot示例](https://github.com/godotengine/godot-demo-projects)（MIT）与官方[SurfaceTool](https://docs.godotengine.org/en/stable/tutorials/3d/procedural_geometry/surfacetool.html)、[MultiMesh](https://docs.godotengine.org/en/stable/tutorials/performance/using_multimesh.html)及TorusMesh/Label3D能力。没有引入外部RTS/模型运行框架，未下载或按外部源码重写核心算法；Agent-Reach工具未提供，使用网页检索。完整框架仍与本项目纯数据模拟/既有命令不兼容，理由沿用第28节。
 
 实际直接复用原生PrimitiveMesh、ArrayMesh、SurfaceTool.append_from/index进行模型组合合并，MultiMesh进行批量绘制，TorusMesh绘制范围，AABB/Camera3D/Plane处理显示包围盒/投影/拾取，Control/字体绘制集中血条/进度，Label3D显示少量静态地标，ImageTexture和ShaderMaterial接线迷雾/建造预览。自写部分为每类内容的几何组合、不可变规则绑定、快照状态到颜色/标记的映射、HUD可用矩形和实例缓存生命周期。没有新增模型合并求解器、相机数学、导航、避让或模拟算法；工程模型由项目自行定义，不包含外部美术素材或逐实体玩法节点。用户暂缓3D肖像，保留其2D依赖，详见[接入记录](../validation/3d-content-and-overlay.md)。
+
+## 30. 模型拾取与既有敌军性能（2026-11-10）
+
+在第28–29节已评估的Godot示例/RTS框架边界下，继续核对[Godot TriangleMesh](https://docs.godotengine.org/en/stable/classes/class_trianglemesh.html)及[引擎TriangleMesh源码](https://github.com/godotengine/godot/blob/master/core/math/triangle_mesh.cpp)。实际直接调用Mesh.get_faces、TriangleMesh.create_from_faces/intersect_ray和Transform3D.affine_inverse；BVH构建和三角形求交均由引擎执行。项目只按共享模型懒建缓存、转换实例空间、过滤迷雾及选择最近命中；不新建自写BVH/射线求解器，也不复制外部源码。
+
+性能侧继续使用已接入的Crusade Steering和MechMarchField，不替换导航/积分/分离算法。改动为既有空间桶的区域索引、原方向结果按格记忆和vendor半径外邻居的预过滤；候选顺序、距离/LOS和最终分离判定保留。碰撞查询直接读取原网格权威数组，将原占用→地形→穿越检查合为一次，结果用整型分类传递；原圆格碰撞与受阻回退顺序不变。压力预置调用现有敌军创建接口，用原生hash/sort给出固定分布；计时沿用Time/Performance。没有新增vendor或测试脚本。检查范围及尚未达到的2000敌军预算见[记录](../validation/3d-interaction-performance.md)。

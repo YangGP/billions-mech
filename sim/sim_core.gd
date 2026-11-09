@@ -149,6 +149,15 @@ func consume_profile() -> Dictionary:
 		counters[String(name)] = int(_profile_counters[name])
 	var result: Dictionary = {"ticks": _profile_ticks, "stages": stages,
 		"worst": worst, "counters": counters}
+	var population: Dictionary = {"enemies": 0, "player_units": 0, "buildings": 0, "ruins": 0}
+	for entity: MechEntityState in _registry.all():
+		if entity.hp > 0 and entity.team == 2:
+			population["enemies"] += 1
+		elif entity.hp > 0 and entity.team == 1 and entity.unit_definition != null:
+			population["player_units"] += 1
+	for building: MechBuildingState in _construction.all():
+		population["buildings" if building.hp > 0 else "ruins"] += 1
+	result["population"] = population
 	_profile_stage_totals.clear()
 	_profile_stage_peaks.clear()
 	_profile_counters.clear()
@@ -676,6 +685,39 @@ func spawn_diagnostic_enemy(enemy_id: StringName, position: Vector2) -> int:
 	if profiling_enabled:
 		print("[enemy:diagnostic] ", enemy_id, " at=", position)
 	return _enemies.create(_registry, _enemy_defs[enemy_id], position)
+
+
+## 既有压力入口的可复现初始负载；不改钱包/图纸/波次，也不向正常玩家命令开放。
+func seed_diagnostic_population(desired: int, seed_value: int = 20261110) -> Dictionary:
+	var occupied: Dictionary = {}
+	var alive: int = 0
+	for entity: MechEntityState in _registry.all():
+		if entity.hp <= 0 or entity.garrisoned:
+			continue
+		occupied[Vector2i(entity.position.floor())] = true
+		if entity.team == 2:
+			alive += 1
+	var needed: int = maxi(0, clampi(desired, 0, 4000) - alive)
+	if needed == 0 or session_ended():
+		return {"spawned": 0, "enemies": alive, "seed": seed_value}
+	var candidates: Array[Vector2i] = []
+	var dimensions: Vector2i = _grid.dimensions()
+	var center: Vector2 = Vector2(_map_definition.mainbrain_origin) + Vector2(_map_definition.mainbrain_footprint) * 0.5
+	for y: int in range(dimensions.y):
+		for x: int in range(dimensions.x):
+			var cell := Vector2i(x, y)
+			if _grid.is_walkable(cell) and not occupied.has(cell) and (Vector2(cell) + Vector2.ONE * 0.5).distance_squared_to(center) >= 28.0 * 28.0:
+				candidates.append(cell)
+	# 原生排序/哈希给出固定、分散的顺序，不消耗导演或全局随机数流。
+	candidates.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
+		return hash(Vector3i(a.x, a.y, seed_value)) < hash(Vector3i(b.x, b.y, seed_value)))
+	var spawned: int = mini(needed, candidates.size())
+	for index: int in range(spawned):
+		var slot: int = index % 20
+		var enemy_id: StringName = &"builder_worn" if slot < 12 else (&"builder" if slot < 19 else &"recycler")
+		_enemies.create(_registry, _enemy_defs[enemy_id], Vector2(candidates[index]) + Vector2.ONE * 0.5)
+	state_changed.emit()
+	return {"spawned": spawned, "enemies": alive + spawned, "seed": seed_value}
 
 
 ## 导出整局只读快照（经济、可见实体、建筑、区域、波次与告警等），供表现层轮询。
@@ -2252,7 +2294,7 @@ func _wall_connections(origin: Vector2i) -> int:
 	var directions: Array[Vector2i] = [Vector2i.LEFT, Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN]
 	for index: int in range(directions.size()):
 		var adjacent: MechBuildingState = _construction.get_building(_grid.occupant_at(origin + directions[index]))
-		if adjacent != null and adjacent.hp > 0 and adjacent.definition.building_id == &"armored_wall":
+		if adjacent != null and adjacent.hp > 0 and adjacent.definition.is_wall_like():
 			mask |= 1 << index
 	return mask
 

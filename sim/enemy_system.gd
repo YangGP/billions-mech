@@ -16,6 +16,8 @@ const VISION_SCAN_INTERVAL: int = 5
 const FOG_DECISION_STRIDE: int = 4
 ## 活跃分桶的格子边长：资产周围按此粒度标记保持全速决策的区域。
 const ACTIVITY_BUCKET_SIZE: int = 16
+## 目标查询只访问包含单位/非墙建筑格的区域；底层候选格与原选敌顺序不变。
+const TARGET_REGION_SIZE: int = 4
 ## 闻声聚拢：朝声响重寻路的间隔秒数与视为已抵达的距离。
 const CONVERGE_REPATH_SECONDS: float = 2.0
 const CONVERGE_ARRIVAL: float = 1.0
@@ -36,6 +38,9 @@ const SHUFFLE_RADIUS: int = 2
 const SHUFFLE_ATTEMPTS: int = 6
 
 var profiling_enabled: bool = false
+var _target_regions: Dictionary = {}
+var _sample_motion: bool = false
+var _motion_profile: Dictionary = {}
 var _field := MechMarchField.new()
 ## 长足者共享忽略崎岖权重的静态场，不为单个敌人重复求解。
 var _wall_field := MechMarchField.new()
@@ -81,6 +86,7 @@ func reset(_grid: MechGridState, goal: Vector2i, _buildings: Array[MechBuildingS
 
 ## 等待所有在途 Worker 任务完成并丢弃其结果，保证安全销毁。
 func shutdown() -> void:
+	_target_regions.clear()
 	if _field_task >= 0:
 		WorkerThreadPool.wait_for_task_completion(_field_task)
 		_field_task = -1
@@ -448,6 +454,10 @@ func create(registry: MechEntityRegistry, rules: MechEnemyDefinition, position: 
 ## 推进一步模拟，返回单位死亡与建筑伤害；SimCore 通过自己的移除/经济
 ## 路径应用它们，使退款与容量遵循既有规则。
 func advance(registry: MechEntityRegistry, grid: MechGridState, navigation: MechGridNavigation, buildings: Array[MechBuildingState], hz: int, noises: Array[Dictionary], vision: MechVisionSystem) -> Dictionary:
+	_sample_motion = profiling_enabled and _tick_counter % hz == 0
+	if _sample_motion:
+		_motion_profile = {"direction": 0, "steering": 0, "collision": 0, "target": 0, "marching": 0}
+	var sample_start: int = Time.get_ticks_usec() if _sample_motion else 0
 	var result: Dictionary = {"dead_units": [], "building_hits": []}
 	var buildings_by_id: Dictionary = {}
 	var building_cells: Dictionary = {}
@@ -486,8 +496,15 @@ func advance(registry: MechEntityRegistry, grid: MechGridState, navigation: Mech
 			if not enemy_buckets.has(enemy_cell):
 				enemy_buckets[enemy_cell] = []
 			enemy_buckets[enemy_cell].append(entity)
+	_index_target_regions(unit_buckets, non_wall_cells)
+	if _sample_motion:
+		_motion_profile["prepare"] = Time.get_ticks_usec() - sample_start
+		sample_start = Time.get_ticks_usec()
 	_refresh_field(grid, buildings, need_main, need_wall)
 	_refresh_zones(enemies, buildings, grid, active_regions)
+	if _sample_motion:
+		_motion_profile["navigation"] = Time.get_ticks_usec() - sample_start
+		sample_start = Time.get_ticks_usec()
 	var dt: float = 1.0 / float(hz)
 	var tick: int = _tick_counter
 	_tick_counter += 1
@@ -507,6 +524,9 @@ func advance(registry: MechEntityRegistry, grid: MechGridState, navigation: Mech
 			non_wall_cells if passes_walls else building_cells, unit_buckets, enemy_buckets, noises, tick, dt, hz, result, coarse)
 		# 效果衰减在上一步移动之后应用，恰好覆盖完整的本步时长。
 		enemy.advance_slow()
+	if _sample_motion:
+		_motion_profile["loop"] = Time.get_ticks_usec() - sample_start
+		print("[perf:enemy-sample] tick=%d usec=%s" % [tick, _motion_profile])
 	return result
 
 
@@ -548,7 +568,10 @@ func _advance_one(enemy: MechEntityState, registry: MechEntityRegistry, grid: Me
 			building_cells, unit_buckets, enemy_buckets, dt, hz, result)
 		return
 	if scan_due:
+		var started: int = Time.get_ticks_usec() if _sample_motion else 0
 		var target: int = _acquire_target(enemy, grid, unit_buckets, building_cells, buildings_by_id)
+		if _sample_motion:
+			_motion_profile["target"] += Time.get_ticks_usec() - started
 		if target > 0:
 			_engage(enemy, target)
 	if enemy.order == &"engaged":
@@ -655,14 +678,24 @@ func _advance_marching(enemy: MechEntityState, grid: MechGridState, enemy_bucket
 	if not zone.is_empty() and zone["dirty"]:
 		return
 	var field: MechMarchField = _march_field_for(enemy)
+	var started: int = Time.get_ticks_usec() if _sample_motion else 0
 	var flow_dir: Vector2 = field.flow_at(cell)
 	if flow_dir == Vector2.ZERO:
 		flow_dir = (_wall_field if enemy.enemy_definition.ignores_rough else _field).flow_at(cell)
 	var speed: float = _movement_speed(enemy, grid, cell)
+	if _sample_motion:
+		_motion_profile["direction"] += Time.get_ticks_usec() - started
+		_motion_profile["marching"] += 1
+		started = Time.get_ticks_usec()
 	var desired: Vector2 = Steering.desired_velocity(flow_dir, speed)
 	var separation: Vector2 = Steering.separation(enemy.position, _separation_neighbors(enemy, enemy_buckets), SEPARATION_RADIUS)
 	var velocity: Vector2 = Steering.combine(desired, separation, FLOW_WEIGHT, SEPARATION_WEIGHT, speed)
+	if _sample_motion:
+		_motion_profile["steering"] += Time.get_ticks_usec() - started
+		started = Time.get_ticks_usec()
 	_guarded_step(enemy, velocity, flow_dir, speed, dt, grid, buildings_by_id)
+	if _sample_motion:
+		_motion_profile["collision"] += Time.get_ticks_usec() - started
 
 
 ## 交战推进：目标存活则射程内站定输出，否则追击。
@@ -749,7 +782,7 @@ func _chase(enemy: MechEntityState, grid: MechGridState, navigation: MechGridNav
 		enemy.finish_path_if_arrived()
 		return
 	var direction: Vector2 = enemy.position.direction_to(enemy.next_waypoint())
-	var separation: Vector2 = Steering.separation(enemy.position, _separation_neighbors(enemy, enemy_buckets), separation_radius)
+	var separation: Vector2 = Steering.separation(enemy.position, _separation_neighbors(enemy, enemy_buckets, separation_radius), separation_radius)
 	var blended: Vector2 = Steering.combine(velocity, separation, FLOW_WEIGHT, SEPARATION_WEIGHT, speed)
 	_guarded_step(enemy, blended, direction, speed, dt, grid, buildings_by_id)
 	enemy.finish_path_if_arrived()
@@ -813,37 +846,35 @@ func _acquire_target(enemy: MechEntityState, grid: MechGridState, unit_buckets: 
 	var best_building_distance: float = INF
 	var best_tower: int = 0
 	var best_tower_distance: float = INF
-	for y: int in range(center.y - radius, center.y + radius + 1):
-		for x: int in range(center.x - radius, center.x + radius + 1):
-			var cell := Vector2i(x, y)
-			for unit: MechEntityState in unit_buckets.get(cell, []):
-				# 同一轮推进中，先手敌人可能已击杀此单位。
-				if unit.hp <= 0:
-					continue
-				var distance: float = enemy.position.distance_squared_to(unit.position)
-				if distance <= vision_squared and distance < best_distance and grid.terrain_line_clear(enemy.position, unit.position):
-					best = unit.entity_id
-					best_distance = distance
-			var building_id: int = building_cells.get(cell, 0)
-			if building_id <= 0:
+	for cell: Vector2i in _target_cells(center, radius):
+		for unit: MechEntityState in unit_buckets.get(cell, []):
+			# 同一轮推进中，先手敌人可能已击杀此单位。
+			if unit.hp <= 0:
 				continue
-			var building: MechBuildingState = buildings_by_id.get(building_id)
-			if building == null or building.definition.is_wall_like():
-				continue
-			var cell_center := Vector2(cell) + Vector2(0.5, 0.5)
-			var building_distance: float = enemy.position.distance_squared_to(cell_center)
-			if building_distance > vision_squared or not grid.terrain_line_clear(enemy.position, cell_center):
-				continue
-			if rules.prefers_towers and building.definition.attack_damage > 0 and building_distance < best_tower_distance:
-				best_tower = building_id
-				best_tower_distance = building_distance
-			# 行军者只有已在射程内才直接锁定建筑；
-			# 更远的接近交给可达且有界的绕行场处理。
-			if not enemy.wandering and not _building_in_range(enemy, building, rules.attack_range):
-				continue
-			if building_distance < best_building_distance:
-				best_building = building_id
-				best_building_distance = building_distance
+			var distance: float = enemy.position.distance_squared_to(unit.position)
+			if distance <= vision_squared and distance < best_distance and grid.terrain_line_clear(enemy.position, unit.position):
+				best = unit.entity_id
+				best_distance = distance
+		var building_id: int = building_cells.get(cell, 0)
+		if building_id <= 0:
+			continue
+		var building: MechBuildingState = buildings_by_id.get(building_id)
+		if building == null or building.definition.is_wall_like():
+			continue
+		var cell_center := Vector2(cell) + Vector2(0.5, 0.5)
+		var building_distance: float = enemy.position.distance_squared_to(cell_center)
+		if building_distance > vision_squared or not grid.terrain_line_clear(enemy.position, cell_center):
+			continue
+		if rules.prefers_towers and building.definition.attack_damage > 0 and building_distance < best_tower_distance:
+			best_tower = building_id
+			best_tower_distance = building_distance
+		# 行军者只有已在射程内才直接锁定建筑；
+		# 更远的接近交给可达且有界的绕行场处理。
+		if not enemy.wandering and not _building_in_range(enemy, building, rules.attack_range):
+			continue
+		if building_distance < best_building_distance:
+			best_building = building_id
+			best_building_distance = building_distance
 	if best_tower > 0:
 		return best_tower
 	if rules.prefers_buildings and best_building > 0:
@@ -851,13 +882,56 @@ func _acquire_target(enemy: MechEntityState, grid: MechGridState, unit_buckets: 
 	return best if best > 0 else best_building
 
 
-func _separation_neighbors(enemy: MechEntityState, enemy_buckets: Dictionary) -> PackedVector2Array:
+func _target_region(cell: Vector2i) -> Vector2i:
+	return Vector2i(floori(float(cell.x) / TARGET_REGION_SIZE), floori(float(cell.y) / TARGET_REGION_SIZE))
+
+
+func _index_target_regions(unit_buckets: Dictionary, non_wall_cells: Dictionary) -> void:
+	_target_regions.clear()
+	for cell: Vector2i in non_wall_cells:
+		var region: Vector2i = _target_region(cell)
+		if not _target_regions.has(region):
+			_target_regions[region] = []
+		_target_regions[region].append(cell)
+	for cell: Vector2i in unit_buckets:
+		if non_wall_cells.has(cell):
+			continue
+		var region: Vector2i = _target_region(cell)
+		if not _target_regions.has(region):
+			_target_regions[region] = []
+		_target_regions[region].append(cell)
+
+
+func _target_cells(center: Vector2i, radius: int) -> Array[Vector2i]:
+	var result: Array[Vector2i] = []
+	var bounds := Rect2i(center - Vector2i(radius, radius), Vector2i(radius * 2 + 1, radius * 2 + 1))
+	var low: Vector2i = _target_region(bounds.position)
+	var high: Vector2i = _target_region(bounds.end - Vector2i.ONE)
+	for y: int in range(low.y, high.y + 1):
+		for x: int in range(low.x, high.x + 1):
+			var region := Vector2i(x, y)
+			if not _target_regions.has(region):
+				continue
+			for cell: Vector2i in _target_regions[region]:
+				if bounds.has_point(cell):
+					result.append(cell)
+	# 保留原先y/x逐格扫描的并列目标顺序，建筑的每个足迹格仍单独接受距离/LOS校验。
+	result.sort_custom(func(a: Vector2i, b: Vector2i) -> bool: return a.x < b.x if a.y == b.y else a.y < b.y)
+	return result
+
+
+func _separation_neighbors(enemy: MechEntityState, enemy_buckets: Dictionary, radius: float = SEPARATION_RADIUS) -> PackedVector2Array:
 	var result := PackedVector2Array()
 	var cell := Vector2i(enemy.position.floor())
+	# 只剔除vendor必定忽略的远邻，边缘留余量，最终半径判定仍交给原Steering。
+	var radius_squared: float = radius * radius + 0.000001
 	for y: int in range(cell.y - 1, cell.y + 2):
 		for x: int in range(cell.x - 1, cell.x + 2):
-			for other: MechEntityState in enemy_buckets.get(Vector2i(x, y), []):
-				if other.entity_id != enemy.entity_id:
+			var neighbors: Variant = enemy_buckets.get(Vector2i(x, y))
+			if neighbors == null:
+				continue
+			for other: MechEntityState in neighbors:
+				if other.entity_id != enemy.entity_id and enemy.position.distance_squared_to(other.position) <= radius_squared:
 					result.append(other.position)
 	return result
 
@@ -871,20 +945,20 @@ func _guarded_step(enemy: MechEntityState, velocity: Vector2, direction: Vector2
 	if velocity.length_squared() <= 0.0:
 		return
 	var ignore_walls: bool = enemy.enemy_definition.passes_walls
-	var blocker: Dictionary = _blocker_at(enemy.position + velocity * dt, grid, buildings_by_id, ignore_walls)
-	if blocker["building"] > 0:
-		_engage(enemy, blocker["building"])
+	var blocker: int = _blocker_at(enemy.position + velocity * dt, grid, buildings_by_id, ignore_walls)
+	if blocker > 0:
+		_engage(enemy, blocker)
 		return
-	if not blocker["blocked"]:
+	if blocker == 0:
 		enemy.position += velocity * dt
 		return
 	var direct: Vector2 = Steering.desired_velocity(direction, speed) * dt
 	if direct.length_squared() > 0.0:
 		blocker = _blocker_at(enemy.position + direct, grid, buildings_by_id, ignore_walls)
-		if blocker["building"] > 0:
-			_engage(enemy, blocker["building"])
+		if blocker > 0:
+			_engage(enemy, blocker)
 			return
-		if not blocker["blocked"]:
+		if blocker == 0:
 			enemy.position += direct
 			return
 	_slide_step(enemy, direction, speed, dt, grid, buildings_by_id)
@@ -914,11 +988,11 @@ func _slide_step(enemy: MechEntityState, direction: Vector2, speed: float, dt: f
 		if to_center.length_squared() <= 0.0:
 			continue
 		var candidate: Vector2 = enemy.position + to_center.normalized() * minf(speed * dt, to_center.length())
-		var blocker: Dictionary = _blocker_at(candidate, grid, buildings_by_id, ignore_walls)
-		if blocker["building"] > 0:
-			_engage(enemy, blocker["building"])
+		var blocker: int = _blocker_at(candidate, grid, buildings_by_id, ignore_walls)
+		if blocker > 0:
+			_engage(enemy, blocker)
 			return
-		if blocker["blocked"]:
+		if blocker < 0:
 			continue
 		best_cost = cost
 		best_position = candidate
@@ -929,29 +1003,29 @@ func _slide_step(enemy: MechEntityState, direction: Vector2, speed: float, dt: f
 ## 圆形碰撞体检查，与网格移动规则保持一致；对阻挡者分类，
 ## 以便调用方转而交战建筑。非建筑占用者按静态墙处理。
 ## 穿墙单位把装甲墙格子视为空地（以正常速度通行）。
-func _blocker_at(point: Vector2, grid: MechGridState, buildings_by_id: Dictionary, ignore_walls: bool = false) -> Dictionary:
+## 返回0可移动，正数交战建筑ID，-1静态阻挡；避免每个移动步分配字典。
+func _blocker_at(point: Vector2, grid: MechGridState, buildings_by_id: Dictionary, ignore_walls: bool = false) -> int:
 	if not grid.point_inside(point):
-		return {"blocked": true, "building": 0}
+		return -1
 	var radius: float = MechGridState.MOBILE_RADIUS
 	var low := Vector2i((point - Vector2.ONE * radius).floor())
 	var high := Vector2i((point + Vector2.ONE * radius).floor())
 	for y: int in range(low.y, high.y + 1):
 		for x: int in range(low.x, high.x + 1):
 			var cell := Vector2i(x, y)
-			var occupant: int = grid.occupant_at(cell)
-			var solid_terrain: bool = occupant == 0 and grid.terrain_at(cell) == MechGridState.Terrain.OBSTACLE
-			if (occupant == 0 and not solid_terrain) or grid.is_pass_through(cell):
+			var occupant: int = grid.enemy_blocker_at(cell)
+			if occupant == 0:
 				continue
 			if occupant > 0 and buildings_by_id.has(occupant):
 				var blocking: MechBuildingState = buildings_by_id[occupant]
 				if ignore_walls and blocking.definition.is_wall_like():
 					continue
 				if _circle_hits_cell(point, cell, radius):
-					return {"blocked": true, "building": occupant}
+					return occupant
 				continue
 			if _circle_hits_cell(point, cell, radius):
-				return {"blocked": true, "building": 0}
-	return {"blocked": false, "building": 0}
+				return -1
+	return 0
 
 
 func _circle_hits_cell(point: Vector2, cell: Vector2i, radius: float) -> bool:

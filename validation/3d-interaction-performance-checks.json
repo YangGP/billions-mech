@@ -1,0 +1,887 @@
+{
+  "date": "2026-11-10",
+  "engine": "4.7.2.stable.steam.ed1daf0bf",
+  "mode": "headless; fixed-fps 60; quit-after 600 engine frames",
+  "map": "content/maps/development_basin_128.tres",
+  "seed": 20261110,
+  "scope": "CPU simulation short run; no visible enemies in measured windows; not rendered FPS or full mixed population acceptance",
+  "checks": {
+    "script_check_only": 58,
+    "existing_vision_checks": 49,
+    "vision_failures": 0,
+    "normal_frames": 300,
+    "campaign_frames": 300,
+    "diagnostic_stress_frames": 1800,
+    "native_movie_frames": 180,
+    "diagnostic_stress_final_frames": 3600,
+    "diagnostic_stress_defeat_tick": 1678,
+    "diagnostic_stress_frozen_after_defeat": true,
+    "changed_collision_scripts_rechecked": [
+      "sim/grid_state.gd",
+      "sim/enemy_system.gd"
+    ]
+  },
+  "manual_input_verified": false,
+  "portraits_3d_deferred": true,
+  "target_2000_30hz_passed": false,
+  "runs": {
+    "baseline-2000": {
+      "log": ".godot\\3d-refinement-baseline-2000.log",
+      "samples": [
+        {
+          "fps": 59.5,
+          "draw_calls": 0.0,
+          "sim_cpu_ms": 51.854,
+          "view_cpu_ms": 1.991,
+          "native_nav_ms": 5.79,
+          "sim_peak_ms": 65.267,
+          "view_peak_ms": 7.643,
+          "frame_peak_ms": 33.333,
+          "tick": 60.0,
+          "paused": "false",
+          "ended": "false",
+          "population": {
+            "enemies": 2000,
+            "player_units": 2,
+            "buildings": 19,
+            "ruins": 0
+          },
+          "visible_enemies": 0
+        },
+        {
+          "fps": 60.0,
+          "draw_calls": 0.0,
+          "sim_cpu_ms": 57.02,
+          "view_cpu_ms": 2.088,
+          "native_nav_ms": 0.624,
+          "sim_peak_ms": 70.111,
+          "view_peak_ms": 4.479,
+          "frame_peak_ms": 16.667,
+          "tick": 121.0,
+          "paused": "false",
+          "ended": "false",
+          "population": {
+            "enemies": 2002,
+            "player_units": 2,
+            "buildings": 19,
+            "ruins": 0
+          },
+          "visible_enemies": 0
+        },
+        {
+          "fps": 60.0,
+          "draw_calls": 0.0,
+          "sim_cpu_ms": 59.389,
+          "view_cpu_ms": 2.386,
+          "native_nav_ms": 2.498,
+          "sim_peak_ms": 68.684,
+          "view_peak_ms": 26.518,
+          "frame_peak_ms": 16.667,
+          "tick": 181.0,
+          "paused": "false",
+          "ended": "false",
+          "population": {
+            "enemies": 2004,
+            "player_units": 2,
+            "buildings": 19,
+            "ruins": 0
+          },
+          "visible_enemies": 0
+        },
+        {
+          "fps": 60.0,
+          "draw_calls": 0.0,
+          "sim_cpu_ms": 61.938,
+          "view_cpu_ms": 2.235,
+          "native_nav_ms": 2.284,
+          "sim_peak_ms": 78.075,
+          "view_peak_ms": 5.851,
+          "frame_peak_ms": 16.667,
+          "tick": 242.0,
+          "paused": "false",
+          "ended": "false",
+          "population": {
+            "enemies": 2006,
+            "player_units": 2,
+            "buildings": 19,
+            "ruins": 0
+          },
+          "visible_enemies": 0
+        }
+      ],
+      "script_errors": []
+    },
+    "optimized-2000": {
+      "log": ".godot\\3d-refinement-optimized-2000.log",
+      "samples": [
+        {
+          "fps": 59.5,
+          "draw_calls": 0.0,
+          "sim_cpu_ms": 46.163,
+          "view_cpu_ms": 1.932,
+          "native_nav_ms": 0.775,
+          "sim_peak_ms": 57.311,
+          "view_peak_ms": 5.173,
+          "frame_peak_ms": 33.333,
+          "tick": 60.0,
+          "paused": "false",
+          "ended": "false",
+          "population": {
+            "enemies": 2000,
+            "player_units": 2,
+            "buildings": 19,
+            "ruins": 0
+          },
+          "visible_enemies": 0
+        },
+        {
+          "fps": 60.0,
+          "draw_calls": 0.0,
+          "sim_cpu_ms": 52.08,
+          "view_cpu_ms": 2.056,
+          "native_nav_ms": 0.594,
+          "sim_peak_ms": 65.493,
+          "view_peak_ms": 4.849,
+          "frame_peak_ms": 16.667,
+          "tick": 121.0,
+          "paused": "false",
+          "ended": "false",
+          "population": {
+            "enemies": 2002,
+            "player_units": 2,
+            "buildings": 19,
+            "ruins": 0
+          },
+          "visible_enemies": 0
+        },
+        {
+          "fps": 60.0,
+          "draw_calls": 0.0,
+          "sim_cpu_ms": 53.302,
+          "view_cpu_ms": 2.324,
+          "native_nav_ms": 2.512,
+          "sim_peak_ms": 64.192,
+          "view_peak_ms": 26.771,
+          "frame_peak_ms": 16.667,
+          "tick": 181.0,
+          "paused": "false",
+          "ended": "false",
+          "population": {
+            "enemies": 2004,
+            "player_units": 2,
+            "buildings": 19,
+            "ruins": 0
+          },
+          "visible_enemies": 0
+        },
+        {
+          "fps": 60.0,
+          "draw_calls": 0.0,
+          "sim_cpu_ms": 54.938,
+          "view_cpu_ms": 2.219,
+          "native_nav_ms": 2.226,
+          "sim_peak_ms": 62.792,
+          "view_peak_ms": 6.502,
+          "frame_peak_ms": 16.667,
+          "tick": 242.0,
+          "paused": "false",
+          "ended": "false",
+          "population": {
+            "enemies": 2006,
+            "player_units": 2,
+            "buildings": 19,
+            "ruins": 0
+          },
+          "visible_enemies": 0
+        }
+      ],
+      "script_errors": []
+    },
+    "flowcache-2000": {
+      "log": ".godot\\3d-refinement-flowcache-2000.log",
+      "samples": [
+        {
+          "fps": 59.5,
+          "draw_calls": 0.0,
+          "sim_cpu_ms": 34.908,
+          "view_cpu_ms": 1.949,
+          "native_nav_ms": 5.996,
+          "sim_peak_ms": 51.316,
+          "view_peak_ms": 5.021,
+          "frame_peak_ms": 33.333,
+          "tick": 60.0,
+          "paused": "false",
+          "ended": "false",
+          "population": {
+            "enemies": 2000,
+            "player_units": 2,
+            "buildings": 19,
+            "ruins": 0
+          },
+          "visible_enemies": 0
+        },
+        {
+          "fps": 60.0,
+          "draw_calls": 0.0,
+          "sim_cpu_ms": 37.043,
+          "view_cpu_ms": 2.037,
+          "native_nav_ms": 0.491,
+          "sim_peak_ms": 39.809,
+          "view_peak_ms": 4.291,
+          "frame_peak_ms": 16.667,
+          "tick": 121.0,
+          "paused": "false",
+          "ended": "false",
+          "population": {
+            "enemies": 2002,
+            "player_units": 2,
+            "buildings": 19,
+            "ruins": 0
+          },
+          "visible_enemies": 0
+        },
+        {
+          "fps": 60.0,
+          "draw_calls": 0.0,
+          "sim_cpu_ms": 39.328,
+          "view_cpu_ms": 2.381,
+          "native_nav_ms": 2.277,
+          "sim_peak_ms": 49.818,
+          "view_peak_ms": 26.338,
+          "frame_peak_ms": 16.667,
+          "tick": 181.0,
+          "paused": "false",
+          "ended": "false",
+          "population": {
+            "enemies": 2004,
+            "player_units": 2,
+            "buildings": 19,
+            "ruins": 0
+          },
+          "visible_enemies": 0
+        },
+        {
+          "fps": 60.0,
+          "draw_calls": 0.0,
+          "sim_cpu_ms": 40.238,
+          "view_cpu_ms": 2.204,
+          "native_nav_ms": 2.57,
+          "sim_peak_ms": 51.629,
+          "view_peak_ms": 5.846,
+          "frame_peak_ms": 16.667,
+          "tick": 242.0,
+          "paused": "false",
+          "ended": "false",
+          "population": {
+            "enemies": 2006,
+            "player_units": 2,
+            "buildings": 19,
+            "ruins": 0
+          },
+          "visible_enemies": 0
+        }
+      ],
+      "script_errors": []
+    },
+    "neighbors-2000": {
+      "log": ".godot\\3d-refinement-neighbors-2000.log",
+      "samples": [
+        {
+          "fps": 59.5,
+          "draw_calls": 0.0,
+          "sim_cpu_ms": 32.557,
+          "view_cpu_ms": 1.88,
+          "native_nav_ms": 6.097,
+          "sim_peak_ms": 49.124,
+          "view_peak_ms": 5.187,
+          "frame_peak_ms": 33.333,
+          "tick": 60.0,
+          "paused": "false",
+          "ended": "false",
+          "population": {
+            "enemies": 2000,
+            "player_units": 2,
+            "buildings": 19,
+            "ruins": 0
+          },
+          "visible_enemies": 0
+        },
+        {
+          "fps": 60.0,
+          "draw_calls": 0.0,
+          "sim_cpu_ms": 34.738,
+          "view_cpu_ms": 1.991,
+          "native_nav_ms": 0.47,
+          "sim_peak_ms": 37.283,
+          "view_peak_ms": 4.927,
+          "frame_peak_ms": 16.667,
+          "tick": 121.0,
+          "paused": "false",
+          "ended": "false",
+          "population": {
+            "enemies": 2002,
+            "player_units": 2,
+            "buildings": 19,
+            "ruins": 0
+          },
+          "visible_enemies": 0
+        },
+        {
+          "fps": 60.0,
+          "draw_calls": 0.0,
+          "sim_cpu_ms": 36.314,
+          "view_cpu_ms": 2.281,
+          "native_nav_ms": 2.189,
+          "sim_peak_ms": 39.659,
+          "view_peak_ms": 26.006,
+          "frame_peak_ms": 16.667,
+          "tick": 181.0,
+          "paused": "false",
+          "ended": "false",
+          "population": {
+            "enemies": 2004,
+            "player_units": 2,
+            "buildings": 19,
+            "ruins": 0
+          },
+          "visible_enemies": 0
+        },
+        {
+          "fps": 60.0,
+          "draw_calls": 0.0,
+          "sim_cpu_ms": 37.763,
+          "view_cpu_ms": 2.143,
+          "native_nav_ms": 2.27,
+          "sim_peak_ms": 41.421,
+          "view_peak_ms": 5.694,
+          "frame_peak_ms": 16.667,
+          "tick": 242.0,
+          "paused": "false",
+          "ended": "false",
+          "population": {
+            "enemies": 2006,
+            "player_units": 2,
+            "buildings": 19,
+            "ruins": 0
+          },
+          "visible_enemies": 0
+        }
+      ],
+      "script_errors": []
+    },
+    "final-2000": {
+      "log": ".godot\\3d-refinement-final-2000.log",
+      "samples": [
+        {
+          "fps": 59.5,
+          "draw_calls": 0.0,
+          "sim_cpu_ms": 32.757,
+          "view_cpu_ms": 1.863,
+          "native_nav_ms": 5.684,
+          "sim_peak_ms": 48.108,
+          "view_peak_ms": 4.782,
+          "frame_peak_ms": 33.333,
+          "tick": 60.0,
+          "paused": "false",
+          "ended": "false",
+          "population": {
+            "enemies": 2000,
+            "player_units": 2,
+            "buildings": 19,
+            "ruins": 0
+          },
+          "visible_enemies": 0,
+          "pick": {
+            "center_id": "1",
+            "cpu_ms": "0.272"
+          }
+        },
+        {
+          "fps": 60.0,
+          "draw_calls": 0.0,
+          "sim_cpu_ms": 34.717,
+          "view_cpu_ms": 1.947,
+          "native_nav_ms": 0.583,
+          "sim_peak_ms": 38.551,
+          "view_peak_ms": 4.253,
+          "frame_peak_ms": 16.667,
+          "tick": 121.0,
+          "paused": "false",
+          "ended": "false",
+          "population": {
+            "enemies": 2002,
+            "player_units": 2,
+            "buildings": 19,
+            "ruins": 0
+          },
+          "visible_enemies": 0,
+          "pick": {
+            "center_id": "1",
+            "cpu_ms": "0.034"
+          }
+        },
+        {
+          "fps": 60.0,
+          "draw_calls": 0.0,
+          "sim_cpu_ms": 36.347,
+          "view_cpu_ms": 2.24,
+          "native_nav_ms": 2.196,
+          "sim_peak_ms": 38.644,
+          "view_peak_ms": 26.18,
+          "frame_peak_ms": 16.667,
+          "tick": 181.0,
+          "paused": "false",
+          "ended": "false",
+          "population": {
+            "enemies": 2004,
+            "player_units": 2,
+            "buildings": 19,
+            "ruins": 0
+          },
+          "visible_enemies": 0,
+          "pick": {
+            "center_id": "1",
+            "cpu_ms": "0.030"
+          }
+        },
+        {
+          "fps": 60.0,
+          "draw_calls": 0.0,
+          "sim_cpu_ms": 38.939,
+          "view_cpu_ms": 2.134,
+          "native_nav_ms": 2.211,
+          "sim_peak_ms": 55.353,
+          "view_peak_ms": 5.725,
+          "frame_peak_ms": 16.667,
+          "tick": 242.0,
+          "paused": "false",
+          "ended": "false",
+          "population": {
+            "enemies": 2006,
+            "player_units": 2,
+            "buildings": 19,
+            "ruins": 0
+          },
+          "visible_enemies": 0,
+          "pick": {
+            "center_id": "1",
+            "cpu_ms": "0.035"
+          }
+        }
+      ],
+      "script_errors": []
+    },
+    "final-1000": {
+      "log": ".godot\\3d-refinement-final-1000.log",
+      "samples": [
+        {
+          "fps": 59.5,
+          "draw_calls": 0.0,
+          "sim_cpu_ms": 16.067,
+          "view_cpu_ms": 1.447,
+          "native_nav_ms": 5.755,
+          "sim_peak_ms": 48.772,
+          "view_peak_ms": 4.103,
+          "frame_peak_ms": 33.333,
+          "tick": 60.0,
+          "paused": "false",
+          "ended": "false",
+          "population": {
+            "enemies": 1000,
+            "player_units": 2,
+            "buildings": 19,
+            "ruins": 0
+          },
+          "visible_enemies": 0,
+          "pick": {
+            "center_id": "1",
+            "cpu_ms": "0.285"
+          }
+        },
+        {
+          "fps": 60.0,
+          "draw_calls": 0.0,
+          "sim_cpu_ms": 16.805,
+          "view_cpu_ms": 1.495,
+          "native_nav_ms": 0.365,
+          "sim_peak_ms": 22.974,
+          "view_peak_ms": 3.405,
+          "frame_peak_ms": 16.667,
+          "tick": 121.0,
+          "paused": "false",
+          "ended": "false",
+          "population": {
+            "enemies": 1002,
+            "player_units": 2,
+            "buildings": 19,
+            "ruins": 0
+          },
+          "visible_enemies": 0,
+          "pick": {
+            "center_id": "1",
+            "cpu_ms": "0.030"
+          }
+        },
+        {
+          "fps": 60.0,
+          "draw_calls": 0.0,
+          "sim_cpu_ms": 17.218,
+          "view_cpu_ms": 1.811,
+          "native_nav_ms": 2.006,
+          "sim_peak_ms": 19.368,
+          "view_peak_ms": 24.906,
+          "frame_peak_ms": 16.667,
+          "tick": 181.0,
+          "paused": "false",
+          "ended": "false",
+          "population": {
+            "enemies": 1004,
+            "player_units": 2,
+            "buildings": 19,
+            "ruins": 0
+          },
+          "visible_enemies": 0,
+          "pick": {
+            "center_id": "1",
+            "cpu_ms": "0.031"
+          }
+        },
+        {
+          "fps": 60.0,
+          "draw_calls": 0.0,
+          "sim_cpu_ms": 17.993,
+          "view_cpu_ms": 1.707,
+          "native_nav_ms": 2.07,
+          "sim_peak_ms": 25.387,
+          "view_peak_ms": 5.368,
+          "frame_peak_ms": 16.667,
+          "tick": 242.0,
+          "paused": "false",
+          "ended": "false",
+          "population": {
+            "enemies": 1006,
+            "player_units": 2,
+            "buildings": 19,
+            "ruins": 0
+          },
+          "visible_enemies": 0,
+          "pick": {
+            "center_id": "1",
+            "cpu_ms": "0.030"
+          }
+        }
+      ],
+      "script_errors": []
+    },
+    "blocker-2000": {
+      "log": ".godot\\3d-refinement-blocker-2000.log",
+      "samples": [
+        {
+          "fps": 59.5,
+          "draw_calls": 0.0,
+          "sim_cpu_ms": 30.29,
+          "view_cpu_ms": 1.866,
+          "native_nav_ms": 5.754,
+          "sim_peak_ms": 45.141,
+          "view_peak_ms": 4.834,
+          "frame_peak_ms": 33.333,
+          "tick": 60.0,
+          "paused": "false",
+          "ended": "false",
+          "population": {
+            "enemies": 2000,
+            "player_units": 2,
+            "buildings": 19,
+            "ruins": 0
+          },
+          "visible_enemies": 0,
+          "pick": {
+            "center_id": "1",
+            "cpu_ms": "0.275"
+          }
+        },
+        {
+          "fps": 60.0,
+          "draw_calls": 0.0,
+          "sim_cpu_ms": 31.943,
+          "view_cpu_ms": 1.966,
+          "native_nav_ms": 0.588,
+          "sim_peak_ms": 35.366,
+          "view_peak_ms": 5.453,
+          "frame_peak_ms": 16.667,
+          "tick": 121.0,
+          "paused": "false",
+          "ended": "false",
+          "population": {
+            "enemies": 2002,
+            "player_units": 2,
+            "buildings": 19,
+            "ruins": 0
+          },
+          "visible_enemies": 0,
+          "pick": {
+            "center_id": "1",
+            "cpu_ms": "0.034"
+          }
+        },
+        {
+          "fps": 60.0,
+          "draw_calls": 0.0,
+          "sim_cpu_ms": 33.715,
+          "view_cpu_ms": 2.254,
+          "native_nav_ms": 2.405,
+          "sim_peak_ms": 45.493,
+          "view_peak_ms": 25.833,
+          "frame_peak_ms": 16.667,
+          "tick": 181.0,
+          "paused": "false",
+          "ended": "false",
+          "population": {
+            "enemies": 2004,
+            "player_units": 2,
+            "buildings": 19,
+            "ruins": 0
+          },
+          "visible_enemies": 0,
+          "pick": {
+            "center_id": "1",
+            "cpu_ms": "0.034"
+          }
+        },
+        {
+          "fps": 60.0,
+          "draw_calls": 0.0,
+          "sim_cpu_ms": 34.849,
+          "view_cpu_ms": 2.125,
+          "native_nav_ms": 2.206,
+          "sim_peak_ms": 39.387,
+          "view_peak_ms": 5.538,
+          "frame_peak_ms": 16.667,
+          "tick": 242.0,
+          "paused": "false",
+          "ended": "false",
+          "population": {
+            "enemies": 2006,
+            "player_units": 2,
+            "buildings": 19,
+            "ruins": 0
+          },
+          "visible_enemies": 0,
+          "pick": {
+            "center_id": "1",
+            "cpu_ms": "0.036"
+          }
+        }
+      ],
+      "script_errors": []
+    },
+    "blocker-value-2000": {
+      "log": ".godot\\3d-refinement-blocker-value-2000.log",
+      "samples": [
+        {
+          "fps": 59.5,
+          "draw_calls": 0.0,
+          "sim_cpu_ms": 29.308,
+          "view_cpu_ms": 1.848,
+          "native_nav_ms": 6.114,
+          "sim_peak_ms": 46.112,
+          "view_peak_ms": 5.079,
+          "frame_peak_ms": 33.333,
+          "tick": 60.0,
+          "paused": "false",
+          "ended": "false",
+          "population": {
+            "enemies": 2000,
+            "player_units": 2,
+            "buildings": 19,
+            "ruins": 0
+          },
+          "visible_enemies": 0,
+          "pick": {
+            "center_id": "1",
+            "cpu_ms": "0.282"
+          }
+        },
+        {
+          "fps": 60.0,
+          "draw_calls": 0.0,
+          "sim_cpu_ms": 30.761,
+          "view_cpu_ms": 1.962,
+          "native_nav_ms": 0.586,
+          "sim_peak_ms": 34.342,
+          "view_peak_ms": 4.294,
+          "frame_peak_ms": 16.667,
+          "tick": 121.0,
+          "paused": "false",
+          "ended": "false",
+          "population": {
+            "enemies": 2002,
+            "player_units": 2,
+            "buildings": 19,
+            "ruins": 0
+          },
+          "visible_enemies": 0,
+          "pick": {
+            "center_id": "1",
+            "cpu_ms": "0.035"
+          }
+        },
+        {
+          "fps": 60.0,
+          "draw_calls": 0.0,
+          "sim_cpu_ms": 32.524,
+          "view_cpu_ms": 2.287,
+          "native_nav_ms": 5.545,
+          "sim_peak_ms": 41.943,
+          "view_peak_ms": 25.792,
+          "frame_peak_ms": 16.667,
+          "tick": 181.0,
+          "paused": "false",
+          "ended": "false",
+          "population": {
+            "enemies": 2004,
+            "player_units": 2,
+            "buildings": 19,
+            "ruins": 0
+          },
+          "visible_enemies": 0,
+          "pick": {
+            "center_id": "1",
+            "cpu_ms": "0.030"
+          }
+        },
+        {
+          "fps": 60.0,
+          "draw_calls": 0.0,
+          "sim_cpu_ms": 33.715,
+          "view_cpu_ms": 2.106,
+          "native_nav_ms": 2.201,
+          "sim_peak_ms": 38.219,
+          "view_peak_ms": 5.844,
+          "frame_peak_ms": 16.667,
+          "tick": 242.0,
+          "paused": "false",
+          "ended": "false",
+          "population": {
+            "enemies": 2006,
+            "player_units": 2,
+            "buildings": 19,
+            "ruins": 0
+          },
+          "visible_enemies": 0,
+          "pick": {
+            "center_id": "1",
+            "cpu_ms": "0.035"
+          }
+        }
+      ],
+      "script_errors": []
+    },
+    "blocker-value-1000": {
+      "log": ".godot\\3d-refinement-blocker-value-1000.log",
+      "samples": [
+        {
+          "fps": 59.5,
+          "draw_calls": 0.0,
+          "sim_cpu_ms": 14.914,
+          "view_cpu_ms": 1.462,
+          "native_nav_ms": 5.655,
+          "sim_peak_ms": 38.022,
+          "view_peak_ms": 4.181,
+          "frame_peak_ms": 33.333,
+          "tick": 60.0,
+          "paused": "false",
+          "ended": "false",
+          "population": {
+            "enemies": 1000,
+            "player_units": 2,
+            "buildings": 19,
+            "ruins": 0
+          },
+          "visible_enemies": 0,
+          "pick": {
+            "center_id": "1",
+            "cpu_ms": "0.279"
+          }
+        },
+        {
+          "fps": 60.0,
+          "draw_calls": 0.0,
+          "sim_cpu_ms": 14.856,
+          "view_cpu_ms": 1.515,
+          "native_nav_ms": 0.406,
+          "sim_peak_ms": 16.774,
+          "view_peak_ms": 3.302,
+          "frame_peak_ms": 16.667,
+          "tick": 121.0,
+          "paused": "false",
+          "ended": "false",
+          "population": {
+            "enemies": 1002,
+            "player_units": 2,
+            "buildings": 19,
+            "ruins": 0
+          },
+          "visible_enemies": 0,
+          "pick": {
+            "center_id": "1",
+            "cpu_ms": "0.029"
+          }
+        },
+        {
+          "fps": 60.0,
+          "draw_calls": 0.0,
+          "sim_cpu_ms": 15.324,
+          "view_cpu_ms": 1.782,
+          "native_nav_ms": 2.136,
+          "sim_peak_ms": 18.987,
+          "view_peak_ms": 24.623,
+          "frame_peak_ms": 16.667,
+          "tick": 181.0,
+          "paused": "false",
+          "ended": "false",
+          "population": {
+            "enemies": 1004,
+            "player_units": 2,
+            "buildings": 19,
+            "ruins": 0
+          },
+          "visible_enemies": 0,
+          "pick": {
+            "center_id": "1",
+            "cpu_ms": "0.029"
+          }
+        },
+        {
+          "fps": 60.0,
+          "draw_calls": 0.0,
+          "sim_cpu_ms": 15.957,
+          "view_cpu_ms": 1.71,
+          "native_nav_ms": 2.347,
+          "sim_peak_ms": 19.961,
+          "view_peak_ms": 4.687,
+          "frame_peak_ms": 16.667,
+          "tick": 242.0,
+          "paused": "false",
+          "ended": "false",
+          "population": {
+            "enemies": 1006,
+            "player_units": 2,
+            "buildings": 19,
+            "ruins": 0
+          },
+          "visible_enemies": 0,
+          "pick": {
+            "center_id": "1",
+            "cpu_ms": "0.034"
+          }
+        }
+      ],
+      "script_errors": []
+    }
+  },
+  "final_implementation_runs": [
+    "blocker-value-2000",
+    "blocker-value-1000"
+  ]
+}

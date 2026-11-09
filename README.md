@@ -26,6 +26,7 @@ godot --path .
 | `run.bat -- --perf` | 输出模拟、表现和导航耗时及阶段峰值 |
 | `run.bat -- --overview` | 启动时查看全图总览 |
 | `run.bat -- --stress --perf` | 既有建拆、探索和诊断战斗压力入口 |
+| `run.bat -- --stress --stress-enemies=2000` | 首次模拟步后补足指定敌军总量并开启性能日志；固定种子，仍需核对可见数量和实际耗时 |
 
 默认采用固定时间、有限四波配置：9:30 预告首波，10:00 开始出兵；并非已调平衡的正式战役。逻辑模拟 30 Hz，默认窗口及逻辑视口 1920×1080。
 
@@ -65,7 +66,7 @@ godot --path .
 - [机械敌人设计稿](docs/enemy-roster.md)：普通建造者三形态/回收者与五类精英已接入，长足者可穿墙，旧原型机已删除；[接入与验证记录](validation/enemy-integration.md)。
 - [验证索引](validation/README.md)、[0.5.89 审核修复](validation/review-fixes-0.5.89.md)、[当前原生画面](validation/screens/review-0.5.89-hud.png)。
 
-本轮47个活动脚本解析、既有视野回归49/49、普通/战役启动、扩展压力及加速首波运行无脚本错误；详情和帧数见[接入记录](validation/enemy-integration.md)。原生工具不可用，新敌人的实际画面/交互、完整四波/战役及规模平衡仍待验收，不能由启动或历史截图替代。
+最新58个运行目录脚本（含vendor）解析、既有视野回归49/49、普通/战役启动和诊断压力运行无脚本错误。实际三维渲染及模型射线求交已检查；真实鼠标/键盘交互、完整四波/战役与综合规模性能仍待验收，详见[三维交互与性能记录](validation/3d-interaction-performance.md)。短时2000敌军模拟仍超过30Hz单步预算，不能用无头固定FPS证明流畅。
 
 ## 工程结构
 
@@ -82,4 +83,4 @@ validation/      有效验证记录、专题证据和地图生成材料
 archive/         非运行依赖的旧原型场景与素材
 ```
 
-编辑入口为 `scenes/main.tscn`；唯一玩法配置为 `content/development_128.tres`，地图为 `content/maps/development_basin_128.tres`。旧前哨、旧开局和训练场已移除。已删除的旧文档可从 Git 历史追溯。
+编辑入口为 `scenes/main_3d.tscn`，`scenes/main.tscn`暂留2D对照；唯一玩法配置为 `content/development_128.tres`，地图为 `content/maps/development_basin_128.tres`。旧前哨、旧开局和训练场已移除。已删除的旧文档可从 Git 历史追溯。

@@ -24,6 +24,8 @@ var _last_map_revision: int = -1
 var _stress_mode: bool = false
 var _stress_timer: float = 0.0
 var _stress_step: int = 0
+var _stress_enemies: int = 0
+var _stress_population_generation: int = -1
 var _session_logged: bool = false
 var _selected_dispatch_region: int = 0
 var _last_coverage_revision: int = -1
@@ -82,6 +84,12 @@ func _ready() -> void:
 	window.position = position
 	_stress_mode = OS.get_cmdline_user_args().has("--stress")
 	_perf_enabled = OS.get_cmdline_user_args().has("--perf")
+	if _stress_mode:
+		for argument: String in OS.get_cmdline_user_args():
+			if argument.begins_with("--stress-enemies="):
+				_stress_enemies = clampi(argument.get_slice("=", 1).to_int(), 0, 4000)
+		if _stress_enemies > 0:
+			_perf_enabled = true
 	_sim.profiling_enabled = _perf_enabled
 	var initial_settings: MechFoundationSettings = SETTINGS.duplicate(true)
 	if OS.get_cmdline_user_args().has("--campaign"):
@@ -137,6 +145,12 @@ func _physics_process(_delta: float) -> void:
 		_perf_sim_usec += elapsed
 		_perf_sim_peak_usec = maxi(_perf_sim_peak_usec, elapsed)
 		_perf_sim_ticks += 1
+	if _stress_mode and _stress_enemies > 0 and _stress_population_generation != _last_generation:
+		# 首个模拟tick先释放正常的初始散兵，再补足目标总数；预置耗时不混入常规tick均值。
+		var seed_started: int = Time.get_ticks_usec()
+		var seeded: Dictionary = _sim.seed_diagnostic_population(_stress_enemies)
+		_stress_population_generation = _last_generation
+		print("[stress:population] requested=%d result=%s generation=%d setup_ms=%.3f" % [_stress_enemies, seeded, _last_generation, (Time.get_ticks_usec() - seed_started) / 1000.0])
 
 
 func _exit_tree() -> void:
@@ -161,14 +175,25 @@ func _process(delta: float) -> void:
 		_perf_frames += 1
 		_perf_seconds += delta
 		if _perf_seconds >= 2.0:
-			print("[perf] fps=%.1f draw_calls=%d sim_cpu_ms=%.3f view_cpu_ms=%.3f native_nav_ms=%.3f sim_peak_ms=%.3f view_peak_ms=%.3f frame_peak_ms=%.3f" % [
+			print("[perf] fps=%.1f draw_calls=%d sim_cpu_ms=%.3f view_cpu_ms=%.3f native_nav_ms=%.3f sim_peak_ms=%.3f view_peak_ms=%.3f frame_peak_ms=%.3f tick=%d paused=%s ended=%s" % [
 				_perf_frames / _perf_seconds, Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME),
 				float(_perf_sim_usec) / maxi(1, _perf_sim_ticks) / 1000.0,
 				float(_perf_view_usec) / maxi(1, _perf_frames) / 1000.0,
 				Performance.get_monitor(Performance.TIME_NAVIGATION_PROCESS) * 1000.0,
-				_perf_sim_peak_usec / 1000.0, _perf_view_peak_usec / 1000.0, _perf_frame_peak * 1000.0])
+				_perf_sim_peak_usec / 1000.0, _perf_view_peak_usec / 1000.0, _perf_frame_peak * 1000.0,
+				_state["clock"]["tick"], _sim.is_paused(), _sim.session_ended()])
 			var profile: Dictionary = _sim.consume_profile()
 			if not profile.is_empty():
+				var visible_enemies: int = 0
+				for entity: Dictionary in _state["entities"]:
+					if entity.get("team", 1) == 2:
+						visible_enemies += 1
+				print("[perf:population] total=%s visible_enemies=%d" % [profile["population"], visible_enemies])
+				if _world.has_method("pick_entity"):
+					# 只读采样真实模型求交耗时；不合成输入或改变选择。
+					var pick_started: int = Time.get_ticks_usec()
+					var picked_id: int = _world.pick_entity(_hud.battle_view_rect().get_center())
+					print("[perf:pick] center_id=%d cpu_ms=%.3f" % [picked_id, (Time.get_ticks_usec() - pick_started) / 1000.0])
 				var avg_stages: Dictionary = {}
 				var peak_stages: Dictionary = {}
 				for stage: String in profile["stages"]:
@@ -293,6 +318,10 @@ func _input(event: InputEvent) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if _settings.is_open():
+		return
+	if event is InputEventMouseButton and (not get_viewport().get_visible_rect().has_point(event.position) or _hud.blocks_point(event.position)):
+		if event.pressed and event.button_index == MOUSE_BUTTON_RIGHT and _build_id != &"":
+			_cancel_build()
 		return
 	if event is InputEventKey and event.pressed and not event.echo:
 		if _event_key(event) >= KEY_1 and _event_key(event) <= KEY_9:
@@ -711,21 +740,31 @@ func _hit_entity(point: Vector2, enemy: bool = false) -> int:
 	return result
 
 
+## 3D只认可射线实际命中的最前方模型，不回退到地面格建筑；2D对照保留旧拾取。
+func _picked_friendly_entity(point: Vector2) -> Dictionary:
+	var id: int = 0
+	if _world.has_method("pick_entity"):
+		id = _world.pick_entity(point)
+	else:
+		id = _hit_entity(point)
+		if id == 0:
+			id = _world.pick_building(point)
+		if id == 0:
+			var building: Dictionary = _sim.building_at(_map_cell(_camera.screen_to_map(point)))
+			id = int(building.get("entity_id", 0))
+	for entity: Dictionary in _state["entities"]:
+		if entity["id"] == id and entity.get("team", 1) == 1:
+			return entity
+	return {}
+
+
 func _finish_selection() -> void:
 	var ids: Array[int] = []
 	var release_cell: Vector2i = _map_cell(_camera.screen_to_map(_selection_end))
 	if _selection_start.distance_to(_selection_end) < 6.0:
-		var hit: int = _hit_entity(_selection_end)
-		if hit > 0:
-			ids.append(hit)
-		else:
-			var building_id: int = _world.pick_building(_selection_end)
-			if building_id > 0:
-				ids.append(building_id)
-			else:
-				var building: Dictionary = _sim.building_at(release_cell)
-				if not building.is_empty():
-					ids.append(building["entity_id"])
+		var picked: Dictionary = _picked_friendly_entity(_selection_end)
+		if not picked.is_empty():
+			ids.append(picked["id"])
 	else:
 		var rect := Rect2(_selection_start, _selection_end - _selection_start).abs()
 		var units: Array[int] = []
@@ -762,13 +801,12 @@ func _is_double_click(position: Vector2) -> bool:
 func _select_same_kind(point: Vector2) -> void:
 	if _hud.blocks_point(point):
 		return
-	var hit: int = _hit_entity(point)
-	if hit > 0:
-		var kind: StringName = &""
-		for entity: Dictionary in _state["entities"]:
-			if entity["id"] == hit:
-				kind = entity.get("kind", &"")
-				break
+	var target: Dictionary = _picked_friendly_entity(point)
+	if target.is_empty():
+		return
+	if not target.get("is_building", false):
+		var hit: int = target["id"]
+		var kind: StringName = target.get("kind", &"")
 		if kind == &"":
 			return
 		# 同类单位先取屏幕内的；屏幕外单位只有与已选单位相邻时才经链式扩选纳入，
@@ -806,15 +844,6 @@ func _select_same_kind(point: Vector2) -> void:
 		_update_cursor()
 		_hud.feedback("已选择 %d 个同类单位；右键下令。" % units.size())
 		return
-	var building_id: int = _world.pick_building(point)
-	var target: Dictionary = {}
-	if building_id > 0:
-		for entity: Dictionary in _state["entities"]:
-			if entity["id"] == building_id:
-				target = entity
-				break
-	else:
-		target = _sim.building_at(_mouse_cell())
 	var family: StringName = target.get("family_id", &"")
 	if family == &"":
 		return
@@ -958,6 +987,12 @@ func _publish_state() -> void:
 	var state: Dictionary = _state
 	var generation_changed: bool = _last_generation != state["generation"]
 	if generation_changed:
+		_last_click_ms = 0
+		_last_click_position = Vector2.ZERO
+		_last_group_time = 0
+		_stress_timer = 0.0
+		_stress_step = 0
+		_stress_population_generation = -1
 		_session_logged = false
 		_selected_dispatch_region = 0
 	_selected_region(state.get("dispatch", {}).get("regions", []))

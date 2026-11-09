@@ -8,6 +8,9 @@ var _generation: int = -1
 var _selection_ids: Array[int] = []
 var _bounds: Dictionary = {}
 var _entities: Dictionary = {}
+var _instance_meshes: Dictionary = {}
+var _instance_transforms: Dictionary = {}
+var _pick_meshes: Dictionary = {}
 var _models := MechInstanceBatches3D.new()
 var _selection := MechInstanceBatches3D.new()
 var _cursor := MechInstanceBatches3D.new()
@@ -70,6 +73,8 @@ func present(state: Dictionary) -> void:
 		_generation = state["generation"]
 	_bounds.clear()
 	_entities.clear()
+	_instance_meshes.clear()
+	_instance_transforms.clear()
 	var groups: Dictionary = {}
 	for entity: Dictionary in state.get("entities", []):
 		var id: int = entity["id"]
@@ -91,6 +96,8 @@ func present(state: Dictionary) -> void:
 		var key: String = "%d_%d_%d" % [mesh.get_instance_id(), floori(point.x / 16.0), floori(point.y / 16.0)]
 		MechInstanceBatches3D.append(groups, key, mesh, transform, tint)
 		_bounds[id] = transform * mesh.get_aabb()
+		_instance_meshes[id] = mesh
+		_instance_transforms[id] = transform
 	for mineral: Dictionary in state.get("minerals", []):
 		if mineral["remaining"] > 0 and mineral.get("assigned_to", 0) == 0:
 			var point: Vector2 = Vector2(mineral["cell"]) + Vector2.ONE * 0.5
@@ -187,8 +194,8 @@ func present_cursor(hover: Vector2i, selected: Vector2i, preview: Dictionary, vi
 	_cursor.present(groups, _fog.material())
 
 
-## 模型点选使用原生AABB求交；只遍历玩家快照，视野外敌人没有拾取对象。
-func _pick(point: Vector2) -> int:
+## AABB粗筛后复用引擎TriangleMesh的BVH求交；不让空心模型的包围盒挡住空隙。
+func pick_entity(point: Vector2) -> int:
 	var origin: Vector3 = _camera.project_ray_origin(point)
 	var direction: Vector3 = _camera.project_ray_normal(point)
 	var closest: float = INF
@@ -196,16 +203,35 @@ func _pick(point: Vector2) -> int:
 	for id: int in _bounds:
 		var bounds: AABB = _bounds[id]
 		var hit: Variant = bounds.intersects_ray(origin, direction)
-		if hit != null:
-			var distance: float = origin.distance_squared_to(hit)
-			if distance < closest:
-				closest = distance
-				result = id
+		if hit == null or origin.distance_squared_to(hit) > closest:
+			continue
+		var mesh: Mesh = _instance_meshes[id]
+		var mesh_id: int = mesh.get_instance_id()
+		if not _pick_meshes.has(mesh_id):
+			var triangles := TriangleMesh.new()
+			if not triangles.create_from_faces(mesh.get_faces()):
+				continue
+			_pick_meshes[mesh_id] = triangles
+		var transform: Transform3D = _instance_transforms[id]
+		var inverse: Transform3D = transform.affine_inverse()
+		var triangles: TriangleMesh = _pick_meshes[mesh_id]
+		var contact: Dictionary = triangles.intersect_ray(inverse * origin, (inverse.basis * direction).normalized())
+		if contact.is_empty():
+			continue
+		var world_contact: Vector3 = transform * Vector3(contact["position"])
+		var dimensions: Vector2i = _state["vision"]["dimensions"]
+		var cell := Vector2i(floori(world_contact.x), floori(world_contact.z))
+		if not Rect2i(Vector2i.ZERO, dimensions).has_point(cell) or _state["vision"]["cells"][cell.y * dimensions.x + cell.x] == MechVisionSystem.State.UNEXPLORED:
+			continue
+		var distance: float = origin.distance_squared_to(world_contact)
+		if distance < closest:
+			closest = distance
+			result = id
 	return result
 
 
 func pick_unit(point: Vector2, enemy: bool = false) -> int:
-	var id: int = _pick(point)
+	var id: int = pick_entity(point)
 	if id == 0:
 		return 0
 	var entity: Dictionary = _entities[id]
@@ -213,7 +239,7 @@ func pick_unit(point: Vector2, enemy: bool = false) -> int:
 
 
 func pick_building(point: Vector2) -> int:
-	var id: int = _pick(point)
+	var id: int = pick_entity(point)
 	return id if id != 0 and _entities[id].get("is_building", false) else 0
 
 
