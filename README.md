@@ -55,7 +55,7 @@ godot --path .
 
 完整操作及输入优先级见[操作说明](docs/operations.md)。暂停期间可下单与更新指令，时间恢复后继续推进；HUD、失焦和离窗会取消未完成的墙线/框选手势。
 
-直接运行`.\run.bat`启动3D。玩法参数仍放在`--`之后，例如`.\run.bat -- --campaign`。战场模型已覆盖53建筑定义、4玩家兵种与9敌人形态，[当前画面和27–34复验清单](validation/3d-content-and-overlay.md)区分引擎检查、实际渲染和未验交互；模型仍属工程白模，现有2D肖像保留。`scenes/model_gallery_3d.tscn`可查看全部模型，`scenes/development_map_overview.tscn`可查看三维地图数据。
+直接运行`.\run.bat`启动3D。玩法参数放在`--`之后，例如`.\run.bat -- --campaign`。战场模型覆盖53建筑定义、4玩家兵种与9敌人形态，仍属工程白模，现有2D肖像保留。操作复验见[统一人工清单](validation/3d-manual-checklist.md)。`scenes/model_gallery_3d.tscn`可查看全部模型，`scenes/development_map_overview.tscn`可查看三维地图数据。
 
 ## 文档与验证
 
@@ -64,7 +64,7 @@ godot --path .
 - [开发任务与验收规格](docs/ai-development-handoff.md)：P0–P8 的任务要求和接手约定；不要从旧基线重做已接入功能。
 - [当前数值](docs/values.md)：按运行 Resource 核对；规划中的六项终局工程不在运行目录中。
 - [机械敌人设计稿](docs/enemy-roster.md)：普通建造者三形态/回收者与五类精英已接入，长足者可穿墙，旧原型机已删除；[接入与验证记录](validation/enemy-integration.md)。
-- [验证索引](validation/README.md)、[0.5.89 审核修复](validation/review-fixes-0.5.89.md)、[当前原生画面](validation/screens/review-0.5.89-hud.png)。
+- [验证索引](validation/README.md)、[三维验证记录](validation/3d-interaction-performance.md)、[当前三维画面](validation/screens/3d-interaction-walls.png)。
 
 最新58个运行目录脚本（含vendor）解析、既有视野回归49/49、普通/战役启动和诊断压力运行无脚本错误。实际三维渲染及模型射线求交已检查；真实鼠标/键盘交互、完整四波/战役与综合规模性能仍待验收，详见[三维交互与性能记录](validation/3d-interaction-performance.md)。短时2000敌军模拟仍超过30Hz单步预算，不能用无头固定FPS证明流畅。
 

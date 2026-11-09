@@ -2,7 +2,7 @@
 
 > 按版本保留的技术决策与来源，后文旧脚本数/旧场景验收仅属当时环境；当前状态见[开发计划](development-plan.md)，最近证据见[验证索引](../validation/README.md)。
 
-> 调研日期：2026-11-04～2026-11-06。按当前实现整理。\
+> 调研覆盖2026-11-04～2026-11-10；各节保留当时的选型条件。\
 > 范围：支撑 architecture.md 的模块复用选型；本稿是来源核对和建议，不表示候选已接入或完成适配/性能验证。\
 > 已确认原则：新建项目，旧原型实现不再使用；外部模块能复用就复用，不能复用先找其他已有方案。开发顺序见 development-plan.md。
 > 当前直接复用与候选分别标明；检查结果见 [验证索引](../validation/README.md)，不以调研替代玩法或性能验收。
@@ -11,7 +11,7 @@
 
 2026-11-08 本轮账本迁移选型：检查[Expresso Inventory](https://github.com/expressobits/inventory-system)（MIT，物品/堆叠与Node/GDExtension库存）及[RTS Framework](https://github.com/rluders/rts-framework)（MIT，完整RTS节点框架）。前者的数据语义是物品实例和库存约束，不是本作无槽位、无上限的全局整数余额；后者需要接管既有场景/命令架构。本轮不借用它们的源码或算法，也不按其思路重写库存系统。直接复用Godot内置[Dictionary](https://docs.godotengine.org/en/stable/classes/class_dictionary.html)的存储、复制与Resource序列化，以及项目已有命令/余数结算；项目仅适配五种资源的业务校验、费用与退款，不引入自制容器、数据库或通用库存框架。
 
-项目采用 2D 等距、模拟/表现分离；已比较 Godot 内置能力、RTS Advanced Lite 的可适配模块与其他已有方案。旧原型代码、场景与内容定义不纳入候选。只有确认外部方案不适合后，才实现本项目特有规则。
+项目保持模拟/表现分离，当前为二维地图逻辑＋正交Camera3D/三维工程模型＋二维HUD。本节及下表的早期2D镜头选型已由第28–30节的3D实现接替；2D小地图与肖像仍保留。旧原型代码、场景与内容定义不纳入候选。
 
 ## 2. 模块复用入口
 
@@ -22,7 +22,7 @@
 | 2D 等距镜头、地图坐标、建造预览、时钟 | Godot 内置 2D/网格能力与外部可适配模块 | Crusade 的等距镜头/地图实现；其他固定步长/放置方案按功能检索 | M1–M3 已使用原生固定物理步、Camera2D 与项目坐标/预览适配；Crusade 要求 4.4.1，未导入其场景运行时 |
 | 选择集合、编队、输入绑定、队列/阵型语义 | RTS Advanced Lite | rluders/rts-framework 的 SelectionManager/CommandManager；Crusade 的选择与单位控制 | 选择/编队/队列已由项目实现；Lite 整框架不采用（§7），独立输入绑定模块保留为 M6 候选（§8） |
 | 玩家单位与局部战术 A* | 可脱离场景树的已有寻路实现 | Godot 内置 AStarGrid2D | M2 已接入原生 AStarGrid2D，M3 支持建筑占用变更后的重建与路径更新；正式单位已接入，规模性能待测 |
-| 小地图 | 先查已有 2D 小地图方案，Lite 无此模块 | Razoric480/godot-minimap-demo | 新工程需接入或实现；该候选为旧演示项目，Godot 4.7 接入与素材许可仍需核对；不直接导入素材 |
+| 小地图 | 先查已有 2D 小地图方案，Lite 无此模块 | Razoric480/godot-minimap-demo | 已用原生Control/ImageTexture及既有快照接入，候选未vendor、未导入素材；具体选型与不兼容原因见§19 |
 | 机潮流场 | 先查已有 Godot 流场实现 | Crusade 的流场与局部避让实现；Mindustry Pathfinder 成本模型 | M5 行军场为项目自有加权场 `sim/march_field.gd`（软成本口径，§9/§10）；直接复用 Crusade `steering.gd`（分离），`flow_field.gd` 已随设计变更从 vendor 移除；游荡敌走既有 AStarGrid2D |
 
 每项正式采用前记录：源 URL、许可证原文位置、版本/提交 SHA、引擎依赖、需修改的接口、已知问题、适配验证结果。可复用模块锁版本入 vendor；未选候选不导入工程。

@@ -2,7 +2,7 @@
 
 对应 0.5.89-dev。现行输入取自 `presentation/main.gd`，配置和运行方法见[README](../README.md)。本稿替代早期三页签/QWERTY 槽位方案；功能状态见[开发计划](development-plan.md)。
 
-2026-11-10按用户要求将`.\run.bat`及Godot项目默认入口改为三维场景，复用下述操作/命令。三维相机、建造、选择及模型/战场提示已接线，真实输入尚待[首批复验](../validation/3d-presentation-first-pass.md)和[27–34项](../validation/3d-content-and-overlay.md)，不能直接继承旧2D验收结果。3D肖像暂缓，保留现有面板肖像。
+2026-11-10，`.\run.bat`及Godot项目默认启动三维场景，使用下述操作/命令。真实输入待按[统一人工清单](../validation/3d-manual-checklist.md)复验，不能直接继承旧2D验收结果。3D肖像暂缓，保留现有面板肖像。
 
 2026-11-09用户已确认建造与选择清单1–8项全部通过，具体范围及未覆盖事项见[人工验证记录](../validation/build-selection-manual.md)。
 

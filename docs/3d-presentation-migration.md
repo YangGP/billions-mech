@@ -1,6 +1,6 @@
 # 二维地图逻辑与三维模型表现修正方案
 
-2026-11-09，依据用户明确的“2D地图＋3D模型”目标制定；2026-11-10已接入运行表现和入口切换。本文保留技术方案及退出条件，完成度统一维护于[开发计划](development-plan.md)，实际证据见[首批记录](../validation/3d-presentation-first-pass.md)和[模型/战场提示记录](../validation/3d-content-and-overlay.md)。run.bat及Godot项目均默认打开三维场景，完整迁移验收继续进行。
+2026-11-09依据用户的“2D地图＋3D模型”目标制定，2026-11-10按已落地代码整理。本文保存技术边界及退出条件；完成度查[开发计划](development-plan.md)，实测查[最新验证记录](../validation/3d-interaction-performance.md)，操作复验查[统一人工清单](../validation/3d-manual-checklist.md)。run.bat及Godot项目默认打开三维场景，完整迁移验收继续进行。
 
 **用户范围修订：3D肖像暂不做。** 本轮保留2D面板肖像及其绘制依赖；下文肖像迁移项暂缓，不作为本轮退出条件。旧2D主画面对照的删除仍应在三维人工回归后执行，不得误删小地图、肖像和历史验证仍使用的2D能力。
 
@@ -16,24 +16,24 @@
 | AStarGrid2D、NavigationServer2D/RVO、共享/局部行军场 | 鼠标到地图落点、模型点选、屏幕框选和可见屏幕判定 |
 | 地图数据、占地/通行、钱包、生产/施工/拆除、敌人能力 | 建造/墙线/范围预览、选中标记、血条与能力提示 |
 | 视野计算、探索记忆和视野外敌人过滤 | 三维地面与模型的迷雾着色、隐藏和拾取同步 |
-| Control/CanvasLayer HUD、编队规则、暂停和命令语义 | 小地图镜头范围/定位接口、对象肖像及编辑器地图预览 |
+| Control/CanvasLayer HUD、2D肖像、编队规则、暂停和命令语义 | 小地图镜头范围/定位接口及编辑器地图预览 |
 
 模型不拥有血量、钱包、导航代理或战斗逻辑；不增加逐实体_process/物理更新，不改用三维导航或刚体来驱动玩法。三维可选拾取代理只负责返回实体ID，最终行为仍由原命令入口校验。
 
 ## 2. 当前依赖与改动落点
 
-| 当前文件 | 要解决的问题 |
+| 职责 | 现有落点与保留边界 |
 | --- | --- |
-| `scenes/main.tscn`、`presentation/main.gd` | 当前根节点/视图为Node2D；解除对Canvas变换和MechIsoGeometry的主画面依赖，装配新的三维世界 |
-| `presentation/map_camera.gd` | Camera2D改为Camera3D控制；保留中键拖动、方向键、边缘滚屏、鼠标锚定缩放、回主脑和总览 |
-| `presentation/terrain_view.gd` | 2D SubViewport地形缓存替换为三维平面分块；沿用同一份地形、地图轮廓和矿点数据 |
-| `presentation/foundation_view.gd` | 多边形白模/高度轮廓拾取替换为模型实例与只读实体映射；覆盖施工、升级、基座、驻防和敌人机制 |
-| `presentation/coverage_view.gd`、`fog_view.gd` | 格子覆盖叠层与迷雾改为三维可用的材质/网格表现 |
-| `presentation/map_hud.gd`、`minimap_view.gd` | 保留2D布局与信息；替换肖像来源、镜头矩形接口和旧“投影世界位置”信号语义 |
-| `presentation/iso_geometry.gd`、`scenes/development_map_overview.tscn` | 等距投影可留给二维小地图/静态总览；明确与三维主画面隔离，复核编辑器预览入口 |
-| `project.godot`、运行/验证文档 | 首轮沿用现有Compatibility渲染器；核对窗口缩放、视口坐标和正式主场景入口 |
+| 场景与组合根 | `scenes/main_3d.tscn`组织Node3D世界，共用Node类型的`presentation/main.gd`；`main.tscn`仅留2D对照 |
+| 相机与投影 | `presentation/map_camera_3d.gd`使用正交Camera3D，提供统一屏幕/地图接口和镜头手势；旧`map_camera.gd`仅供2D对照 |
+| 地形与地图预览 | `presentation/terrain_view_3d.gd`分块网格；`scenes/development_map_overview.tscn`读取同一地图数据并提供独立3D预览 |
+| 模型与拾取 | `foundation_view_3d.gd`、`model_catalog_3d.gd`、`instance_batches_3d.gd`集中同步模型；AABB粗筛后由原生TriangleMesh求交 |
+| 迷雾与预览 | `fog_view_3d.gd`及空间着色器共享三态纹理；覆盖/范围/建造预览由3D视图接线，不改模拟规则 |
+| HUD与战场状态 | `map_hud.gd`、`battle_overlay_3d.gd`集中展示状态，2D肖像及其绘制依赖保留 |
+| 小地图 | `minimap_view.gd`保留二维等距绘制，`iso_geometry.gd`继续供其使用；镜头定位/范围通过统一地图接口同步 |
+| 默认入口 | `project.godot`与`run.bat`均指向`main_3d.tscn`，保持Compatibility渲染器 |
 
-以上为职责落点，实际文件拆分在第一阶段确定。避免为每个旧类建立一套长期平行框架；临时三维验证场景通过完整迁移验收后，主入口统一切换。
+以上为已落地职责，不另建长期平行的玩法框架；旧2D主画面对照在三维人工回归后删除，肖像和小地图依赖保留。
 
 ## 3. 关键技术约定
 
@@ -48,19 +48,19 @@
 ### 模型、地形与规模
 
 - 地形按分块网格/共享材质构建，不能给128×128的每格创建独立常驻节点。真实地图轮廓外不铺可交互地面，水/岩体阻挡仍由原二维地图决定。
-- 重复单位优先复用[MultiMeshInstance3D](https://docs.godotengine.org/en/stable/tutorials/3d/using_multi_mesh_instance.html)，按模型种类和空间分块管理；维护稳定实体ID与实例槽位映射，出生/死亡/升级/重开时更新，不能把实例下标当作实体ID。
+- 重复单位复用[MultiMeshInstance3D](https://docs.godotengine.org/en/stable/tutorials/3d/using_multi_mesh_instance.html)，按模型种类和空间分块管理；实体ID保存在快照/显示映射中，出生/死亡/升级/重开时更新，不能把实例下标当作实体ID。
 - 共享Mesh/Material；可单独展示少量建筑或精英，但只由集中视图同步快照。MultiMesh整批裁剪的局限必须通过分块处理，不能依赖逐实例自动剔除。性能策略见[官方优化说明](https://docs.godotengine.org/en/stable/tutorials/performance/using_multimesh.html)。
 - 定义模型原点、占地、朝向、可视包围盒、选择锚点、材质及替代模型的绑定规范；所有现有53个建筑定义、4类玩家单位和9个敌人形态都必须可显示、可辨认。31类建筑和22个升级形态不要求先做53套精美模型，但必须有明确等级和状态提示。
 - 正式模型优先glTF/GLB，保留来源/许可证与导入设置；当前活动目录没有此类模型资源，第一轮使用引擎几何体占位。骨骼动画的批量表现需单独评估，不承诺MultiMesh直接复用逐实例AnimationPlayer。
 
 ### 选择与交互
 
-- 点选依据三维模型可视范围和深度返回实体ID，复用原生射线/包围体求交；先用少量模型验证遮挡重叠，再决定轻量选择代理或投影包围体方案。普通敌人使用现有空间候选过滤，不能为点选给所有单位挂玩法物理体。
+- 点选用原生AABB粗筛和共享TriangleMesh的BVH求交，转换实例空间后按世界命中距离返回最近实体ID；不回退地面格建筑，不为每个单位挂玩法物理体。遮挡、模型空隙和真实输入仍须按人工清单复验。
 - 框选继续按屏幕矩形与实体选择锚点判定，保留单位优先、Shift追加、Ctrl切换和编队。被己方建筑视觉遮住的友军仍可框选；视野外敌军不能因三维拾取被暴露。
 - 保留双击单位的屏幕内同类与相邻链式扩选、建筑升级族同类选择；屏幕内判定改用新相机接口，不能再拿二维等距Rect2判定三维视野。
 - HUD拥有先行输入拦截；框选端点仍裁剪到实际战场，鼠标可移入UI并松开完成选择，不触发UI操作。失焦/离窗取消手势；弹窗、设置和全屏小地图的输入优先级不变。
 - 建造先鼠标跟随，方向键微调不带动镜头，鼠标移动恢复跟随；连续放置、墙线、非法格与暂停下单继续走原预览/提交校验。模型尺寸和旋转不改变逻辑占地。
-- 小地图继续使用2D格子数据，点击先输出逻辑地图坐标再让相机聚焦；镜头范围用有效战场边缘射线与地面求交得到的多边形表示，不沿用旧投影世界矩形。肖像可先用共享模型的按需SubViewport截图，避免持续重复渲染大量对象。
+- 小地图继续使用2D格子数据，点击先输出逻辑地图坐标再让相机聚焦；镜头范围用有效战场边缘射线与地面求交得到的多边形表示。肖像保留现有2D按需绘制，本轮不迁移。
 
 ### 迷雾与信息边界
 
@@ -96,6 +96,6 @@
 
 ## 6. 复用调查与实施前条件
 
-已检索官方[godot-demo-projects](https://github.com/godotengine/godot-demo-projects)（MIT，按引擎版本选择分支），其作用是原生三维场景/材质接线参考；目前未下载/分析具体示例源码，也未引入依赖，不把查阅文档描述成源码复用。已有[复用调研](reuse-research.md)中的完整RTS框架仍需按纯数据模拟边界评估，不能直接替换项目运行时。
+三维实现直接复用引擎原生能力，来源与候选取舍见[复用调研](reuse-research.md)第28–30节。官方[godot-demo-projects](https://github.com/godotengine/godot-demo-projects)（MIT）作为能力检索入口，未复制其示例源码或引入运行依赖；完整RTS框架与本项目纯数据模拟边界不兼容，未替换项目运行时。
 
-实施前优先复用Camera3D、Plane、MeshInstance3D、MultiMeshInstance3D、ImageTexture、Control和现有快照/命令。若原生与现有能力不足、确需按外部源码思路实现，先按AGENT.md把具体版本拉到reference目录分析模块/依赖/许可证及不可复用部分，再实施；实际运行依赖另放vendor。第一阶段需明确拾取和迷雾的实测选择，不提前宣称方案已经验证。
+后续改动继续优先复用Camera3D、Plane、TriangleMesh、MultiMeshInstance3D、ImageTexture、Control和现有快照/命令。若确需按外部源码思路实现，先按AGENT.md把具体版本拉到reference目录分析模块/依赖/许可证及不可复用部分，再实施；实际运行依赖另放vendor。引擎检查、画面、真实输入和综合性能分别验收。

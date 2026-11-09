@@ -1,18 +1,18 @@
 # 文档索引
 
-更新于2026-11-10，对应 **0.5.89-dev / 三维迁移前基线`42972f8`及首批三维开发入口**。运行和常用键位见根目录[README](../README.md)。
+更新于2026-11-10，对应 **0.5.89-dev / 运行代码基线`b3ed91e`**。默认三维入口已启用，交互/整局与综合性能仍待验。运行和常用键位见根目录[README](../README.md)。
 
 ## 从哪里开始
 
 | 目的 | 入口 |
 | --- | --- |
 | 查看完成度、缺口和下一步 | [当前开发计划](development-plan.md) |
-| 修正2D地图与3D模型技术路线 | [三维表现修正方案](3d-presentation-migration.md)：保留二维逻辑/导航，`--3d`首批开发入口已接入；[检查与待验项](../validation/3d-presentation-first-pass.md) |
-| 查看三维模型与本轮验收 | [模型/战场提示记录](../validation/3d-content-and-overlay.md)：53建筑/4玩家/9敌种、血条/预览/能力提示、默认3D入口；3D肖像暂缓 |
-| 查看三维交互与规模测量 | [最新交互/性能记录](../validation/3d-interaction-performance.md)：模型求交、墙连接、真实敌军压力和35–38复验；2000敌军模拟预算尚未达标 |
+| 理解二维逻辑与三维表现边界 | [三维迁移方案](3d-presentation-migration.md)：职责、技术约定及退出条件；进度查开发计划 |
+| 验证三维操作和生命周期 | [统一人工清单](../validation/3d-manual-checklist.md)：基础1–8及27–38，全数待复验；3D肖像暂缓 |
+| 查看三维画面与规模测量 | [最新验证记录](../validation/3d-interaction-performance.md)：模型求交、墙连接、真实敌军压力；2000敌军模拟预算尚未达标 |
 | 交给其他 AI 继续实现 | [开发任务与验收规格](ai-development-handoff.md)；先查当前进度，再选未完成任务 |
 | 查当前运行数值 | [数值表](values.md)；最终以 `content/` Resource 和权威校验为准 |
-| 查最近修复与证据 | [0.5.89 修复](../validation/review-fixes-0.5.89.md)、[验证索引](../validation/README.md) |
+| 查验证证据与历史审核 | [验证索引](../validation/README.md)：当前实测、用户确认与历史专题分开保存 |
 | 理解产品方向 | [基础设定](game-design-concept.md)、[建筑目录 V2](building-roster-v2.md) |
 | 查敌人新设计与项目适配 | [机械敌人设计稿](enemy-roster.md)：普通建造者三形态/回收者与五类精英已接入，原型机已删除；机制与整局平衡待验收 |
 | 查玩家兵种设计方向 | [玩家兵种设计稿（提案）](player-roster.md)：七兵种（三通用/三对策/一侦察），纯设计，未接入 |

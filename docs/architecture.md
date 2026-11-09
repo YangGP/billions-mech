@@ -66,7 +66,7 @@ UI预览不授予免检权限，自动化也走普通命令。自动内部命令
 
 首批三维入口为`scenes/main_3d.tscn`，与2D入口共用Node类型的`main.gd`组合根、命令与HUD。相机适配器统一screen_to_map/map_to_screen/configure_map/focus_map/visible_map_polygon，主控制器不再依赖等距Canvas变换；小地图内部仍可使用MechIsoGeometry。三维地面为16×16分块SurfaceTool网格，模型为共享原生Mesh的空间分块MultiMesh，Fog节点维护一张三态纹理供地面/模型共同采样。模型拾取使用原生AABB粗筛和共享TriangleMesh的BVH射线求交，按世界空间命中距离取最近模型；单击/双击共享一次查询，不再回退地面格建筑。所有实例只含显示状态，视野外敌军不进入显示/拾取集合。完整外观、能力表现和交互验收尚未完成。
 
-后续`MechModelCatalog3D`通过原生SurfaceTool合并组合几何，覆盖53建筑定义/4玩家/9敌种；`MechBattleOverlay3D`集中绘制血条、进度和状态，不逐实体创建Control。模型AABB同时驱动拾取和提示锚点，建造预览复用同一模型与图纸。范围/路径/火力/光环/干扰显示仅消费过滤后的快照；相机可用区域由HUD实际面板确定。未使用批次立即隐藏并在闲置后释放；总览减少未受伤/未选中提示。地图编辑预览、模型目录为独立内容工具，不运行另一套模拟。工程模型不是正式美术，最新接入/验收边界见[本轮记录](../validation/3d-content-and-overlay.md)。
+`MechModelCatalog3D`通过原生SurfaceTool合并组合几何，覆盖53建筑定义/4玩家/9敌种；`MechBattleOverlay3D`集中绘制血条、进度和状态，不逐实体创建Control。模型AABB用于拾取粗筛和提示锚点，建造预览复用同一模型与图纸。范围/路径/火力/光环/干扰显示仅消费过滤后的快照；相机可用区域由HUD实际面板确定。未使用批次立即隐藏并在闲置后释放；总览减少未受伤/未选中提示。地图编辑预览、模型目录为独立内容工具，不运行另一套模拟。工程模型不是正式美术，画面样例见[模型记录](../validation/3d-content-and-overlay.md)，当前检查边界见[最新验证](../validation/3d-interaction-performance.md)。
 
 `main.gd`收到状态信号只标脏，每渲染帧至多构造一次完整快照，输入、绘制、选择复用最近发布值；命令执行读取实时权威状态。原生移动批次提交后更新视野，暂停/重开作废旧回调。
 
