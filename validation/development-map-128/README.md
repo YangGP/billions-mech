@@ -1,6 +1,8 @@
 # 128×128开发地图检查
 
-> 本页保留0.5.25地图先行阶段的检查记录。0.5.26已删除旧图/训练场与临时主脑定义，资源ID改为metal_ore/crystals；最新地图bundle已通过[p1校验](p1-bundle-validated.json)，其余迁移及当前运行边界见[本批记录](../p1-ledger-single-map.md)。下文旧入口及训练场结论仅属于历史版本。
+> 历史地图生成材料（0.5.25起）。JSON/导航/预览报告只证明各自记录版本，不是0.5.89重新生成的校验。当前地图/资源与运行规则见[地图专稿](../../docs/map-terrain.md)、[数值表](../../docs/values.md)，最近代码检查见[0.5.89记录](../review-fixes-0.5.89.md)。`p1-bundle-validated.json`仍仅是P1阶段的校验快照；后续风口、水域和燃料已接入源/运行地图，不把旧截图、统计或哈希冒充当前。
+
+当前唯一入口 `content/development_128.tres`，使用正式 `mainbrain.tres`（5×5）、600币/80金属矿和2侦察机。下文的临时主脑、旧入口、旧钱包和旧训练场只作生成历史解释，不是可运行步骤。
 
 2026-11-08，0.5.25-dev。新默认地图为“四隘盆地”，复用现有Godot灰盒地形/实体渲染，`art_source=existing`，未生成或替换美术。数据由手工编排的多边形布局经Pillow栅格化，再适配现有`Rect2i`地图格式；连通分析复用SciPy和generate2dmap工具，未编写运行时随机地图生成或寻路算法。
 
@@ -13,7 +15,7 @@
 - 可行走的碰撞诊断：[preview.html](preview-final/preview.html)。这是俯视数据预览，不是替代原生等距美术。
 - 再编译：在项目根目录执行`python tools/compile_development_map.py`；依赖现有Pillow、NumPy、SciPy。地图源、原生Resource与检查bundle同源，不能只改其中一个输出。
 
-## 布局与当前运行边界
+## 生成时布局与旧运行边界
 
 | 项目 | 结果 |
 |---|---|
@@ -30,7 +32,7 @@
 
 ## 检查结果
 
-| 检查 | 当前结果 |
+| 检查 | 生成时结果 |
 |---|---|
 | 内容编译与SciPy连通 | 主脑占用后可行走地形仅1个连通分量；矿点与建设位均有合法地形 |
 | [bundle校验](bundle-validated.json) | pass，0 errors、0 warnings |

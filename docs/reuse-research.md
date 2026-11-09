@@ -1,9 +1,11 @@
 # 模块复用：已有方案调研
 
+> 按版本保留的技术决策与来源，后文旧脚本数/旧场景验收仅属当时环境；当前状态见[开发计划](development-plan.md)，最近证据见[验证索引](../validation/README.md)。
+
 > 调研日期：2026-11-04～2026-11-06。按当前实现整理。\
 > 范围：支撑 architecture.md 的模块复用选型；本稿是来源核对和建议，不表示候选已接入或完成适配/性能验证。\
 > 已确认原则：新建项目，旧原型实现不再使用；外部模块能复用就复用，不能复用先找其他已有方案。开发顺序见 development-plan.md。
-> 当前直接复用与候选分别标明；检查结果见 [M5 实施记录](../validation/m5-threat-defense.md)，不以调研替代玩法或性能验收。
+> 当前直接复用与候选分别标明；检查结果见 [验证索引](../validation/README.md)，不以调研替代玩法或性能验收。
 
 ## 1. 结论
 
@@ -79,7 +81,7 @@
 
 后续目标漂移反馈修正的是项目指令适配：友军临时占位不再替换点击格/阵型终点；最后路点在原生位移实际提交后确认，空路径重试原目标。单兵静态不可达时拒绝下令，不寻找附近替代终点。求路与避让仍分别直接调用原生 AStarGrid2D 与 RVO，没有新增避让或寻路算法。
 
-按 [官方回调时序](https://docs.godotengine.org/en/stable/tutorials/navigation/navigation_using_navigationservers.html)，提交发生在固定物理帧，移动提交和视图刷新在同帧的原生回调收齐后执行，不在每个单独回调中各自刷新。已知限制：RVO 不能保证所有拥堵场景都能解开，[官方说明](https://docs.godotengine.org/en/stable/tutorials/navigation/navigation_using_navigationagents.html) 提示完全对称的迎面情形可能失败。当前 36 个脚本语法与双场景启动已通过，窄口通行/编队已有用户人工复验；暂停、资源生命周期与其余交互仍待补验，范围见 [M5 检查记录](../validation/m5-threat-defense.md)。
+按 [官方回调时序](https://docs.godotengine.org/en/stable/tutorials/navigation/navigation_using_navigationservers.html)，提交发生在固定物理帧，移动提交和视图刷新在同帧的原生回调收齐后执行，不在每个单独回调中各自刷新。已知限制：RVO 不能保证所有拥堵场景都能解开，[官方说明](https://docs.godotengine.org/en/stable/tutorials/navigation/navigation_using_navigationagents.html) 提示完全对称的迎面情形可能失败。当前 36 个脚本语法与双场景启动已通过，窄口通行/编队已有用户人工复验；暂停、资源生命周期与其余交互仍待补验，范围见 [历史性能专题](../validation/performance-wanderers.md)。
 
 ## 7. RTS Advanced Lite 整框架采用结论
 
