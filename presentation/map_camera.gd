@@ -29,6 +29,8 @@ var input_blocked: bool = false:
 		input_blocked = value
 		if value:
 			_stop_drag()
+## 建造时方向键调整放置格，不能同时被连续按键平移读取。
+var keyboard_pan_blocked: bool = false
 
 
 ## 通知镜头外部手势的占用状态；占用期间停用拖拽。
@@ -127,13 +129,13 @@ func _process(delta: float) -> void:
 	if input_blocked or _dragging or _external_gesture or not get_window().has_focus():
 		return
 	var direction := Vector2.ZERO
-	if Input.is_physical_key_pressed(KEY_LEFT):
+	if not keyboard_pan_blocked and Input.is_physical_key_pressed(KEY_LEFT):
 		direction.x -= 1.0
-	if Input.is_physical_key_pressed(KEY_RIGHT):
+	if not keyboard_pan_blocked and Input.is_physical_key_pressed(KEY_RIGHT):
 		direction.x += 1.0
-	if Input.is_physical_key_pressed(KEY_UP):
+	if not keyboard_pan_blocked and Input.is_physical_key_pressed(KEY_UP):
 		direction.y -= 1.0
-	if Input.is_physical_key_pressed(KEY_DOWN):
+	if not keyboard_pan_blocked and Input.is_physical_key_pressed(KEY_DOWN):
 		direction.y += 1.0
 	if edge_scroll_enabled and _mouse_inside and get_viewport().gui_get_hovered_control() == null:
 		var mouse: Vector2 = get_viewport().get_mouse_position()

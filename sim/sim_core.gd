@@ -279,23 +279,12 @@ func execute_command(command: MechCommand, cancel_motion: bool = true) -> Dictio
 		MechCommand.Type.DEMOLISH:
 			var building: MechBuildingState = _construction.get_building(command.payload["entity_id"])
 			var clearing: bool = building.phase == MechBuildingState.Phase.RUINED
-			if clearing:
-				# 清基座绝不退款（values.md §7）；paid_cost 置零让拆除完成的退款路径自然为空。
-				building.paid_cost = MechResources.empty()
-			building.phase = MechBuildingState.Phase.DEMOLISHING
-			building.elapsed_demolition_ticks = 0
-			building.repairing = false
-			building.repair_remainder = 0
-			building.repair_hp_accumulator = 0
-			if _affects_coverage(building.definition):
-				_coverage_dirty = true
-			_auras_dirty = true
-			_repair_stations_dirty = true
-			_dispatch_dirty = true
-			_threat.note_construction(Vector2(building.origin) + Vector2(building.definition.footprint) * 0.5)
-			_recompute_economy()
-			result["clearing"] = clearing
-			result["refund"] = building.refund()
+			var refund: Dictionary = MechResources.empty() if clearing else building.refund()
+			var noise_position: Vector2 = Vector2(building.origin) + Vector2(building.definition.footprint) * 0.5
+			# 直接复用移除事务：订单/周期投入、驻军、预约与预算一次结算；暂停时也立即生效。
+			_remove_building(building.entity_id, refund, true)
+			_threat.note_construction(noise_position)
+			result = {"ok": true, "reason": "", "clearing": clearing, "refund": refund}
 		MechCommand.Type.CANCEL_DEMOLISH:
 			var building: MechBuildingState = _construction.get_building(command.payload["entity_id"])
 			var was_clearing: bool = building.hp <= 0
@@ -1895,6 +1884,7 @@ func _remove_building(entity_id: int, refund: Dictionary, refund_orders: bool = 
 		_environment_dirty = true
 		_environment_full_refresh = true
 	_auras_dirty = true
+	_repair_stations_dirty = true
 	_dispatch_dirty = true
 	_economy.credit(MechResources.add(MechResources.add(refund, cycle_refund), _production.remove_factory(entity_id, refund_orders)))
 	if entity_id == _mainbrain_id:

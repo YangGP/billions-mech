@@ -183,6 +183,33 @@ func blocks_point(point: Vector2) -> bool:
 	return false
 
 
+## 以实际可见HUD面板为边界，取包含起点的战场矩形；不使用固定分辨率常量。
+func selection_bounds(start: Vector2, end: Vector2) -> Rect2:
+	if blocks_point(start):
+		return Rect2()
+	var viewport: Rect2 = get_viewport().get_visible_rect()
+	var left: float = viewport.position.x
+	var top: float = viewport.position.y
+	var right: float = viewport.end.x
+	var bottom: float = viewport.end.y
+	var proposed: Rect2 = Rect2(start, end - start).abs().grow(1.0)
+	for panel: Control in _panels:
+		if not panel.is_visible_in_tree():
+			continue
+		var area: Rect2 = panel.get_global_rect().intersection(viewport)
+		if not area.has_area() or not area.intersects(proposed):
+			continue
+		if area.end.y <= start.y:
+			top = maxf(top, area.end.y)
+		elif area.position.y >= start.y:
+			bottom = minf(bottom, area.position.y)
+		elif area.end.x <= start.x:
+			left = maxf(left, area.end.x)
+		elif area.position.x >= start.x:
+			right = minf(right, area.position.x)
+	return Rect2(Vector2(left, top), Vector2(maxf(0.0, right - left), maxf(0.0, bottom - top)))
+
+
 func dismiss_dialogs() -> void:
 	_pending_demolish = 0
 	_dialog.hide()
@@ -693,9 +720,9 @@ func request_demolition() -> void:
 		return
 	_pending_demolish = _selection["entity_id"]
 	if _selection.get("phase", MechBuildingState.Phase.OPERATING) == MechBuildingState.Phase.RUINED:
-		_dialog.dialog_text = "清除「%s」基座需要 %.1f 游戏秒，完成时不退款。\n占地与矿点绑定在清除完成时释放；可取消清除保留基座。" % [_selection["name"], _selection["demolition_seconds"]]
+		_dialog.dialog_text = "立即清除「%s」基座，无退款。\n确认后释放占地、矿点及环境采集区预约。" % _selection["name"]
 	else:
-		_dialog.dialog_text = "拆除「%s」需要 %.1f 游戏秒，完成后返还 %s。\n期间建筑停机，运营预留在拆除完成时释放；基座清除后释放土地与矿点绑定。" % [_selection["name"], _selection["demolition_seconds"], MechResources.text(_selection["refund"])]
+		_dialog.dialog_text = "立即拆除「%s」，返还 %s。\n确认后建筑移除、占用释放，未交付订单与未结周期投入一并结清。" % [_selection["name"], MechResources.text(_selection["refund"])]
 	_dialog.popup_centered(Vector2i(540, 210))
 
 

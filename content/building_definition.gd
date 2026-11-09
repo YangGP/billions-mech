@@ -44,8 +44,10 @@ extends Resource
 @export var extraction_per_minute: int = 0
 ## 覆盖半径（格，0 表示不提供覆盖）。
 @export var coverage_radius: int = 0
-@export_range(0.0, 64.0, 0.5) var sight_radius: float = 0.0
-@export var demolition_seconds: float = 3.0
+## 普通建筑完工且连通后提供基础视野，专业建筑可覆盖此值。
+@export_range(0.0, 64.0, 0.5) var sight_radius: float = 4.0
+## 正常拆除命令立即执行；保留字段供旧内容读取。
+@export var demolition_seconds: float = 0.0
 @export_range(0.0, 1.0) var refund_ratio: float = 0.5
 @export var is_core: bool = false
 @export var buildable: bool = true
@@ -136,7 +138,7 @@ func validation_error() -> String:
 		return "生产队列长度无效"
 	if attack_damage < 0 or (attack_damage > 0 and (attack_seconds <= 0.0 or attack_range <= 0.0)):
 		return "建筑攻击参数无效"
-	if not is_finite(construction_seconds) or construction_seconds <= 0.0 or not is_finite(demolition_seconds) or demolition_seconds <= 0.0:
+	if not is_finite(construction_seconds) or construction_seconds <= 0.0 or not is_finite(demolition_seconds) or demolition_seconds < 0.0:
 		return "建筑工程时间无效"
 	if not is_finite(refund_ratio) or refund_ratio < 0.0 or refund_ratio > 1.0 or (is_core and buildable):
 		return "建筑退款或核心规则无效"

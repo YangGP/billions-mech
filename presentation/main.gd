@@ -39,6 +39,7 @@ var _selection := MechSelectionState.new()
 var _selection_dragging: bool = false
 var _selection_start := Vector2.ZERO
 var _selection_end := Vector2.ZERO
+var _selection_bounds := Rect2()
 var _selection_additive: bool = false
 var _selection_toggle: bool = false
 var _attack_move_mode: bool = false
@@ -224,6 +225,10 @@ func _input(event: InputEvent) -> void:
 			_close_settings()
 			get_viewport().set_input_as_handled()
 		return
+	# 鼠标回到战场即恢复跟随，不必先放下第一座建筑。
+	if event is InputEventMouseMotion and _build_id != &"" and not event.relative.is_zero_approx() \
+			and get_viewport_rect().has_point(event.position) and not _hud.blocks_point(event.position):
+		_keyboard_build = false
 	# 建造快捷键必须先于获得焦点的 HUD 按钮处理，否则按键会被按钮吞掉。
 	if event is InputEventKey and event.pressed and not event.echo and not _wall_dragging:
 		var key: int = _event_key(event)
@@ -231,18 +236,19 @@ func _input(event: InputEvent) -> void:
 			_request_build(&"compute_node" if key == KEY_Q else (&"armored_wall" if key == KEY_W else &"sentry_tower"))
 			get_viewport().set_input_as_handled()
 			return
-		if _build_id != &"" and _keyboard_build and key in [KEY_LEFT, KEY_RIGHT, KEY_UP, KEY_DOWN, KEY_ENTER]:
+		if _build_id != &"" and key in [KEY_LEFT, KEY_RIGHT, KEY_UP, KEY_DOWN, KEY_ENTER]:
 			_handle_key(key)
 			get_viewport().set_input_as_handled()
 			return
 	if _selection_dragging:
 		if event is InputEventMouseMotion:
-			_selection_end = event.position
+			_selection_end = _clamped_selection_point(event.position)
 			_hud.present_drag(Rect2(_selection_start, _selection_end - _selection_start).abs(), _selection_start.distance_to(_selection_end) >= 6.0)
 			get_viewport().set_input_as_handled()
 		elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and not event.pressed:
-			_selection_end = event.position
-			if get_viewport_rect().has_point(event.position) and not _hud.blocks_point(event.position):
+			_selection_end = _clamped_selection_point(event.position)
+			# 从战场开始的框选允许在HUD上松开，仍按裁剪后的战场矩形提交。
+			if _selection_bounds.has_area() and get_viewport_rect().has_point(event.position):
 				_finish_selection()
 			_cancel_selection_drag()
 			get_viewport().set_input_as_handled()
@@ -305,6 +311,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif _is_double_click(event.position):
 			_select_same_kind(event.position)
 		else:
+			_selection_bounds = _hud.selection_bounds(event.position, event.position)
+			if not _selection_bounds.has_area():
+				return
 			_selection_dragging = true
 			_selection_start = event.position
 			_selection_end = event.position
@@ -350,7 +359,10 @@ func _event_key(event: InputEventKey) -> int:
 
 
 func _handle_key(key: int) -> bool:
-	if _build_id != &"" and _keyboard_build and key in [KEY_LEFT, KEY_RIGHT, KEY_UP, KEY_DOWN]:
+	if _build_id != &"" and key in [KEY_LEFT, KEY_RIGHT, KEY_UP, KEY_DOWN]:
+		if not _keyboard_build:
+			_build_cell = _mouse_cell()
+		_keyboard_build = true
 		match key:
 			KEY_LEFT:
 				_build_cell += Vector2i(-1, 0)
@@ -362,8 +374,12 @@ func _handle_key(key: int) -> bool:
 				_build_cell += Vector2i(0, 1)
 		_update_cursor()
 		return true
-	if _build_id != &"" and _keyboard_build and key == KEY_ENTER:
-		_commands.submit(MechCommand.new(MechCommand.Type.PLACE_BUILDING, {"building_id": _build_id, "origin": _build_cell}))
+	if _build_id != &"" and key == KEY_ENTER:
+		var mouse: Vector2 = get_viewport().get_mouse_position()
+		if not _keyboard_build and (not get_viewport_rect().has_point(mouse) or _hud.blocks_point(mouse)):
+			return true
+		var cell: Vector2i = _build_cell if _keyboard_build else _mouse_cell()
+		_commands.submit(MechCommand.new(MechCommand.Type.PLACE_BUILDING, {"building_id": _build_id, "origin": cell}))
 		return true
 	match key:
 		KEY_F10:
@@ -499,8 +515,9 @@ func _request_build(id: StringName) -> void:
 			_hud.feedback(entry["unavailable_reason"], true)
 			return
 		_build_id = id
-		_keyboard_build = true
-		_build_cell = SETTINGS.map_definition.mainbrain_origin + SETTINGS.map_definition.mainbrain_footprint + Vector2i(1, 0)
+		_keyboard_build = false
+		_build_cell = _mouse_cell()
+		_camera.keyboard_pan_blocked = true
 		_hud.present_build(id)
 		_coverage.show()
 		_hud.feedback("%s：左键下单；方向键移动、Enter下单；右键退出。%s" % [entry["name"], "Shift＋左键拖线可连放墙。" if id == &"armored_wall" else ""])
@@ -517,6 +534,7 @@ func _cancel_build() -> void:
 	_cancel_wall_drag()
 	_build_id = &""
 	_keyboard_build = false
+	_camera.keyboard_pan_blocked = false
 	_hud.present_build(&"")
 	_coverage.hide()
 	_hud.feedback("已退出建造。左键点选/框选，右键下令；选中工厂右键设集结点。")
@@ -649,6 +667,14 @@ func _cancel_selection_drag() -> void:
 	_selection_dragging = false
 	_camera.set_external_gesture(false)
 	_hud.present_drag(Rect2(), false)
+	_selection_bounds = Rect2()
+
+
+func _clamped_selection_point(point: Vector2) -> Vector2:
+	_selection_bounds = _hud.selection_bounds(_selection_start, point)
+	if not _selection_bounds.has_area():
+		return _selection_start
+	return point.clamp(_selection_bounds.position, _selection_bounds.end - Vector2.ONE)
 
 
 func _screen_position(entity: Dictionary) -> Vector2:
@@ -670,6 +696,7 @@ func _hit_entity(point: Vector2, enemy: bool = false) -> int:
 
 func _finish_selection() -> void:
 	var ids: Array[int] = []
+	var release_cell: Vector2i = MechIsoGeometry.cell_at(_world.get_global_transform_with_canvas().affine_inverse() * _selection_end)
 	if _selection_start.distance_to(_selection_end) < 6.0:
 		var hit: int = _hit_entity(_selection_end)
 		if hit > 0:
@@ -679,7 +706,7 @@ func _finish_selection() -> void:
 			if building_id > 0:
 				ids.append(building_id)
 			else:
-				var building: Dictionary = _sim.building_at(_mouse_cell())
+				var building: Dictionary = _sim.building_at(release_cell)
 				if not building.is_empty():
 					ids.append(building["entity_id"])
 	else:
@@ -698,7 +725,7 @@ func _finish_selection() -> void:
 		# 拖框不作为点击起点，重置双击状态，避免紧接着的单击被误判为双击。
 		_last_click_ms = 0
 	_selection.select(ids, _selection_additive, _selection_toggle)
-	_selected = _mouse_cell() if _sim.inspect_cell(_mouse_cell())["inside"] else Vector2i(-1, -1)
+	_selected = release_cell if _sim.inspect_cell(release_cell)["inside"] else Vector2i(-1, -1)
 	_refresh_selection()
 	_update_cursor()
 	_hud.feedback("已选择 %d 个己方实体；右键下令，A＋左键攻击移动。" % _selection.ids.size())
@@ -866,7 +893,7 @@ func _on_command_finished(command_type: int, result: Dictionary) -> void:
 		MechCommand.Type.CANCEL_CONSTRUCTION:
 			_hud.feedback("施工已取消，返还 %s 并释放占用。" % MechResources.text(result["refund"]))
 		MechCommand.Type.DEMOLISH:
-			_hud.feedback("已开始清除基座；完成时不退款，释放占地与矿点绑定。" if result.get("clearing", false) else "已开始拆除；建筑停机，工程完成后退款并释放占用。")
+			_hud.feedback("基座已立即清除，无退款，占地与矿点绑定已释放。" if result.get("clearing", false) else "建筑已立即拆除，返还 %s，占用和订单已结清。" % MechResources.text(result["refund"]))
 		MechCommand.Type.CANCEL_DEMOLISH:
 			_hud.feedback("清除已取消，基座保留原地。" if result.get("was_clearing", false) else "拆除已取消，血量保持，建筑恢复工作。")
 		MechCommand.Type.TOGGLE_REPAIR:
@@ -1033,18 +1060,19 @@ func _wall_cells() -> Array[Vector2i]:
 func _update_cursor() -> void:
 	var mouse: Vector2 = get_viewport().get_mouse_position()
 	var cursor_visible: bool = not _settings.is_open() and get_window().has_focus() and get_viewport_rect().has_point(mouse) and not _hud.blocks_point(mouse)
+	var keyboard_cursor_visible: bool = _build_id != &"" and _keyboard_build and not _settings.is_open() and get_window().has_focus()
 	var cell: Vector2i = _build_cell if _build_id != &"" and _keyboard_build else _mouse_cell()
 	var info: Dictionary = {}
-	if cursor_visible:
+	if cursor_visible or keyboard_cursor_visible:
 		info = _sim.inspect_cell(cell)
 	elif _selected.x >= 0:
 		info = _sim.inspect_cell(_selected)
 	var preview: Dictionary = {}
 	if _wall_dragging:
 		preview = _sim.preview_wall_line(_wall_cells())
-	elif cursor_visible and _build_id != &"":
+	elif (cursor_visible or keyboard_cursor_visible) and _build_id != &"":
 		preview = _sim.preview_build(_build_id, cell)
-	_world.present_cursor(cell, _selected, preview, cursor_visible or _wall_dragging or (_build_id != &"" and _keyboard_build))
+	_world.present_cursor(cell, _selected, preview, cursor_visible or _wall_dragging or keyboard_cursor_visible)
 	_hud.present_cell(info, preview)
 
 
