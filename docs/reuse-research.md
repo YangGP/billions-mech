@@ -258,3 +258,9 @@ Agent-Reach 不可用，使用网页检索。先核对高星候选 [Mindustry](h
 实施前重新检索[官方示例](https://github.com/godotengine/godot-demo-projects)（MIT）和[RTS Framework](https://github.com/rluders/rts-framework)（MIT，WIP）。完整RTS框架绑定自己的Controller/SelectionManager/节点化单位，不作为本项目模拟、导航和命令层的替代依赖；没有复制或按其源码重写算法。官方示例用于查找原生能力的适用范围，目前未下载具体示例源码，不宣称源码已复用。Agent-Reach当前工具不可用，使用网页检索。
 
 实际直接使用Godot原生Camera3D正交投影/射线/屏幕投影、Plane/AABB求交、Geometry2D裁剪/三角化、SurfaceTool、BoxMesh/CylinderMesh、MultiMeshInstance3D、ImageTexture与现有快照/HUD。自写部分为地图坐标、镜头手势、快照到模型批次的绑定、预览及迷雾材质接线；不新增相机投影、求交、寻路或避让算法。兼容渲染器保持不变，具体阶段和验证边界见[迁移方案](3d-presentation-migration.md)。
+
+## 29. 三维模型与战场提示（2026-11-10）
+
+继续检索[官方Godot示例](https://github.com/godotengine/godot-demo-projects)（MIT）与官方[SurfaceTool](https://docs.godotengine.org/en/stable/tutorials/3d/procedural_geometry/surfacetool.html)、[MultiMesh](https://docs.godotengine.org/en/stable/tutorials/performance/using_multimesh.html)及TorusMesh/Label3D能力。没有引入外部RTS/模型运行框架，未下载或按外部源码重写核心算法；Agent-Reach工具未提供，使用网页检索。完整框架仍与本项目纯数据模拟/既有命令不兼容，理由沿用第28节。
+
+实际直接复用原生PrimitiveMesh、ArrayMesh、SurfaceTool.append_from/index进行模型组合合并，MultiMesh进行批量绘制，TorusMesh绘制范围，AABB/Camera3D/Plane处理显示包围盒/投影/拾取，Control/字体绘制集中血条/进度，Label3D显示少量静态地标，ImageTexture和ShaderMaterial接线迷雾/建造预览。自写部分为每类内容的几何组合、不可变规则绑定、快照状态到颜色/标记的映射、HUD可用矩形和实例缓存生命周期。没有新增模型合并求解器、相机数学、导航、避让或模拟算法；工程模型由项目自行定义，不包含外部美术素材或逐实体玩法节点。用户暂缓3D肖像，保留其2D依赖，详见[接入记录](../validation/3d-content-and-overlay.md)。

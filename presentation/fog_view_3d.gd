@@ -1,12 +1,15 @@
+@tool
 class_name MechFogView3D
 extends Node
 ## 仍由二维视野权威决定可见性；共用纹理供三维地面和模型材质采样。
 
 const FOG_SHADER: Shader = preload("res://presentation/map_fog_3d.gdshader")
+const PREVIEW_SHADER: Shader = preload("res://presentation/build_preview_3d.gdshader")
 var _revision: int = -1
 var _generation: int = -1
 var _texture: ImageTexture
 var _materials: Dictionary = {}
+var _dimensions := Vector2.ONE
 
 
 func material(ground: bool = false) -> ShaderMaterial:
@@ -17,8 +20,20 @@ func material(ground: bool = false) -> ShaderMaterial:
 		result.shader = FOG_SHADER
 		result.set_shader_parameter("fog_cells", _texture)
 		result.set_shader_parameter("ground_grid", ground)
+		result.set_shader_parameter("map_dimensions", _dimensions)
 		_materials[ground] = result
 	return _materials[ground]
+
+
+func preview_material() -> ShaderMaterial:
+	if not _materials.has("preview"):
+		material()
+		var result := ShaderMaterial.new()
+		result.shader = PREVIEW_SHADER
+		result.set_shader_parameter("fog_cells", _texture)
+		result.set_shader_parameter("map_dimensions", _dimensions)
+		_materials["preview"] = result
+	return _materials["preview"]
 
 
 func present(vision: Dictionary, generation: int, _outline: PackedVector2Array) -> void:
@@ -27,6 +42,7 @@ func present(vision: Dictionary, generation: int, _outline: PackedVector2Array) 
 	_revision = vision["revision"]
 	_generation = generation
 	var dimensions: Vector2i = vision["dimensions"]
+	_dimensions = Vector2(dimensions)
 	var cells: PackedByteArray = vision["cells"]
 	var pixels := PackedByteArray()
 	pixels.resize(cells.size())

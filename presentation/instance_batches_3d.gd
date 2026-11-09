@@ -1,13 +1,24 @@
+@tool
 class_name MechInstanceBatches3D
 extends Node3D
 ## 仅集中管理显示实例，无实体逻辑/逐实例节点。批次键由模型和空间块组成。
 
 var _batches: Dictionary = {}
+var _idle: Dictionary = {}
 
 
 func present(groups: Dictionary, shared_material: Material) -> void:
-	for key: String in _batches:
-		_batches[key].visible = groups.has(key)
+	for key: String in _batches.keys():
+		if groups.has(key):
+			_idle.erase(key)
+		else:
+			_batches[key].visible = false
+			_batches[key].multimesh.visible_instance_count = 0
+			_idle[key] = int(_idle.get(key, 0)) + 1
+			if int(_idle[key]) > 120:
+				_batches[key].free()
+				_batches.erase(key)
+				_idle.erase(key)
 	for key: String in groups:
 		var data: Dictionary = groups[key]
 		var transforms: Array = data["transforms"]
@@ -38,6 +49,7 @@ func clear() -> void:
 	for node: MultiMeshInstance3D in _batches.values():
 		node.free()
 	_batches.clear()
+	_idle.clear()
 
 
 static func append(groups: Dictionary, key: String, mesh: Mesh, transform: Transform3D, color: Color) -> void:

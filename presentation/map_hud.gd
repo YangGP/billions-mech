@@ -215,6 +215,13 @@ func dismiss_dialogs() -> void:
 	_dialog.hide()
 
 
+## 镜头焦点和总览使用包含视口中心的可用战场矩形；选择手势仍逐点裁剪实际面板。
+func battle_view_rect() -> Rect2:
+	var viewport: Rect2 = get_viewport().get_visible_rect()
+	var center: Vector2 = viewport.get_center()
+	return selection_bounds(center, viewport.position).intersection(selection_bounds(center, viewport.end))
+
+
 func present_map(map_state: Dictionary) -> void:
 	_map_label.text = map_state["name"]
 	_minimap_view.present_map(map_state)

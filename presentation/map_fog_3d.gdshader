@@ -13,7 +13,7 @@ void vertex() {
 void fragment() {
 	float state = texture(fog_cells, map_position / map_dimensions).r;
 	// 黑雾区域不写入颜色/深度，避免灯光把地图轮廓或高模型照出来。
-	if (state < 0.25) {
+	if (state < 0.25 || any(lessThan(map_position, vec2(0.0))) || any(greaterThanEqual(map_position, map_dimensions))) {
 		discard;
 	}
 	vec3 base = COLOR.rgb;

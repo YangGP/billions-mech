@@ -92,6 +92,8 @@ func _ready() -> void:
 		get_tree().quit(1)
 		return
 	_commands.configure(_sim.execute_command)
+	if _world.has_method("configure"):
+		_world.configure(initial_settings)
 	_commands.command_finished.connect(_on_command_finished)
 	_coverage.hide()
 	_hud.pause_requested.connect(_toggle_pause)
@@ -112,6 +114,8 @@ func _ready() -> void:
 	_settings.close_requested.connect(_close_settings)
 	_settings.settings_applied.connect(_apply_camera_settings)
 	_apply_camera_settings(_settings.preferences())
+	if _camera.has_method("set_play_area"):
+		_camera.set_play_area(_hud.battle_view_rect())
 	get_window().focus_exited.connect(_cancel_wall_drag)
 	get_window().mouse_exited.connect(_cancel_wall_drag)
 	get_window().focus_exited.connect(_cancel_selection_drag)
@@ -141,6 +145,8 @@ func _exit_tree() -> void:
 
 func _process(delta: float) -> void:
 	var started: int = Time.get_ticks_usec() if _perf_enabled else 0
+	if _camera.has_method("set_play_area"):
+		_camera.set_play_area(_hud.battle_view_rect())
 	_publish_state()
 	_update_cursor()
 	_hud.present_zoom(_camera.zoom_factor())
@@ -777,7 +783,7 @@ func _select_same_kind(point: Vector2) -> void:
 		var units: Array[int] = []
 		for entity: Dictionary in same_kind:
 			# 屏幕范围由实际相机投影判断，命中的单位始终作为扩选起点。
-			if entity["id"] == hit or _camera.map_point_on_screen(entity["position"]):
+			if entity["id"] == hit or (_camera.map_point_on_screen(entity["position"]) and not _hud.blocks_point(_screen_position(entity))):
 				chosen[entity["id"]] = true
 				units.append(entity["id"])
 		while not units.is_empty():

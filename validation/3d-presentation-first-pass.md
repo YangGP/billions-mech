@@ -2,6 +2,8 @@
 
 2026-11-10。实施前基线提交为`42972f8`，包含上一轮建造光标、瞬间拆除、建筑视野、跨UI框选修复和迁移计划。本记录仅覆盖三维开发入口首批接入，阶段完成度查[开发计划](../docs/development-plan.md)。
 
+后续已接入完整工程模型目录和战场提示，Godot项目与bat均默认启动3D；用户暂缓3D肖像。以下“通用兜底/待替换/2D默认入口”等描述仅代表首批接入时状态，最新证据与27–34复验项查[后续记录](3d-content-and-overlay.md)。
+
 ## 接入内容
 
 - `scenes/main_3d.tscn`以Node3D组织地面、模型、正交Camera3D和光照；复用现有HUD、模拟、命令、配置和敌人系统。`main.gd`改为Node组合根，2D对照入口仍可运行。
@@ -14,12 +16,14 @@
 ## 启动
 
 ```powershell
-.\run.bat -- --3d
-.\run.bat -- --3d --campaign
-.\run.bat -- --3d --overview
+.\run.bat
+.\run.bat -- --campaign
+.\run.bat -- --overview
 ```
 
-也可在Godot中运行`scenes/main_3d.tscn`。默认`run.bat`仍打开2D对照场景；待完整迁移和交互复验后统一切换主入口，当前不能当作最终3D版本交付。
+也可在Godot中运行`scenes/main_3d.tscn`。`run.bat`及Godot项目均已默认打开3D场景。完整迁移和交互复验继续进行，当前不能当作最终3D版本交付。
+
+入口调整已用`.\run.bat --headless --quit-after 30`检查，退出码0，运行日志确认`3D development whitebox`，未发现脚本错误。
 
 ## 已执行检查
 

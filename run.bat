@@ -17,7 +17,7 @@ if not exist ".godot\import.log" goto import_failed
 rem Godot can exit zero even when the editor reports script parse errors.
 findstr /L /C:"SCRIPT ERROR:" ".godot\import.log" >nul
 if not errorlevel 1 goto import_failed
-call godot --path "%~dp0." --log-file "%~dp0.godot\run.log" %*
+call godot --path "%~dp0." --log-file "%~dp0.godot\run.log" res://scenes/main_3d.tscn %*
 set "MECH_EXIT_CODE=%ERRORLEVEL%"
 goto finish
 

@@ -1,4 +1,4 @@
-[gd_scene load_steps=10 format=3]
+[gd_scene load_steps=11 format=3]
 
 [ext_resource type="Script" path="res://presentation/main.gd" id="1"]
 [ext_resource type="Script" path="res://presentation/terrain_view_3d.gd" id="2"]
@@ -8,6 +8,7 @@
 [ext_resource type="PackedScene" path="res://scenes/ui/map_hud.tscn" id="6"]
 [ext_resource type="PackedScene" path="res://scenes/ui/settings_menu.tscn" id="7"]
 [ext_resource type="Script" path="res://presentation/fog_view_3d.gd" id="8"]
+[ext_resource type="Script" path="res://presentation/battle_overlay_3d.gd" id="9"]
 
 [sub_resource type="Environment" id="WorldEnvironment"]
 background_mode = 1
@@ -43,6 +44,19 @@ environment = SubResource("WorldEnvironment")
 rotation_degrees = Vector3(-55, -35, 0)
 light_color = Color(1, 0.95, 0.85, 1)
 light_energy = 1.0
+
+[node name="BattleOverlay" type="CanvasLayer" parent="."]
+layer = 0
+
+[node name="Draw" type="Control" parent="BattleOverlay"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("9")
 
 [node name="HUD" parent="." instance=ExtResource("6")]
 

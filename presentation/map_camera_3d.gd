@@ -30,6 +30,7 @@ var _dragging: bool = false
 var _last_drag_position := Vector2.ZERO
 var _external_gesture: bool = false
 var _mouse_inside: bool = false
+var _battle_rect := Rect2()
 
 
 func _ready() -> void:
@@ -52,6 +53,12 @@ func configure_map(map_state: Dictionary) -> void:
 	focus_mainbrain()
 
 
+func set_play_area(area: Rect2) -> void:
+	if area.has_area() and not _battle_rect.is_equal_approx(area):
+		_battle_rect = area
+		_clamp_position()
+
+
 func screen_to_map(point: Vector2) -> Vector2:
 	var hit: Variant = GROUND.intersects_ray(project_ray_origin(point), project_ray_normal(point))
 	return Vector2(hit.x, hit.z) if hit != null else Vector2(INF, INF)
@@ -63,7 +70,7 @@ func map_to_screen(point: Vector2, height: float = 0.0) -> Vector2:
 
 func map_point_on_screen(point: Vector2) -> bool:
 	var world := Vector3(point.x, 0.0, point.y)
-	return not is_position_behind(world) and _play_area().has_point(map_to_screen(point))
+	return not is_position_behind(world) and get_viewport().get_visible_rect().has_point(map_to_screen(point))
 
 
 func visible_map_polygon() -> PackedVector2Array:
@@ -176,6 +183,8 @@ func _process(delta: float) -> void:
 
 
 func _play_area() -> Rect2:
+	if _battle_rect.has_area():
+		return _battle_rect.intersection(get_viewport().get_visible_rect())
 	var extent: Vector2 = get_viewport().get_visible_rect().size
 	return Rect2(Vector2.ZERO, Vector2(extent.x, maxf(240.0, extent.y - HUD_BOTTOM)))
 
@@ -184,7 +193,9 @@ func _update_transform() -> void:
 	size = BASE_SPAN / _factor
 	var height: float = maxf(1.0, get_viewport().get_visible_rect().size.y)
 	var down := Vector3(1.0, 0.0, 1.0).normalized()
-	var target := Vector3(_focus.x, 0.0, _focus.y) + down * (HUD_BOTTOM * 0.5 * size / height / 0.75)
+	var right := Vector3(1.0, 0.0, -1.0).normalized()
+	var offset: Vector2 = get_viewport().get_visible_rect().get_center() - _play_area().get_center()
+	var target := Vector3(_focus.x, 0.0, _focus.y) + down * (offset.y * size / height / 0.75) + right * (offset.x * size / height)
 	position = target + VIEW_BACK.normalized() * 300.0
 	look_at(target, Vector3.UP)
 
