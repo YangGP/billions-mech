@@ -21,6 +21,11 @@ var unit_definition: MechUnitDefinition
 var enemy_definition: MechEnemyDefinition
 ## 游荡形态标记：环境散兵即便使用行军型敌种定义，也只闻声聚拢或原地挪动。
 var wandering: bool = false
+var charge_ticks: int = 0
+var speed_boost_ticks: int = 0
+var ability_cooldown_ticks: int = 0
+var jam_target_id: int = 0
+var scavenge_stacks: int = 0
 var team: int = 1
 var hp: int = 0
 var max_hp: int = 0
@@ -115,6 +120,9 @@ func snapshot() -> Dictionary:
 		"is_unit": unit_definition != null, "team": team, "hp": hp, "max_hp": max_hp,
 		"is_enemy": enemy_definition != null,
 		"enemy_id": enemy_definition.enemy_id if enemy_definition != null else &"",
+		"elite": enemy_definition.elite if enemy_definition != null else false,
+		"charge_ticks": charge_ticks, "speed_boost_ticks": speed_boost_ticks,
+		"scavenge_stacks": scavenge_stacks, "jam_target_id": jam_target_id,
 		"order": order, "order_goal": order_goal, "attack_target_id": attack_target_id,
 		"facing": facing, "arrival_facing": arrival_facing, "has_arrival_facing": has_arrival_facing,
 		"formation_id": formation_id, "formation_center": formation_center, "formation_offset": formation_offset,

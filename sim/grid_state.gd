@@ -92,10 +92,10 @@ func navigation_changes_since(since: int) -> Array[Vector2i]:
 
 ## 供后台路径数据构建使用的独立不可变副本：
 ## 工作线程绝不读取活网格，避免与命令写入占用层产生竞争。
-func navigation_copy() -> MechGridState:
+func navigation_copy(ignore_rough: bool = false) -> MechGridState:
 	var copy := MechGridState.new()
 	copy._dimensions = _dimensions
-	copy._rough_weight = _rough_weight
+	copy._rough_weight = 1.0 if ignore_rough else _rough_weight
 	copy._terrain = _terrain.duplicate()
 	copy._playable = _playable.duplicate()
 	copy._outline = _outline.duplicate()

@@ -3,17 +3,15 @@ extends RefCounted
 ## 波次调度（依据 waves-enemies.md §2–§6 与 values.md §2/§12）：静默期或
 ## 发展度触发首波，预算 B(n) = 首波 × growth^(n-1)，预告附带定性规模
 ## 等级与粗略的进攻边缘方向。TAB 式投放：每波从边缘带（玩家视野外）
-## 跨投放窗口连续流入，条目有序且均匀错峰。编成为第一幕策略：
-## 建造者填满预算，原型机自 WAVE 3 起加入一个。生成以请求形式返回；
+## 跨投放窗口连续流入，条目有序且均匀错峰。普通池与主题精英按资源配置
+## 花费预算，普通数/精英配额独立约束。生成以请求形式返回；
 ## 实体创建由 MechEnemySystem 负责。total_waves 为正时导演在该波后
 ## 停止排程（首切片胜利门槛）；为 0 则保持无尽幕循环。
 
 ## "计算节点"建筑编号，用于发展度触发的节点计数。
 const NODE_ID: StringName = &"compute_node"
-## 原型机从第几波起加入编成。
-const PROTOTYPE_FROM_WAVE: int = 3
-
 var _active: bool = false
+var profiling_enabled: bool = false
 var _tick_rate: int = 30
 var _defs: Dictionary = {}
 var _main_band: Array[Vector2i] = []
@@ -45,6 +43,12 @@ var _tier_label: String = ""
 var _edge: StringName = &""
 var _edge_name: String = ""
 var _pending: Array[Dictionary] = []
+var _population: Dictionary[StringName, int] = {}
+var _ordinary_since_elite: int = 0
+var _ordinary_per_elite: int = 100
+var _max_elite_types: int = 3
+var _rng := RandomNumberGenerator.new()
+var _seed: int = 1
 
 
 ## 校验并装载敌种定义与波次参数，返回错误信息（空串表示成功）。
@@ -59,8 +63,11 @@ func configure(settings: MechFoundationSettings) -> String:
 		if _defs.has(rules.enemy_id):
 			return "重复敌种编号"
 		_defs[rules.enemy_id] = rules
-	if not _defs.has(&"builder") or not _defs.has(&"prototype"):
-		return "缺少建造者或原型机定义"
+	if not _defs.has(&"builder") or not _defs.has(&"recycler"):
+		return "缺少普通建造者或回收者定义"
+	_ordinary_per_elite = maxi(1, settings.ordinary_per_elite)
+	_max_elite_types = clampi(settings.max_elite_types, 1, 3)
+	_seed = settings.session_seed
 	_silence_ticks = maxi(1, ceili(settings.silence_seconds * settings.simulation_hz))
 	_announce_delay_ticks = maxi(1, ceili(settings.wave_announce_seconds * settings.simulation_hz))
 	_wave_interval_ticks = maxi(1, ceili(settings.wave_interval_seconds * settings.simulation_hz))
@@ -93,14 +100,26 @@ func reset(grid: MechGridState, map_definition: MechMapDefinition, active: bool,
 	_edge = &""
 	_edge_name = ""
 	_pending.clear()
+	_population.clear()
+	_ordinary_since_elite = 0
+	_rng.seed = _seed
 	_collect_bands(grid, map_definition)
 
 
 ## 推进一步：先清空流式投放队列，再按相位时钟（静默→预告→投放）推进。
-func advance(grid: MechGridState, buildings: Array[MechBuildingState]) -> Array[Dictionary]:
+func advance(grid: MechGridState, buildings: Array[MechBuildingState], entities: Array[MechEntityState] = []) -> Array[Dictionary]:
 	if not _active or grid == null:
 		return []
 	_tick_counter += 1
+	_population.clear()
+	for entity: MechEntityState in entities:
+		if entity.team == 2 and entity.hp > 0 and entity.enemy_definition != null:
+			var id: StringName = entity.enemy_definition.enemy_id
+			_population[id] = int(_population.get(id, 0)) + 1
+	# 在途条目也预占配额，含本tick即将释放的条目，避免跨波超量。
+	for entry: Dictionary in _pending:
+		var id: StringName = entry["enemy_id"]
+		_population[id] = int(_population.get(id, 0)) + 1
 	var requests: Array[Dictionary] = []
 	# 流式投放先行清空 _pending，与下方的相位时钟无关。
 	if not _pending.is_empty():
@@ -220,7 +239,6 @@ func _announce() -> void:
 func _queue_wave() -> void:
 	var wave_number: int = _wave_index + 1
 	var budget: float = _budget_for(wave_number)
-	var builder: MechEnemyDefinition = _defs[&"builder"]
 	var band: Array[Vector2i] = _flank_band if wave_number % _flank_every == 0 and not _flank_band.is_empty() else _main_band
 	# 终波改从全部边缘带入场。
 	if _final_requested and wave_number >= _total_waves and not _all_bands.is_empty():
@@ -229,23 +247,28 @@ func _queue_wave() -> void:
 		band = _main_band
 	if band.is_empty():
 		return
-	# 编成：原型机自 WAVE 3 起优先加入，回收者来自第二阶段切片，
-	# 剩余预算由建造者填满。
+	# 配额余数跨波保留；回收者与三形态建造者都计入普通数量。
 	var entries: Array[StringName] = []
-	if wave_number >= PROTOTYPE_FROM_WAVE:
-		entries.append(&"prototype")
-		budget -= _defs[&"prototype"].threat_cost
-	var recycler: MechEnemyDefinition = _defs.get(&"recycler")
-	if recycler != null and (wave_number >= 2 or (_campaign_mode and _campaign_stage >= 2)):
-		# 回收者最多占用四分之一预算。
-		var recycler_budget: float = budget * 0.25
-		var recyclers: int = maxi(0, floori(recycler_budget / recycler.threat_cost))
-		for index: int in range(recyclers):
-			entries.append(&"recycler")
-		budget -= recyclers * recycler.threat_cost
-	var builders: int = maxi(0, floori(budget / builder.threat_cost))
-	for index: int in range(builders):
-		entries.append(&"builder")
+	var stage: int = _campaign_stage if _campaign_mode else clampi(1 + (_wave_index / 4), 1, 3)
+	while budget > 0.0:
+		var rules: MechEnemyDefinition
+		if _ordinary_since_elite >= _ordinary_per_elite:
+			rules = _choose_elite(stage, wave_number, budget)
+		if rules != null:
+			_ordinary_since_elite -= _ordinary_per_elite
+		else:
+			rules = _choose_ordinary(stage, wave_number, budget)
+			if rules == null:
+				break
+			_ordinary_since_elite += 1
+		entries.append(rules.enemy_id)
+		budget -= rules.threat_cost
+		_population[rules.enemy_id] = int(_population.get(rules.enemy_id, 0)) + 1
+	if profiling_enabled:
+		var composition: Dictionary = {}
+		for id: StringName in entries:
+			composition[id] = int(composition.get(id, 0)) + 1
+		print("[wave:composition] wave=", wave_number, " stage=", stage, " budget_remaining=", budget, " ordinary_credit=", _ordinary_since_elite, " entries=", composition)
 	# TAB 式细流：条目跨投放窗口从边缘带依次流出，
 	# 首条立即生效，其余在其后均匀错峰。
 	var spacing: float = float(_release_window_ticks) / maxi(1, entries.size() - 1) if entries.size() > 1 else float(_release_window_ticks)
@@ -262,6 +285,44 @@ func _queue_wave() -> void:
 	# _pending 清空即视为该波结束。
 	if _total_waves > 0 and _wave_index >= _total_waves:
 		_phase = &"done"
+
+
+func _choose_ordinary(stage: int, wave: int, budget: float) -> MechEnemyDefinition:
+	var candidates: Array[MechEnemyDefinition] = []
+	var total: int = 0
+	for rules: MechEnemyDefinition in _defs.values():
+		if not rules.elite and rules.minimum_stage <= stage and rules.first_wave <= wave and rules.threat_cost <= budget and rules.stage_weights[stage - 1] > 0:
+			candidates.append(rules)
+			total += rules.stage_weights[stage - 1]
+	if total == 0:
+		return null
+	var pick: int = _rng.randi_range(1, total)
+	for rules: MechEnemyDefinition in candidates:
+		pick -= rules.stage_weights[stage - 1]
+		if pick <= 0:
+			return rules
+	return null
+
+
+func _choose_elite(stage: int, wave: int, budget: float) -> MechEnemyDefinition:
+	var types: Dictionary = {}
+	for id: StringName in _population:
+		var rules: MechEnemyDefinition = _defs.get(id)
+		if rules != null and rules.elite and _population[id] > 0:
+			types[id] = true
+	var candidates: Array[MechEnemyDefinition] = []
+	for rules: MechEnemyDefinition in _defs.values():
+		if not rules.elite or stage < rules.minimum_stage or wave < rules.first_wave or budget < rules.threat_cost:
+			continue
+		if int(_population.get(rules.enemy_id, 0)) >= rules.max_alive:
+			continue
+		if not types.has(rules.enemy_id) and types.size() >= _max_elite_types:
+			continue
+		candidates.append(rules)
+	if candidates.is_empty():
+		return null
+	# 同一波按波号选择主题，存活/在途配额仍优先于主题选择。
+	return candidates[(wave - 1) % candidates.size()]
 
 
 ## 波次预算：B(n) = 首波 × 阶段倍率 × growth^(n-1)；终波使用固定预算。

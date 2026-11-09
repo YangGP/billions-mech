@@ -64,6 +64,11 @@ var income_multiplier_percent: int = 100
 var extraction_multiplier_percent: int = 100
 var cooling_multiplier_percent: int = 100
 var attack_cooldown_ticks: int = 0
+## 干扰只暂停火力，不改变运营、供电或经济；免疫窗归目标所有。
+var jam_ticks: int = 0
+var jam_immunity_ticks: int = 0
+var jam_recovery_ticks: int = 0
+var jam_source_id: int = 0
 var shot_ticks: int = 0
 var shot_target: Vector2 = Vector2.ZERO
 ## 交战状态：受击时置位，敌人保持在 THREAT_RADIUS 内时维持，
@@ -144,6 +149,10 @@ func mark_ruined() -> void:
 	extraction_multiplier_percent = 100
 	cooling_multiplier_percent = 100
 	attack_cooldown_ticks = 0
+	jam_ticks = 0
+	jam_immunity_ticks = 0
+	jam_recovery_ticks = 0
+	jam_source_id = 0
 	shot_ticks = 0
 
 
@@ -188,6 +197,8 @@ func status() -> String:
 		return "等待友军移出" if waiting_for_clearance else "施工中"
 	if phase == Phase.DEMOLISHING:
 		return "清除基座中" if hp == 0 else "拆除中"
+	if jam_ticks > 0:
+		return "受到干扰 · 火力暂停"
 	if threatened:
 		return "交战中 · 维修暂停" if repairing else "交战中"
 	if not powered:
@@ -208,6 +219,7 @@ func snapshot() -> Dictionary:
 	var result: Dictionary = definition.snapshot()
 	result.merge({"entity_id": entity_id, "origin": origin, "is_building": true,
 		"phase": phase, "status": status(), "hp": hp, "paid_cost": MechResources.copy(paid_cost),
+		"jam_ticks": jam_ticks, "jam_immunity_ticks": jam_immunity_ticks,
 		"build_progress": float(elapsed_build_ticks) / build_ticks,
 		"demolition_progress": float(elapsed_demolition_ticks) / demolition_ticks,
 		"demolition_seconds": definition.demolition_seconds, "refund": refund(),

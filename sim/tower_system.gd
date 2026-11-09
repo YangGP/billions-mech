@@ -19,7 +19,7 @@ func advance(registry: MechEntityRegistry, buildings: Array[MechBuildingState], 
 			continue
 		building.attack_cooldown_ticks = maxi(0, building.attack_cooldown_ticks - 1)
 		building.shot_ticks = maxi(0, building.shot_ticks - 1)
-		if not building.operating() or building.attack_cooldown_ticks > 0:
+		if not building.operating() or building.jam_ticks > 0 or building.attack_cooldown_ticks > 0:
 			continue
 		var center: Vector2 = Vector2(building.origin) + Vector2(building.definition.footprint) * 0.5
 		var target: MechEntityState = _nearest_enemy(registry, center, building.definition.attack_range, grid, vision)

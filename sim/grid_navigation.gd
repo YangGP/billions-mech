@@ -9,6 +9,7 @@ var _grid: MechGridState
 var _ignored_occupants: Dictionary = {}
 ## 友军可穿越模式：被网格标记为可穿越的占用者不再阻挡寻路。
 var _friendly_pass: bool = false
+var _ignore_rough: bool = false
 ## 上次同步的网格版本号，用于增量更新。
 var _revision: int = -1
 var _terrain_revision: int = -1
@@ -20,8 +21,9 @@ func set_friendly_pass(enabled: bool) -> void:
 
 ## 重建 A* 网格。换网格、地形版本变化或忽略占用表变化时全量刷新，
 ## 否则只更新自上次版本以来的脏格子。
-func rebuild(grid: MechGridState, ignored_occupants: Dictionary = {}) -> void:
-	var full_refresh: bool = _grid != grid or _terrain_revision != grid.terrain_revision() or _ignored_occupants != ignored_occupants
+func rebuild(grid: MechGridState, ignored_occupants: Dictionary = {}, ignore_rough: bool = false) -> void:
+	var full_refresh: bool = _grid != grid or _terrain_revision != grid.terrain_revision() or _ignored_occupants != ignored_occupants or _ignore_rough != ignore_rough
+	_ignore_rough = ignore_rough
 	_grid = grid
 	_ignored_occupants = ignored_occupants.duplicate()
 	if full_refresh:
@@ -36,7 +38,7 @@ func rebuild(grid: MechGridState, ignored_occupants: Dictionary = {}) -> void:
 			for x: int in range(grid.dimensions().x):
 				var cell := Vector2i(x, y)
 				_navigation.set_point_solid(cell, not grid.is_walkable(cell, true, _ignored_occupants, _friendly_pass))
-				_navigation.set_point_weight_scale(cell, grid.movement_weight(cell))
+				_navigation.set_point_weight_scale(cell, 1.0 if _ignore_rough else grid.movement_weight(cell))
 	else:
 		# set_point_solid 会原地更新原生网格；update() 会清空全部点数据，
 		# 逼得每段墙都引发一次全图重写。
@@ -119,5 +121,5 @@ func _segment_cost(from: Vector2, to: Vector2) -> float:
 	var weight: float = 0.0
 	for index: int in range(steps):
 		var point: Vector2 = from.lerp(to, (index + 0.5) / float(steps))
-		weight += _grid.movement_weight(Vector2i(point.floor()))
+		weight += 1.0 if _ignore_rough else _grid.movement_weight(Vector2i(point.floor()))
 	return length * weight / float(steps)

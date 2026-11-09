@@ -39,17 +39,25 @@ func family_root(id: StringName) -> StringName:
 	return _family_roots.get(id, id)
 
 
-## 由定义表的 upgrade_to 关系反推每一级的直接父级，再逐级上溯到族根。
+## 遍历全部 upgrade_to 引用收集各级定义，再逐级上溯到族根。
 func _rebuild_family_roots() -> void:
 	_family_roots.clear()
 	var parents: Dictionary[StringName, StringName] = {}
-	for rules: MechBuildingDefinition in _definitions.values():
+	var ids: Dictionary[StringName, bool] = {}
+	var pending: Array[MechBuildingDefinition] = []
+	pending.assign(_definitions.values())
+	while not pending.is_empty():
+		var rules: MechBuildingDefinition = pending.pop_back()
+		if ids.has(rules.building_id):
+			continue
+		ids[rules.building_id] = true
 		if rules.upgrade_to != null:
 			parents[rules.upgrade_to.building_id] = rules.building_id
-	for id: StringName in _definitions:
+			pending.append(rules.upgrade_to)
+	for id: StringName in ids:
 		var root: StringName = id
 		var guard: int = 0
-		while parents.has(root) and guard <= _definitions.size():
+		while parents.has(root) and guard < ids.size():
 			root = parents[root]
 			guard += 1
 		_family_roots[id] = root

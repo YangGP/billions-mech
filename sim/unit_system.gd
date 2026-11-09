@@ -2,7 +2,7 @@ class_name MechUnitSystem
 extends RefCounted
 ## 玩家指令与 M4 静态目标战斗循环。无场景依赖。
 ## 对敌人的命中以结果返回；伤害由 SimCore 统一应用，
-## 使原型机的电磁庇护等效果经由同一入口生效。
+## 使偏转场与拾荒防护等效果经由同一入口生效。
 
 ## 战斗级噪声发射器（由 SimCore 设置）；每次开火的命中点都会触发。
 var combat_noise: Callable = Callable()

@@ -23,6 +23,7 @@ const OPERATION_NOISE_INTERVAL_SECONDS: float = 5.0
 var _active: bool = false
 ## 建造者定义：既是感疫产物，也是环境散兵；散兵在生成时标记为游荡形态。
 var _builder: MechEnemyDefinition
+var _ambient: MechEnemyDefinition
 var _pending_scatter: Array[Vector2] = []
 var _edge_cells: Array[Vector2] = []
 var _backfill_ticks: int = 0
@@ -40,13 +41,18 @@ var _tick_rate: int = 30
 ## 从敌种定义表与全局设置装配参数；返回错误描述，空字符串表示成功。
 func configure(definitions: Array[MechEnemyDefinition], settings: MechFoundationSettings) -> String:
 	_builder = null
+	_ambient = null
 	for rules: MechEnemyDefinition in definitions:
 		if rules == null:
 			continue
 		if rules.enemy_id == &"builder":
 			_builder = rules
+		elif rules.enemy_id == &"builder_worn":
+			_ambient = rules
 	if _builder == null:
 		return "缺少建造者定义（游荡散兵与感疫产出共用）"
+	if _ambient == null:
+		_ambient = _builder
 	_radius_combat = maxf(1.0, settings.noise_radius_combat)
 	_radius_construction = maxf(1.0, settings.noise_radius_construction)
 	_radius_operation = maxf(1.0, settings.noise_radius_operation)
@@ -102,13 +108,13 @@ func advance(buildings: Array[MechBuildingState]) -> Array[Dictionary]:
 		var scatter: Array[Vector2] = _pending_scatter.duplicate()
 		_pending_scatter.clear()
 		for position: Vector2 in scatter:
-			requests.append({"enemy_id": _builder.enemy_id, "position": position, "wandering": true})
+			requests.append({"enemy_id": _ambient.enemy_id, "position": position, "wandering": true})
 		return requests
 	_backfill_ticks += 1
 	if _backfill_ticks < _backfill_interval or _edge_cells.is_empty():
 		return requests
 	_backfill_ticks = 0
-	requests.append({"enemy_id": _builder.enemy_id, "position": _edge_cells[randi() % _edge_cells.size()], "wandering": true})
+	requests.append({"enemy_id": _ambient.enemy_id, "position": _edge_cells[randi() % _edge_cells.size()], "wandering": true})
 	return requests
 
 

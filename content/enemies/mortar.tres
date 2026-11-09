@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="MechEnemyDefinition" format=3]
+[ext_resource type="Script" path="res://content/enemy_definition.gd" id="1"]
+[resource]
+script = ExtResource("1")
+enemy_id = &"mortar"
+display_name = "C-06 臼炮"
+elite = true
+max_hp = 1200
+damage = 25
+damage_vs_building = 60
+attack_seconds = 4.0
+attack_range = 8.0
+move_speed = 0.9
+vision_radius = 10.0
+threat_cost = 30.0
+minimum_stage = 2
+first_wave = 3
+prefers_buildings = true
+prefers_towers = true
+splash_radius = 1.5

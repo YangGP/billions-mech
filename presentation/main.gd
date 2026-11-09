@@ -187,8 +187,11 @@ func _stress_advance(delta: float) -> void:
 	_stress_step += 1
 	if _stress_step % 4 == 0:
 		var center: Vector2 = Vector2(SETTINGS.map_definition.mainbrain_origin) + Vector2(24, 0)
-		_sim.spawn_diagnostic_enemy(&"builder", center + Vector2(0, -6))
-		_sim.spawn_diagnostic_enemy(&"builder", center + Vector2(0, 6))
+		var roster: Array[StringName] = [&"builder", &"builder_worn", &"builder_veteran", &"recycler",
+			&"scavenger", &"deflector", &"strider", &"mortar", &"silencer"]
+		var offset: int = (_stress_step / 4 - 1) * 2
+		_sim.spawn_diagnostic_enemy(roster[offset % roster.size()], center + Vector2(0, -6))
+		_sim.spawn_diagnostic_enemy(roster[(offset + 1) % roster.size()], center + Vector2(0, 6))
 	if _stress_step % 8 == 0:
 		var index: int = 0
 		for entity: Dictionary in _state["entities"]:
@@ -736,7 +739,8 @@ func _select_same_kind(point: Vector2) -> void:
 		var chosen: Dictionary[int, bool] = {}
 		var units: Array[int] = []
 		for entity: Dictionary in same_kind:
-			if visible.has_point(entity["position"]):
+			# 镜头矩形使用等距投影坐标；命中的单位始终作为扩选起点。
+			if entity["id"] == hit or visible.has_point(MechIsoGeometry.project(entity["position"])):
 				chosen[entity["id"]] = true
 				units.append(entity["id"])
 		while not units.is_empty():

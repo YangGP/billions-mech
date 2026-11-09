@@ -29,6 +29,9 @@ enum WaveTrigger { DEVELOPMENT_OR_TIME, TIME_ONLY, DEVELOPMENT_SCORE }
 
 ## 威胁方（values.md 	2/	12/	13/	15）。训练关卡保持 threat_enabled 关闭。
 @export var enemy_definitions: Array[MechEnemyDefinition] = []
+@export_range(1, 1000, 1) var ordinary_per_elite: int = 100
+@export_range(1, 3, 1) var max_elite_types: int = 3
+@export_range(2, 3, 1) var max_jammed_towers: int = 3
 @export var threat_enabled: bool = true
 @export var wave_trigger_mode: WaveTrigger = WaveTrigger.DEVELOPMENT_OR_TIME
 @export_range(0.0, 3600.0, 1.0) var silence_seconds: float = 600.0

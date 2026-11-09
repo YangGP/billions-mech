@@ -143,6 +143,8 @@ func _draw() -> void:
 			var target: Vector2 = _project(entity["shot_target"]) + Vector2(0, -20)
 			draw_line(point + Vector2(0, -24), target, Color("f0d594"), 2.0, true)
 			draw_circle(target, 5.0, Color("f0d594"))
+		if entity.get("jam_ticks", 0) > 0:
+			draw_arc(point + Vector2(0, -24), 28.0, 0.0, TAU, 20, Color("87d9ed"), 3.0, true)
 
 
 func _draw_sentinel(entity: Dictionary, point: Vector2) -> void:
@@ -173,13 +175,19 @@ func _draw_practice_target(entity: Dictionary, point: Vector2) -> void:
 
 
 func _draw_enemy(entity: Dictionary, point: Vector2) -> void:
-	if entity.get("enemy_id", &"") == &"prototype":
-		_draw_prototype(entity, point)
+	if entity.get("elite", false):
+		_draw_elite(entity, point)
 		return
 	_draw_shadow(point, Vector2(16, 8))
 	var body := PackedVector2Array([point + Vector2(-10, -8), point + Vector2(-10, -24),
 		point + Vector2(0, -32), point + Vector2(10, -24), point + Vector2(10, -8), point])
-	draw_colored_polygon(body, Color("c9908b"))
+	var color: Color = {&"builder_worn": Color("8b7770"), &"builder_veteran": Color("db6464"),
+		&"recycler": Color("d9a15d")}.get(entity.get("enemy_id", &""), Color("c9908b"))
+	draw_colored_polygon(body, color)
+	if entity.get("enemy_id", &"") == &"recycler":
+		draw_rect(Rect2(point + Vector2(-17, -16), Vector2(34, 10)), color.darkened(0.3))
+	if entity.get("charge_ticks", 0) > 0:
+		draw_line(point + Vector2(-6, 3), point + Vector2(6, 3), Color("f0d594"), 3.0, true)
 	draw_line(point + Vector2(-6, -21), point + Vector2(6, -21), Color("7a2e28"), 3.0, true)
 	draw_line(point + Vector2(-6, -13), point + Vector2(6, -13), Color("7a2e28"), 3.0, true)
 	draw_rect(Rect2(point + Vector2(-16, -42), Vector2(32, 3)), Color("213540"))
@@ -188,24 +196,40 @@ func _draw_enemy(entity: Dictionary, point: Vector2) -> void:
 		_draw_shelter_mark(point)
 
 
-## 原型机：采用醒目的重型剪影，让"集火它"一眼可读（waves-enemies.md §8.2）；它还自带庇护光环标记。
-func _draw_prototype(entity: Dictionary, point: Vector2) -> void:
+## 精英复用既有集中绘制；颜色与上装区分五类核心特点。
+func _draw_elite(entity: Dictionary, point: Vector2) -> void:
+	var id: StringName = entity.get("enemy_id", &"")
+	var tint: Color = {&"scavenger": Color("cc9d61"), &"deflector": Color("a78dde"),
+		&"strider": Color("77bf96"), &"mortar": Color("c67c66"), &"silencer": Color("77c7db")}.get(id, Color("c9a0e8"))
 	_draw_shadow(point, Vector2(26, 13))
 	var body := PackedVector2Array([point + Vector2(-18, -6), point + Vector2(-18, -34),
 		point + Vector2(0, -48), point + Vector2(18, -34), point + Vector2(18, -6), point])
-	draw_colored_polygon(body, Color("6e5a78"))
+	draw_colored_polygon(body, tint.darkened(0.3))
 	draw_colored_polygon(PackedVector2Array([point + Vector2(-11, -28), point + Vector2(-11, -40),
 		point + Vector2(0, -44), point + Vector2(11, -40), point + Vector2(11, -28)]), Color("4a3a55"))
-	draw_line(point + Vector2(-8, -34), point + Vector2(8, -34), Color("c9a0e8"), 3.0, true)
-	draw_line(point + Vector2(-8, -24), point + Vector2(8, -24), Color("c9a0e8"), 3.0, true)
-	draw_line(point + Vector2(-8, -14), point + Vector2(8, -14), Color("c9a0e8"), 3.0, true)
+	draw_line(point + Vector2(-8, -34), point + Vector2(8, -34), tint, 3.0, true)
+	match id:
+		&"strider":
+			for side: int in [-1, 1]:
+				draw_polyline(PackedVector2Array([point + Vector2(side * 10, -22), point + Vector2(side * 29, -13), point + Vector2(side * 31, 5)]), tint, 4.0, true)
+		&"mortar":
+			draw_line(point + Vector2(0, -26), point + Vector2(18, -57), tint, 9.0, true)
+		&"silencer":
+			draw_line(point + Vector2(0, -36), point + Vector2(0, -68), tint, 3.0, true)
+			draw_arc(point + Vector2(0, -58), 11, PI, TAU, 12, tint, 2.0, true)
+		&"deflector":
+			draw_arc(point + Vector2(0, -25), 29, 0, TAU, 24, tint, 2.0, true)
+		&"scavenger":
+			draw_rect(Rect2(point + Vector2(-22, -29), Vector2(44, 12)), tint)
+			if entity.get("scavenge_stacks", 0) > 0:
+				draw_arc(point + Vector2(0, -17), 25, 0, TAU, 20, tint, 3.0, true)
 	draw_rect(Rect2(point + Vector2(-24, -58), Vector2(48, 4)), Color("213540"))
-	draw_rect(Rect2(point + Vector2(-24, -58), Vector2(48.0 * float(entity["hp"]) / entity["max_hp"], 4)), Color("c9a0e8"))
+	draw_rect(Rect2(point + Vector2(-24, -58), Vector2(48.0 * float(entity["hp"]) / entity["max_hp"], 4)), tint)
 	if entity.get("sheltered", false):
 		_draw_shelter_mark(point)
 
 
-## 处于激活庇护下的敌人带一圈淡色圆环，让玩家在开火前就能看到 50% 减伤。
+## 受偏转场保护的敌人显示减伤圆环。
 func _draw_shelter_mark(point: Vector2) -> void:
 	draw_arc(point + Vector2(0, -10), 20.0, PI * 0.15, PI * 0.85, 16, Color("c9a0e8", 0.55), 2.0, true)
 

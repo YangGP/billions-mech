@@ -3,8 +3,7 @@ extends RefCounted
 ## 虫群行军：静态地形场提供战略方向。相互重叠的局部场引导未交战的
 ## 敌人经由可达缺口行进，并提供绕行前方建筑的短途支线。已交战的敌人
 ## 保持原目标不变；墙只在接触时被攻击，绝不因其可见而被选中。
-## HP 不会使任何场失效。局部场使用真实移动规则；穿墙单位共享全局场
-## 并缓存豁免墙体的局部场。
+## HP 不会使任何场失效。长足者共用免崎岖权重静态场及豁免墙的局部场。
 
 ## 转向混合权重：流场速度与同类分离力各占的比重。
 const FLOW_WEIGHT: float = 1.0
@@ -36,18 +35,18 @@ const SHUFFLE_DECISION_SECONDS: float = 8.0
 const SHUFFLE_RADIUS: int = 2
 const SHUFFLE_ATTEMPTS: int = 6
 
-const WALL_ID: StringName = &"armored_wall"
-
 var profiling_enabled: bool = false
 var _field := MechMarchField.new()
+## 长足者共享忽略崎岖权重的静态场，不为单个敌人重复求解。
+var _wall_field := MechMarchField.new()
 ## 穿墙单位沿用普通行军场，只在移动时无视墙体碰撞。
 ## 这份额外的 A* 仅用于追击/寻路查询，并非第二套场。
-var _proto_navigation := MechGridNavigation.new()
+var _wall_navigation := MechGridNavigation.new()
 var _wall_ids: Dictionary = {}
 var _goal: Vector2i = Vector2i.ZERO
 var _field_revision: int = -1
-var _proto_navigation_revision: int = -1
-var _proto_navigation_geometry: Dictionary = {}
+var _wall_navigation_revision: int = -1
+var _wall_navigation_geometry: Dictionary = {}
 var _zones: Dictionary = {}
 var _zone_grid_revision: int = -1
 var _zone_task: int = -1
@@ -70,10 +69,11 @@ func reset(_grid: MechGridState, goal: Vector2i, _buildings: Array[MechBuildingS
 	_tick_counter = 0
 	_goal = goal
 	_field = MechMarchField.new()
-	_proto_navigation = MechGridNavigation.new()
+	_wall_field = MechMarchField.new()
+	_wall_navigation = MechGridNavigation.new()
 	_field_revision = -1
-	_proto_navigation_revision = -1
-	_proto_navigation_geometry.clear()
+	_wall_navigation_revision = -1
+	_wall_navigation_geometry.clear()
 	_zones.clear()
 	_zone_grid_revision = -1
 	_wall_ids.clear()
@@ -94,7 +94,7 @@ func shutdown() -> void:
 ## 共享场只依赖静态地形，因此从不需要签名校验。穿墙 A* 仍需要
 ## 非墙几何用于追击/寻路查询；墙的几何与墙的 HP 都被刻意排除在外。
 func _nav_signature(buildings: Array[MechBuildingState]) -> Dictionary:
-	var proto_geometry: Dictionary = {}
+	var wall_geometry: Dictionary = {}
 	var wall_ids: Dictionary = {}
 	for building: MechBuildingState in buildings:
 		if building.hp <= 0:
@@ -104,30 +104,30 @@ func _nav_signature(buildings: Array[MechBuildingState]) -> Dictionary:
 		if Rect2i(building.origin, building.definition.footprint).has_point(_goal):
 			continue
 		if not building.definition.is_wall_like():
-			proto_geometry[building.entity_id] = Vector4i(
+			wall_geometry[building.entity_id] = Vector4i(
 				building.origin.x, building.origin.y,
 				building.definition.footprint.x, building.definition.footprint.y
 			)
-	return {"proto_geometry": proto_geometry, "wall_ids": wall_ids}
+	return {"wall_geometry": wall_geometry, "wall_ids": wall_ids}
 
 
 ## 收集上次的构建结果，并按需在 Worker 线程重建共享行军场与穿墙 A*。
-func _refresh_field(grid: MechGridState, buildings: Array[MechBuildingState], need_main: bool, need_proto: bool) -> void:
+func _refresh_field(grid: MechGridState, buildings: Array[MechBuildingState], need_main: bool, need_wall: bool) -> void:
 	# 闲逛者复用现有 A*，从不消耗核心行军场。
 	# 共享场只含地形，绝不因建筑而失效。
 	_collect_field_result(buildings)
-	if _field_task >= 0 or (not need_main and not need_proto):
+	if _field_task >= 0 or (not need_main and not need_wall):
 		return
 	var revision: int = grid.revision()
 	var signatures: Dictionary = _nav_signature(buildings)
-	var proto_geometry: Dictionary = signatures["proto_geometry"]
+	var wall_geometry: Dictionary = signatures["wall_geometry"]
 	var wall_ids: Dictionary = signatures["wall_ids"]
 	var rebuild_main: bool = need_main and _field_revision < 0
 	# 穿墙 A* 只用于追击/寻路查询；它无视墙的占位，
 	# 因此只有非墙几何变化才会使其失效。
-	var nav_stale: bool = _proto_navigation_revision < 0 \
-		or _proto_navigation_geometry != proto_geometry
-	var rebuild_nav: bool = need_proto and nav_stale
+	var nav_stale: bool = _wall_navigation_revision < 0 \
+		or _wall_navigation_geometry != wall_geometry
+	var rebuild_nav: bool = need_wall and nav_stale
 	if not rebuild_main and not rebuild_nav:
 		_wall_ids = wall_ids
 		return
@@ -136,7 +136,7 @@ func _refresh_field(grid: MechGridState, buildings: Array[MechBuildingState], ne
 	var job: Dictionary = {"grid": grid.navigation_copy(), "goal": _goal,
 		"wall_ids": wall_ids, "revision": revision,
 		"main": rebuild_main, "nav": rebuild_nav,
-		"proto_geometry": proto_geometry, "profiling": profiling_enabled}
+		"wall_geometry": wall_geometry, "profiling": profiling_enabled}
 	_field_task = WorkerThreadPool.add_task(_compute_fields.bind(job), false, "Mech march fields")
 	if profiling_enabled:
 		print("[perf:fields] submit_ms=%.3f revision=%d" % [(Time.get_ticks_usec() - started) / 1000.0, revision])
@@ -146,17 +146,20 @@ func _refresh_field(grid: MechGridState, buildings: Array[MechBuildingState], ne
 func _compute_fields(job: Dictionary) -> void:
 	var started: int = Time.get_ticks_usec() if job["profiling"] else 0
 	var output: Dictionary = {"revision": job["revision"],
-		"proto_geometry": job["proto_geometry"], "wall_ids": job["wall_ids"]}
+		"wall_geometry": job["wall_geometry"], "wall_ids": job["wall_ids"]}
 	var grid: MechGridState = job["grid"]
 	if job["main"]:
 		var field := MechMarchField.new()
 		field.rebuild(grid, job["goal"])
 		output["field"] = field
+		var wall_field := MechMarchField.new()
+		wall_field.rebuild(grid.navigation_copy(true), job["goal"])
+		output["wall_field"] = wall_field
 	if job["nav"]:
 		# 每个 AStarGrid2D 同一时刻只归属一个线程，任务完成后才移交；
 		# 不存在并发访问活跃 A* 对象的情况。
 		var navigation := MechGridNavigation.new()
-		navigation.rebuild(grid, job["wall_ids"])
+		navigation.rebuild(grid, job["wall_ids"], true)
 		output["navigation"] = navigation
 	if job["profiling"]:
 		output["worker_ms"] = (Time.get_ticks_usec() - started) / 1000.0
@@ -178,20 +181,21 @@ func _collect_field_result(buildings: Array[MechBuildingState]) -> void:
 	var current: Dictionary = _nav_signature(buildings)
 	# 共享场只含地形，与建筑无关、始终有效。穿墙 A*
 	# 只用于追击/寻路查询，依赖非墙几何。
-	var nav_ok: bool = result.get("proto_geometry", {}) == current["proto_geometry"]
+	var nav_ok: bool = result.get("wall_geometry", {}) == current["wall_geometry"]
 	var applied_main: bool = false
 	var applied_nav: bool = false
 	if result.has("field"):
 		_field = result["field"]
+		_wall_field = result["wall_field"]
 		_field_revision = result["revision"]
 		applied_main = true
 	if result.has("navigation") and nav_ok:
-		_proto_navigation = result["navigation"]
-		_proto_navigation_revision = result["revision"]
-		_proto_navigation_geometry = result["proto_geometry"]
+		_wall_navigation = result["navigation"]
+		_wall_navigation_revision = result["revision"]
+		_wall_navigation_geometry = result["wall_geometry"]
 		applied_nav = true
 	elif result.has("navigation"):
-		_proto_navigation_revision = -1
+		_wall_navigation_revision = -1
 	_wall_ids = current["wall_ids"]
 	if result.has("worker_ms"):
 		print("[perf:fields] worker_ms=%.3f main=%s nav=%s revision=%d" % [
@@ -279,8 +283,8 @@ func _submit_zone(key: Vector3i, zone: Dictionary, grid: MechGridState, building
 		copy.definition = building.definition
 		frozen.append(copy)
 	var input: Dictionary = {"key": key, "bounds": zone["bounds"], "passes_walls": zone["passes_walls"],
-		"grid": grid.navigation_copy(), "revision": grid.revision(), "buildings": frozen,
-		"global": _field, "wall_ids": _wall_ids.duplicate(), "profiling": profiling_enabled}
+		"grid": grid.navigation_copy(zone["passes_walls"]), "revision": grid.revision(), "buildings": frozen,
+		"global": _wall_field if zone["passes_walls"] else _field, "wall_ids": _wall_ids.duplicate(), "profiling": profiling_enabled}
 	_zone_task = WorkerThreadPool.add_task(_compute_zone.bind(input), false, "Mech local field")
 	if profiling_enabled:
 		print("[perf:assault-submit] ms=%.3f bounds=%s" % [(Time.get_ticks_usec() - started) / 1000.0, bounds])
@@ -389,17 +393,18 @@ func _build_zone(zone: Dictionary, grid: MechGridState, buildings: Array[MechBui
 ## 局部可达出口必须改善战略进展才被采用，且额外路长受限，
 ## 以免某个区域把虫群诱入漫长的折返或绕行。
 func _march_field_for(enemy: MechEntityState) -> MechMarchField:
+	var global_field: MechMarchField = _wall_field if enemy.enemy_definition.ignores_rough else _field
 	var zone: Dictionary = _zones.get(enemy.march_zone, {})
 	if zone.is_empty() or zone["dirty"]:
-		return _field
+		return global_field
 	var local: MechMarchField = zone["forward"]
 	var cell := Vector2i(enemy.position.floor())
 	var source: Vector2i = local.source_at(cell)
 	if source.x < 0:
-		return _field
-	var here: float = _field.cost_at(cell)
-	if _field.cost_at(source) >= here or local.cost_at(cell) > here + BREACH_DETOUR:
-		return _field
+		return global_field
+	var here: float = global_field.cost_at(cell)
+	if global_field.cost_at(source) >= here or local.cost_at(cell) > here + BREACH_DETOUR:
+		return global_field
 	return local
 
 
@@ -416,7 +421,8 @@ func _opportunistic_target(enemy: MechEntityState) -> int:
 		return 0
 	var source: Vector2i = nearby.source_at(cell)
 	# 只有严格改善战略进展（progress ≤ 0）且总绕行不超上限，才值得顺手攻击。
-	var progress: float = _field.cost_at(source) - _field.cost_at(cell)
+	var global_field: MechMarchField = _wall_field if enemy.enemy_definition.ignores_rough else _field
+	var progress: float = global_field.cost_at(source) - global_field.cost_at(cell)
 	if progress > 0.0 or distance + progress > OPPORTUNISTIC_DETOUR:
 		return 0
 	return zone["owners"].get(source, 0)
@@ -461,7 +467,7 @@ func advance(registry: MechEntityRegistry, grid: MechGridState, navigation: Mech
 	var enemy_buckets: Dictionary = {}
 	var enemies: Array[MechEntityState] = []
 	var need_main: bool = false
-	var need_proto: bool = false
+	var need_wall: bool = false
 	for entity: MechEntityState in registry.all():
 		if entity.hp <= 0 or entity.garrisoned:
 			continue
@@ -473,15 +479,14 @@ func advance(registry: MechEntityRegistry, grid: MechGridState, navigation: Mech
 			_mark_active_region(unit_cell, active_regions)
 		elif entity.team == 2 and entity.enemy_definition != null:
 			enemies.append(entity)
-			need_proto = need_proto or entity.enemy_definition.passes_walls
-			# 穿墙单位读取与普通行军者相同的加权场，
-			# 只是碰撞时无视装甲墙。
+			need_wall = need_wall or entity.enemy_definition.passes_walls
+			# 同类敌人共用其通行权重的场，长足者另外豁免墙体碰撞。
 			need_main = need_main or not entity.wandering
 			var enemy_cell := Vector2i(entity.position.floor())
 			if not enemy_buckets.has(enemy_cell):
 				enemy_buckets[enemy_cell] = []
 			enemy_buckets[enemy_cell].append(entity)
-	_refresh_field(grid, buildings, need_main, need_proto)
+	_refresh_field(grid, buildings, need_main, need_wall)
 	_refresh_zones(enemies, buildings, grid, active_regions)
 	var dt: float = 1.0 / float(hz)
 	var tick: int = _tick_counter
@@ -498,7 +503,7 @@ func advance(registry: MechEntityRegistry, grid: MechGridState, navigation: Mech
 			enemy.repath_ticks = 0
 		enemy.fog_coarse = coarse
 		var passes_walls: bool = enemy.enemy_definition.passes_walls
-		_advance_one(enemy, registry, grid, _proto_navigation if passes_walls else navigation, buildings_by_id,
+		_advance_one(enemy, registry, grid, _wall_navigation if passes_walls else navigation, buildings_by_id,
 			non_wall_cells if passes_walls else building_cells, unit_buckets, enemy_buckets, noises, tick, dt, hz, result, coarse)
 		# 效果衰减在上一步移动之后应用，恰好覆盖完整的本步时长。
 		enemy.advance_slow()
@@ -526,9 +531,10 @@ func _advance_one(enemy: MechEntityState, registry: MechEntityRegistry, grid: Me
 	var rules: MechEnemyDefinition = enemy.enemy_definition
 	if rules == null:
 		return
-	if rules.passes_walls and _proto_navigation_revision < 0:
+	if rules.passes_walls and _wall_navigation_revision < 0:
 		return
 	enemy.cooldown_ticks = maxi(0, enemy.cooldown_ticks - 1)
+	enemy.charge_ticks = maxi(0, enemy.charge_ticks - 1)
 	enemy.shot_ticks = maxi(0, enemy.shot_ticks - 1)
 	enemy.repath_ticks = maxi(0, enemy.repath_ticks - 1)
 	# 受到攻击是立即交战条件，即使还没到视野扫描时刻。
@@ -617,7 +623,7 @@ func _walk_wanderer(enemy: MechEntityState, grid: MechGridState, enemy_buckets: 
 	if not enemy.has_move_order:
 		return
 	var cell: Vector2i = Vector2i(enemy.position.floor())
-	var speed: float = enemy.enemy_definition.move_speed * enemy.enemy_definition.wandering_speed_ratio * enemy.slow_multiplier / grid.movement_weight(cell)
+	var speed: float = _movement_speed(enemy, grid, cell) * (1.0 if enemy.charge_ticks > 0 else enemy.enemy_definition.wandering_speed_ratio)
 	var velocity: Vector2 = enemy.preferred_velocity(speed, dt, grid.mobile_segment_clear.bind(_wall_ids if enemy.enemy_definition.passes_walls else {}))
 	if velocity == Vector2.ZERO:
 		enemy.finish_path_if_arrived()
@@ -651,8 +657,8 @@ func _advance_marching(enemy: MechEntityState, grid: MechGridState, enemy_bucket
 	var field: MechMarchField = _march_field_for(enemy)
 	var flow_dir: Vector2 = field.flow_at(cell)
 	if flow_dir == Vector2.ZERO:
-		flow_dir = _field.flow_at(cell)
-	var speed: float = enemy.enemy_definition.move_speed * enemy.slow_multiplier / grid.movement_weight(cell)
+		flow_dir = (_wall_field if enemy.enemy_definition.ignores_rough else _field).flow_at(cell)
+	var speed: float = _movement_speed(enemy, grid, cell)
 	var desired: Vector2 = Steering.desired_velocity(flow_dir, speed)
 	var separation: Vector2 = Steering.separation(enemy.position, _separation_neighbors(enemy, enemy_buckets), SEPARATION_RADIUS)
 	var velocity: Vector2 = Steering.combine(desired, separation, FLOW_WEIGHT, SEPARATION_WEIGHT, speed)
@@ -685,6 +691,9 @@ func _advance_engaged(enemy: MechEntityState, registry: MechEntityRegistry, grid
 	else:
 		aim_point = target_unit.position
 		in_range = enemy.position.distance_to(target_unit.position) <= rules.attack_range
+	# 持有有效可感知目标才刷新冲锋；失去感知只保留一秒余速。
+	if enemy.position.distance_to(aim_point) <= rules.vision_radius and grid.terrain_line_clear(enemy.position, aim_point):
+		enemy.charge_ticks = maxi(1, ceili(rules.charge_linger_seconds * hz)) if rules.charge_bonus > 0.0 else 0
 	# 站定攻击：射程内且地形视线通畅时结算一次伤害。
 	if in_range and grid.terrain_line_clear(enemy.position, aim_point):
 		enemy.set_move_path(PackedVector2Array())
@@ -701,6 +710,8 @@ func _advance_engaged(enemy: MechEntityState, registry: MechEntityRegistry, grid
 				target_unit.hp = maxi(0, target_unit.hp - rules.damage)
 				if target_unit.hp == 0:
 					result["dead_units"].append(target_unit.entity_id)
+			if rules.splash_radius > 0.0:
+				_apply_splash(enemy, aim_point, target_id, registry, buildings_by_id, grid, result)
 		return
 	# 逼近建筑时允许部分重叠，让整个群体都能贴到目标。
 	var separation_radius: float = CROWD_SEPARATION_RADIUS if target_building != null else SEPARATION_RADIUS
@@ -731,7 +742,7 @@ func _chase(enemy: MechEntityState, grid: MechGridState, navigation: MechGridNav
 	if not enemy.has_move_order:
 		return
 	var cell: Vector2i = Vector2i(enemy.position.floor())
-	var speed: float = enemy.enemy_definition.move_speed * enemy.slow_multiplier / grid.movement_weight(cell)
+	var speed: float = _movement_speed(enemy, grid, cell)
 	var velocity: Vector2 = enemy.preferred_velocity(speed, dt, navigation.segment_clear)
 	if velocity == Vector2.ZERO:
 		# 走完的路径让敌人得以朝移动目标重新寻路。
@@ -746,6 +757,34 @@ func _chase(enemy: MechEntityState, grid: MechGridState, navigation: MechGridNav
 
 func _repath_interval(dt: float) -> int:
 	return maxi(1, ceili(1.0 / dt))
+
+
+func _movement_speed(enemy: MechEntityState, grid: MechGridState, cell: Vector2i) -> float:
+	var rules: MechEnemyDefinition = enemy.enemy_definition
+	var speed: float = rules.move_speed + (rules.charge_bonus if enemy.charge_ticks > 0 else 0.0)
+	if enemy.speed_boost_ticks > 0:
+		speed = maxf(speed, rules.boost_speed)
+	return speed * enemy.slow_multiplier / (1.0 if rules.ignores_rough else grid.movement_weight(cell))
+
+
+## 炮击只影响固定落点附近的合法目标；直接命中已单独登记，不重复计伤。
+func _apply_splash(enemy: MechEntityState, point: Vector2, primary: int, registry: MechEntityRegistry,
+		buildings: Dictionary, grid: MechGridState, result: Dictionary) -> void:
+	var rules: MechEnemyDefinition = enemy.enemy_definition
+	for building: MechBuildingState in buildings.values():
+		if building.entity_id == primary or building.hp <= 0:
+			continue
+		var area := Rect2(Vector2(building.origin), Vector2(building.definition.footprint))
+		var closest: Vector2 = point.clamp(area.position, area.end)
+		if point.distance_to(closest) <= rules.splash_radius and grid.terrain_line_clear(point, closest):
+			result["building_hits"].append({"id": building.entity_id, "damage": rules.building_damage()})
+	for unit: MechEntityState in registry.all():
+		if unit.entity_id == primary or unit.team != 1 or unit.unit_definition == null or unit.hp <= 0 or unit.garrisoned:
+			continue
+		if point.distance_to(unit.position) <= rules.splash_radius and grid.terrain_line_clear(point, unit.position):
+			unit.hp = maxi(0, unit.hp - rules.damage)
+			if unit.hp == 0:
+				result["dead_units"].append(unit.entity_id)
 
 
 func _engage(enemy: MechEntityState, target_id: int) -> void:
@@ -772,6 +811,8 @@ func _acquire_target(enemy: MechEntityState, grid: MechGridState, unit_buckets: 
 	var best_distance: float = INF
 	var best_building: int = _opportunistic_target(enemy) if not enemy.wandering else 0
 	var best_building_distance: float = INF
+	var best_tower: int = 0
+	var best_tower_distance: float = INF
 	for y: int in range(center.y - radius, center.y + radius + 1):
 		for x: int in range(center.x - radius, center.x + radius + 1):
 			var cell := Vector2i(x, y)
@@ -793,6 +834,9 @@ func _acquire_target(enemy: MechEntityState, grid: MechGridState, unit_buckets: 
 			var building_distance: float = enemy.position.distance_squared_to(cell_center)
 			if building_distance > vision_squared or not grid.terrain_line_clear(enemy.position, cell_center):
 				continue
+			if rules.prefers_towers and building.definition.attack_damage > 0 and building_distance < best_tower_distance:
+				best_tower = building_id
+				best_tower_distance = building_distance
 			# 行军者只有已在射程内才直接锁定建筑；
 			# 更远的接近交给可达且有界的绕行场处理。
 			if not enemy.wandering and not _building_in_range(enemy, building, rules.attack_range):
@@ -800,6 +844,8 @@ func _acquire_target(enemy: MechEntityState, grid: MechGridState, unit_buckets: 
 			if building_distance < best_building_distance:
 				best_building = building_id
 				best_building_distance = building_distance
+	if best_tower > 0:
+		return best_tower
 	if rules.prefers_buildings and best_building > 0:
 		return best_building
 	return best if best > 0 else best_building
@@ -819,7 +865,7 @@ func _separation_neighbors(enemy: MechEntityState, enemy_buckets: Dictionary) ->
 ## 逐级升级的受阻防护步（改编自 Crusade 追随者思路）：先混合速度步，
 ## 再纯方向步，最后是朝更低积分代价的基数滑动。任一级遇到建筑阻挡
 ## 都改为交战该建筑而非移动；装甲墙拦不住穿墙单位
-## （原型见 waves-enemies.md §8.2）。
+## （长足者能力见 docs/enemy-roster.md）。
 func _guarded_step(enemy: MechEntityState, velocity: Vector2, direction: Vector2, speed: float,
 		dt: float, grid: MechGridState, buildings_by_id: Dictionary) -> void:
 	if velocity.length_squared() <= 0.0:

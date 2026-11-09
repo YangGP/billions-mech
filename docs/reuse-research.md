@@ -248,3 +248,7 @@ Agent-Reach 不可用，使用网页检索。先核对高星候选 [Mindustry](h
 ## 26. 0.5.89 生命周期修复（2026-11-09）
 
 核对 [OpenRA](https://github.com/OpenRA/OpenRA)（GPL-3.0，C#/SDL 完整 RTS 引擎）：其 Actor/Trait/World 运行时不适合作为本项目纯 GDScript 模拟的直接依赖。本轮没有移植或重写其算法。直接复用项目现有的 Godot [AStarGrid2D](https://docs.godotengine.org/en/stable/classes/class_astargrid2d.html)、NavigationServer2D 避让、交易与命令模块；仅修正闸门通行参数、驻防命令生命周期、真实付款/退款归属和终波展示状态。没有新增寻路、避让或预算求解算法。
+
+## 27. 新敌人运行接入（2026-11-09）
+
+检索官方Godot示例与GDQuest Steering AI后，继续直接复用项目已接入的原生AStarGrid2D、WorkerThreadPool、Resource、现有Steering vendor和MechMarchField。没有从外部框架移植或重新实现导航算法。项目新增部分为敌人数据、阶段/配额编成及战斗状态适配；候选来源、复用边界和验证见[接入记录](../validation/enemy-integration.md)。

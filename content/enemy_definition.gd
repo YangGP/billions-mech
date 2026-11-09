@@ -14,6 +14,26 @@ extends Resource
 @export var vision_radius: float = 6.0
 ## 波次预算的威胁单价，用于按预算凑敌。
 @export var threat_cost: float = 1.0
+## 普通池各阶段相对权重；精英改用出场阶段、波序及存活配额。
+@export var stage_weights := Vector3i(35, 55, 55)
+@export var elite: bool = false
+@export_range(1, 6, 1) var max_alive: int = 6
+@export_range(1, 3, 1) var minimum_stage: int = 1
+@export_range(1, 32, 1) var first_wave: int = 1
+@export var charge_bonus: float = 0.0
+@export var charge_linger_seconds: float = 1.0
+@export var ignores_rough: bool = false
+@export var prefers_towers: bool = false
+@export var splash_radius: float = 0.0
+@export var scavenge_radius: float = 0.0
+@export var scavenge_reduction_per_death: float = 0.03
+@export var scavenge_max_reduction: float = 0.30
+@export var jam_range: float = 0.0
+@export var jam_seconds: float = 4.0
+@export var jam_immunity_seconds: float = 8.0
+@export var jam_cooldown_seconds: float = 14.0
+@export var boost_seconds: float = 6.0
+@export var boost_speed: float = 0.0
 ## 优先攻击建筑而非单位。
 @export var prefers_buildings: bool = false
 ## false = 游荡型：从不向主脑行军；以缓慢的 TAB 式挪动待机，
@@ -21,11 +41,12 @@ extends Resource
 @export var marches_to_core: bool = true
 ## 仅用于未接战时的游荡/闻声聚集；战斗追击仍用 move_speed。
 @export_range(0.1, 1.0, 0.05) var wandering_speed_ratio: float = 1.0
-## 电磁庇护（原型）：处于该单位 shelter_radius 内的敌方受到的所有来源
+## 电磁偏转场：处于该单位 shelter_radius 内的敌方受到的所有来源
 ## 伤害降低；击杀该单位后庇护解除。
 @export var shelter_radius: float = 0.0
+@export var shelter_self: bool = false
 @export_range(0.0, 1.0, 0.01) var shelter_reduction: float = 0.5
-## 穿墙（原型）：以正常速度越过装甲墙；其他建筑与障碍地形仍然阻挡
+## 长足者穿墙：以正常速度越过墙；其他建筑与障碍地形仍然阻挡
 ## （一路攻击开道）。
 @export var passes_walls: bool = false
 
@@ -43,6 +64,18 @@ func validation_error() -> String:
 			return "敌种时间、射程或移速无效"
 	if threat_cost <= 0.0:
 		return "敌种威胁单价无效"
+	if not is_finite(threat_cost) or stage_weights.x < 0 or stage_weights.y < 0 or stage_weights.z < 0:
+		return "敌种预算或阶段权重无效"
+	if max_alive < 1 or max_alive > 6 or minimum_stage < 1 or minimum_stage > 3 or first_wave < 1:
+		return "敌种配额或出场阶段无效"
+	for value: float in [charge_bonus, charge_linger_seconds, splash_radius, scavenge_radius, jam_range, boost_speed]:
+		if not is_finite(value) or value < 0.0:
+			return "敌种特殊距离或速度无效"
+	for value: float in [jam_seconds, jam_immunity_seconds, jam_cooldown_seconds, boost_seconds]:
+		if not is_finite(value) or value <= 0.0:
+			return "敌种特殊计时无效"
+	if scavenge_reduction_per_death <= 0.0 or not is_finite(scavenge_reduction_per_death) or scavenge_max_reduction < 0.0 or scavenge_max_reduction >= 1.0 or not is_finite(scavenge_max_reduction):
+		return "拾荒防护比例无效"
 	if not is_finite(wandering_speed_ratio) or wandering_speed_ratio < 0.1 or wandering_speed_ratio > 1.0:
 		return "游荡速度倍率无效"
 	if shelter_radius < 0.0 or not is_finite(shelter_radius):
@@ -64,5 +97,13 @@ func snapshot() -> Dictionary:
 		"attack_seconds": attack_seconds, "attack_range": attack_range,
 		"move_speed": move_speed, "vision_radius": vision_radius,
 		"threat_cost": threat_cost, "prefers_buildings": prefers_buildings,
+		"elite": elite, "charge_bonus": charge_bonus, "ignores_rough": ignores_rough,
+		"splash_radius": splash_radius, "jam_range": jam_range,
+		"stage_weights": stage_weights, "minimum_stage": minimum_stage, "first_wave": first_wave, "max_alive": max_alive,
+		"charge_linger_seconds": charge_linger_seconds, "prefers_towers": prefers_towers,
+		"scavenge_radius": scavenge_radius, "scavenge_reduction_per_death": scavenge_reduction_per_death,
+		"scavenge_max_reduction": scavenge_max_reduction, "jam_seconds": jam_seconds,
+		"jam_immunity_seconds": jam_immunity_seconds, "jam_cooldown_seconds": jam_cooldown_seconds,
+		"boost_seconds": boost_seconds, "boost_speed": boost_speed,
 		"marches_to_core": marches_to_core, "wandering_speed_ratio": wandering_speed_ratio, "shelter_radius": shelter_radius,
-		"shelter_reduction": shelter_reduction, "passes_walls": passes_walls}
+		"shelter_reduction": shelter_reduction, "shelter_self": shelter_self, "passes_walls": passes_walls}

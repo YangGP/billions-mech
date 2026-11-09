@@ -15,6 +15,7 @@ var _minerals := MechMineralSystem.new()
 var _production := MechProductionSystem.new()
 var _units := MechUnitSystem.new()
 var _enemies := MechEnemySystem.new()
+var _enemy_abilities := MechEnemyAbilities.new()
 var _towers := MechTowerSystem.new()
 var _waves := MechWaveDirector.new()
 var _threat := MechThreatSystem.new()
@@ -81,6 +82,7 @@ func _init() -> void:
 func shutdown() -> void:
 	_enemies.shutdown()
 	_registry.clear()
+	_enemy_abilities = MechEnemyAbilities.new()
 
 
 func _on_movement_finished() -> void:
@@ -194,6 +196,7 @@ func configure(settings: MechFoundationSettings) -> bool:
 	# 每个开火方的战斗噪声都汇入威胁系统。
 	_enemies.configure_noise(_threat.note_combat)
 	_enemies.profiling_enabled = profiling_enabled
+	_waves.profiling_enabled = profiling_enabled
 	_units.combat_noise = _threat.note_combat
 	_towers.combat_noise = _threat.note_combat
 	_probe_speed = maxf(0.1, settings.probe_speed)
@@ -598,11 +601,13 @@ func advance_one_tick() -> void:
 	_profile_mark(&"vision_pre")
 	# 上一 tick 发出的噪声本 tick 到达游荡敌（下方单位/敌人阶段中的战斗噪声则落在下一 tick）。
 	var noises: Array[Dictionary] = _threat.noises()
-	# 庇护源每 tick 收集一次；伤害入口复核 hp，被先手火力击杀的原型机不再庇护后续命中。
+	# 精英源每tick收集一次；统一伤害入口复核存活状态。
+	_enemy_abilities.prepare(_registry)
 	var shelters: Array[MechEntityState] = _collect_shelter_sources()
 	var unit_result: Dictionary = _units.advance(_registry, _grid, _navigation, _tick_rate, _vision)
 	for hit: Dictionary in unit_result["enemy_hits"]:
 		_damage_enemy(hit["id"], hit["damage"], shelters)
+	_enemy_abilities.advance(_registry, _construction.all(), _grid, _tick_rate, _settings.max_jammed_towers)
 	_profile_mark(&"units")
 	var enemy_result: Dictionary = _enemies.advance(_registry, _grid, _navigation, _construction.all(), _tick_rate, noises, _vision)
 	for hit: Dictionary in enemy_result["building_hits"]:
@@ -615,6 +620,7 @@ func advance_one_tick() -> void:
 		_remove_entity(id)
 	if not enemy_result["dead_units"].is_empty():
 		_recompute_economy()
+	_enemy_abilities.validate_links(_registry, _construction.all(), _grid)
 	_advance_slow_fences()
 	if _trigger_traps():
 		_recompute_economy()
@@ -678,6 +684,8 @@ func spawn_diagnostic_enemy(enemy_id: StringName, position: Vector2) -> int:
 	# 性能诊断入口；正常游玩只经波次生成敌人。
 	if not _enemy_defs.has(enemy_id):
 		return 0
+	if profiling_enabled:
+		print("[enemy:diagnostic] ", enemy_id, " at=", position)
 	return _enemies.create(_registry, _enemy_defs[enemy_id], position)
 
 
@@ -1498,7 +1506,7 @@ func _release_enemies() -> void:
 	var requests: Array[Dictionary] = []
 	if _settings.campaign_mode:
 		_waves.set_campaign_stage(_mainbrain_level())
-	requests.append_array(_waves.advance(_grid, _construction.all()))
+	requests.append_array(_waves.advance(_grid, _construction.all(), _registry.all()))
 	requests.append_array(_threat.advance(_construction.all()))
 	_release_spawns(requests)
 
@@ -1582,8 +1590,7 @@ func _remove_entity(id: int) -> void:
 	_registry.remove(id)
 
 
-## 本 tick 的活跃庇护源（原型机电磁庇护，waves-enemies.md §8.2）；
-## 通常为空或只有一台原型机。
+## 当前活跃偏转场源；普通敌人不承担范围减伤能力。
 func _collect_shelter_sources() -> Array[MechEntityState]:
 	var sources: Array[MechEntityState] = []
 	for entity: MechEntityState in _registry.all():
@@ -1597,24 +1604,34 @@ func _collect_shelter_sources() -> Array[MechEntityState]:
 ## 它只覆盖玩家资产。
 func _damage_enemy(entity_id: int, damage: int, shelters: Array[MechEntityState]) -> void:
 	var entity: MechEntityState = _registry.get_entity(entity_id)
-	if entity == null or entity.hp <= 0:
+	if entity == null or entity.hp <= 0 or damage <= 0:
 		return
 	var source: MechEntityState = _sheltered_by(entity, shelters)
+	var reduction: float = _enemy_abilities.defense(entity)
 	if source != null:
-		damage = maxi(1, ceili(damage * (1.0 - source.enemy_definition.shelter_reduction)))
+		reduction = maxf(reduction, source.enemy_definition.shelter_reduction)
+	damage = maxi(1, ceili(damage * (1.0 - reduction)))
 	entity.hp = maxi(0, entity.hp - damage)
 	if entity.hp > 0:
 		return
+	if entity.enemy_definition != null:
+		_enemy_abilities.note_death(entity)
+	if entity.enemy_definition != null and entity.enemy_definition.jam_range > 0.0:
+		_enemy_abilities.release_source(entity_id, _construction.all())
 	# 敌人不持有格子或经济容量；只有注册表变化。建筑死亡由调用方的批量阶段结算。
 	_remove_entity(entity_id)
 
 
 ## 覆盖该实体的活跃庇护源（若有）；首个命中即生效，重叠庇护绝不叠加。
 func _sheltered_by(entity: MechEntityState, shelters: Array[MechEntityState]) -> MechEntityState:
+	var best: MechEntityState
 	for source: MechEntityState in shelters:
+		if source.entity_id == entity.entity_id and not source.enemy_definition.shelter_self:
+			continue
 		if source.hp > 0 and entity.position.distance_to(source.position) <= source.enemy_definition.shelter_radius:
-			return source
-	return null
+			if best == null or source.enemy_definition.shelter_reduction > best.enemy_definition.shelter_reduction:
+				best = source
+	return best
 
 
 func preview_footprint(origin: Vector2i, footprint: Vector2i) -> Dictionary:
@@ -2258,6 +2275,7 @@ func _reset() -> void:
 	_tick_counter = 0
 	_clock.reset()
 	_registry.clear()
+	_enemy_abilities = MechEnemyAbilities.new()
 	_construction.clear()
 	_production.clear()
 	_grid.configure(_map_definition)
@@ -2356,6 +2374,8 @@ func _settings_error(settings: MechFoundationSettings) -> String:
 		return "模拟频率或验证实体速度无效"
 	if not is_finite(settings.probe_sight_radius) or settings.probe_sight_radius <= 0.0 or settings.probe_sight_radius > 64.0:
 		return "验证实体视野半径无效"
+	if settings.ordinary_per_elite < 1 or settings.max_elite_types < 1 or settings.max_elite_types > 3 or settings.max_jammed_towers < 2 or settings.max_jammed_towers > 3:
+		return "精英配额或干扰上限无效"
 	var construction := MechConstructionSystem.new()
 	error = construction.configure(settings.building_definitions)
 	if not error.is_empty():

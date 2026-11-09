@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="MechFoundationSettings" load_steps=45 format=3]
+[gd_resource type="Resource" script_class="MechFoundationSettings" load_steps=51 format=3]
 
 [ext_resource type="Script" path="res://content/foundation_settings.gd" id="1"]
 [ext_resource type="Resource" path="res://content/maps/development_basin_128.tres" id="2"]
@@ -13,7 +13,13 @@
 [ext_resource type="Script" path="res://content/enemy_definition.gd" id="11"]
 [ext_resource type="Resource" path="res://content/enemies/builder.tres" id="12"]
 [ext_resource type="Resource" path="res://content/enemies/recycler.tres" id="14"]
-[ext_resource type="Resource" path="res://content/enemies/prototype.tres" id="15"]
+[ext_resource type="Resource" path="res://content/enemies/deflector.tres" id="15"]
+[ext_resource type="Resource" path="res://content/enemies/builder_worn.tres" id="46"]
+[ext_resource type="Resource" path="res://content/enemies/builder_veteran.tres" id="47"]
+[ext_resource type="Resource" path="res://content/enemies/scavenger.tres" id="48"]
+[ext_resource type="Resource" path="res://content/enemies/strider.tres" id="49"]
+[ext_resource type="Resource" path="res://content/enemies/mortar.tres" id="50"]
+[ext_resource type="Resource" path="res://content/enemies/silencer.tres" id="51"]
 
 [ext_resource type="Script" path="res://content/unit_definition.gd" id="16"]
 [ext_resource type="Resource" path="res://content/buildings/relay_node.tres" id="17"]
@@ -57,7 +63,7 @@ starting_resources = Dictionary[StringName, int]({&"coins": 600, &"metal_ore": 8
 starting_unit_id = &"scout"
 starting_unit_cells = Array[Vector2i]([Vector2i(59, 68), Vector2i(66, 68)])
 probe_speed = 2.5
-enemy_definitions = Array[ExtResource("11")]([ExtResource("12"), ExtResource("14"), ExtResource("15")])
+enemy_definitions = Array[ExtResource("11")]([ExtResource("12"), ExtResource("14"), ExtResource("46"), ExtResource("47"), ExtResource("48"), ExtResource("15"), ExtResource("49"), ExtResource("50"), ExtResource("51")])
 threat_enabled = true
 wave_trigger_mode = 1
 silence_seconds = 570.0

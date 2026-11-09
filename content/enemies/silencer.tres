@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="MechEnemyDefinition" format=3]
+[ext_resource type="Script" path="res://content/enemy_definition.gd" id="1"]
+[resource]
+script = ExtResource("1")
+enemy_id = &"silencer"
+display_name = "E-12 静默者"
+elite = true
+max_hp = 300
+damage = 10
+attack_seconds = 1.5
+move_speed = 1.2
+vision_radius = 8.0
+threat_cost = 18.0
+minimum_stage = 3
+first_wave = 3
+max_alive = 4
+jam_range = 6.0
+boost_speed = 1.8

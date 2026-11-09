@@ -15,3 +15,5 @@ move_speed = 1.0
 vision_radius = 6.0
 threat_cost = 5.0
 prefers_buildings = true
+stage_weights = Vector3i(5, 10, 10)
+first_wave = 2

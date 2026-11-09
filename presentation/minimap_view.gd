@@ -151,7 +151,7 @@ func _draw() -> void:
 			continue
 		var point: Vector2 = _w2l(MechIsoGeometry.project(entity["position"]))
 		if entity.get("team", 1) == 2:
-			draw_circle(point, 4.0 if entity.get("enemy_id", &"") == &"prototype" else 2.5, ENEMY)
+			draw_circle(point, 4.0 if entity.get("elite", false) else 2.5, ENEMY)
 		else:
 			draw_circle(point, 2.0, OWN_UNIT)
 	if not _map.is_empty():
