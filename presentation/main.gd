@@ -2,6 +2,11 @@ extends Node2D
 ## 组合根：装配模拟、命令队列与全部表现层视图；只有命令可以改变模拟状态。
 
 const SETTINGS: MechFoundationSettings = preload("res://content/development_128.tres")
+## 双击判定窗口（毫秒）与两次按下之间的最大位移（像素）。
+const DOUBLE_CLICK_MS: int = 400
+const DOUBLE_CLICK_SLOP: float = 8.0
+## 双击链式扩选时，屏幕外同类单位与已选单位的最大间距（世界格）。
+const SAME_KIND_CHAIN_RADIUS: float = 2.0
 
 var _sim := MechSimCore.new()
 var _commands := MechCommandQueue.new()
@@ -39,6 +44,9 @@ var _selection_toggle: bool = false
 var _attack_move_mode: bool = false
 var _last_group: int = -1
 var _last_group_time: int = 0
+## 上一次选择模式左键按下的时间与位置，用于双击判定；0 表示没有可续接的点击。
+var _last_click_ms: int = 0
+var _last_click_position := Vector2.ZERO
 var _last_threat_key: String = ""
 var _last_alert_key: String = ""
 var _state: Dictionary = {}
@@ -291,6 +299,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			_select_world_position(_world.get_global_mouse_position())
 		elif _attack_move_mode:
 			_issue_unit_order(true)
+		elif _is_double_click(event.position):
+			_select_same_kind(event.position)
 		else:
 			_selection_dragging = true
 			_selection_start = event.position
@@ -301,6 +311,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 	if event.button_index == MOUSE_BUTTON_RIGHT:
+		_last_click_ms = 0
 		if _build_id != &"":
 			_cancel_build()
 		elif _attack_move_mode:
@@ -670,14 +681,104 @@ func _finish_selection() -> void:
 					ids.append(building["entity_id"])
 	else:
 		var rect := Rect2(_selection_start, _selection_end - _selection_start).abs()
+		var units: Array[int] = []
+		var buildings: Array[int] = []
 		for entity: Dictionary in _state["entities"]:
-			if entity.get("team", 1) == 1 and rect.has_point(_screen_position(entity)):
-				ids.append(entity["id"])
+			if entity.get("team", 1) != 1 or not rect.has_point(_screen_position(entity)):
+				continue
+			if entity.get("is_building", false):
+				buildings.append(entity["id"])
+			else:
+				units.append(entity["id"])
+		# 框选优先生效于单位：只要矩形内有任一己方单位，建筑就不进入选择集，避免拖拽时整片基地被连带选中。
+		ids = units if not units.is_empty() else buildings
+		# 拖框不作为点击起点，重置双击状态，避免紧接着的单击被误判为双击。
+		_last_click_ms = 0
 	_selection.select(ids, _selection_additive, _selection_toggle)
 	_selected = _mouse_cell() if _sim.inspect_cell(_mouse_cell())["inside"] else Vector2i(-1, -1)
 	_refresh_selection()
 	_update_cursor()
 	_hud.feedback("已选择 %d 个己方实体；右键下令，A＋左键攻击移动。" % _selection.ids.size())
+
+
+## 双击判定：同一位置窗口内的第二次左键按下算作双击，并清空状态避免三击重复触发。
+func _is_double_click(position: Vector2) -> bool:
+	var now: int = Time.get_ticks_msec()
+	var doubled: bool = _last_click_ms > 0 and now - _last_click_ms <= DOUBLE_CLICK_MS \
+		and _last_click_position.distance_to(position) <= DOUBLE_CLICK_SLOP
+	_last_click_ms = 0 if doubled else now
+	_last_click_position = position
+	return doubled
+
+
+## 双击选择同种：单位按 kind，建筑按升级链族根（升级前后视为同种）。
+func _select_same_kind(point: Vector2) -> void:
+	if _hud.blocks_point(point):
+		return
+	var hit: int = _hit_entity(point)
+	if hit > 0:
+		var kind: StringName = &""
+		for entity: Dictionary in _state["entities"]:
+			if entity["id"] == hit:
+				kind = entity.get("kind", &"")
+				break
+		if kind == &"":
+			return
+		# 同类单位先取屏幕内的；屏幕外单位只有与已选单位相邻时才经链式扩选纳入，
+		# 避免一次双击把地图远端零散的同种部队也拉进选择集。
+		var same_kind: Array[Dictionary] = []
+		var positions: Dictionary[int, Vector2] = {}
+		for entity: Dictionary in _state["entities"]:
+			if entity.get("team", 1) == 1 and not entity.get("is_building", false) and entity.get("kind", &"") == kind:
+				same_kind.append(entity)
+				positions[entity["id"]] = entity["position"]
+		var visible: Rect2 = _camera.visible_world_rect()
+		var chosen: Dictionary[int, bool] = {}
+		var units: Array[int] = []
+		for entity: Dictionary in same_kind:
+			if visible.has_point(entity["position"]):
+				chosen[entity["id"]] = true
+				units.append(entity["id"])
+		while not units.is_empty():
+			var additions: Array[int] = []
+			for entity: Dictionary in same_kind:
+				var id: int = entity["id"]
+				if chosen.get(id, false):
+					continue
+				for selected_id: int in units:
+					if positions[id].distance_to(positions[selected_id]) <= SAME_KIND_CHAIN_RADIUS:
+						additions.append(id)
+						break
+			if additions.is_empty():
+				break
+			for id: int in additions:
+				chosen[id] = true
+			units.append_array(additions)
+		_selection.select(units)
+		_refresh_selection()
+		_update_cursor()
+		_hud.feedback("已选择 %d 个同类单位；右键下令。" % units.size())
+		return
+	var building_id: int = _world.pick_building(point)
+	var target: Dictionary = {}
+	if building_id > 0:
+		for entity: Dictionary in _state["entities"]:
+			if entity["id"] == building_id:
+				target = entity
+				break
+	else:
+		target = _sim.building_at(_mouse_cell())
+	var family: StringName = target.get("family_id", &"")
+	if family == &"":
+		return
+	var buildings: Array[int] = []
+	for entity: Dictionary in _state["entities"]:
+		if entity.get("is_building", false) and entity.get("team", 1) == 1 and entity.get("family_id", &"") == family:
+			buildings.append(entity["id"])
+	_selection.select(buildings)
+	_refresh_selection()
+	_update_cursor()
+	_hud.feedback("已选择 %d 座同类建筑（升级前后视为同种）。" % buildings.size())
 
 
 func _selected_units() -> Array[int]:

@@ -4,6 +4,8 @@ extends RefCounted
 
 var _definitions: Dictionary[StringName, MechBuildingDefinition] = {}
 var _buildings: Dictionary[int, MechBuildingState] = {}
+## 升级链族根：同一建筑的各等级形态（含升级前后）映射到同一个根 id。
+var _family_roots: Dictionary[StringName, StringName] = {}
 
 
 ## 装配建筑定义表；返回错误描述，空字符串表示成功。
@@ -20,6 +22,7 @@ func configure(definitions: Array[MechBuildingDefinition]) -> String:
 		_definitions[rules.building_id] = rules
 	if not _definitions.has(&"mainbrain") or not _definitions[&"mainbrain"].is_core:
 		return "缺少主脑定义"
+	_rebuild_family_roots()
 	return ""
 
 
@@ -29,6 +32,27 @@ func clear() -> void:
 
 func definition(id: StringName) -> MechBuildingDefinition:
 	return _definitions.get(id)
+
+
+## 升级链族根：同一族的各级形态返回同一个 id，用于"同种建筑"判定。
+func family_root(id: StringName) -> StringName:
+	return _family_roots.get(id, id)
+
+
+## 由定义表的 upgrade_to 关系反推每一级的直接父级，再逐级上溯到族根。
+func _rebuild_family_roots() -> void:
+	_family_roots.clear()
+	var parents: Dictionary[StringName, StringName] = {}
+	for rules: MechBuildingDefinition in _definitions.values():
+		if rules.upgrade_to != null:
+			parents[rules.upgrade_to.building_id] = rules.building_id
+	for id: StringName in _definitions:
+		var root: StringName = id
+		var guard: int = 0
+		while parents.has(root) and guard <= _definitions.size():
+			root = parents[root]
+			guard += 1
+		_family_roots[id] = root
 
 
 func get_building(entity_id: int) -> MechBuildingState:

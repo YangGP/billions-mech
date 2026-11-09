@@ -765,6 +765,7 @@ func building_at(cell: Vector2i) -> Dictionary:
 
 func _building_snapshot(building: MechBuildingState) -> Dictionary:
 	var result: Dictionary = building.snapshot()
+	result["family_id"] = _construction.family_root(building.definition.building_id)
 	var mineral: Dictionary = _minerals.deposit(building.mineral_id)
 	result["mineral"] = mineral
 	result["upgrade_error"] = _upgrade_error_for(building)
