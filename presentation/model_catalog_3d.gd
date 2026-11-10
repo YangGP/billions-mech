@@ -195,13 +195,15 @@ func _unit(id: String) -> void:
 			_block(Vector3(0.3, 0.25, 0.28), Vector3(0, 1.05, 0), LIGHT)
 			_block(Vector3(0.22, 0.07, 0.04), Vector3(0, 1.08, -0.16), CYAN)
 			_block(Vector3(0.16, 0.16, 1.0 if id == "rail_mech" else 0.5), Vector3(width * 0.55, 0.85, -0.3), BLUE if id == "rail_mech" else GOLD)
-		"builder", "builder_worn", "builder_veteran":
-			var tint: Color = {"builder_worn": Color("8b7770"), "builder_veteran": RED}.get(id, Color("c9908b"))
+		"builder", "builder_worn", "builder_veteran", "provoker":
+			var tint: Color = {"builder_worn": Color("8b7770"), "builder_veteran": RED, "provoker": Color("e0a35e")}.get(id, Color("c9908b"))
 			_legs(0.27, 0.18, 0.45, 2, DARK)
 			_block(Vector3(0.48, 0.38, 0.38), Vector3(0, 0.6, 0), tint)
 			_block(Vector3(0.48, 0.12, 0.15), Vector3(0, 0.48, -0.3), STEEL)
 			if id == "builder_veteran":
 				_block(Vector3(0.65, 0.12, 0.28), Vector3(0, 0.83, 0), GOLD)
+			if id == "provoker":
+				_block(Vector3(0.1, 0.5, 0.1), Vector3(0, 1.02, 0), Color("e07a5f"))
 		"recycler", "scavenger":
 			_legs(0.4, 0.32, 0.45, 2, DARK)
 			_block(Vector3(0.85, 0.55, 0.62), Vector3(0, 0.7, 0), GOLD)

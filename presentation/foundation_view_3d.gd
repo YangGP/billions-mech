@@ -262,6 +262,8 @@ func _present_effects() -> void:
 			_circle(groups, point, 0.65, Color("77c7db"), "jammed", bounds.end.y + 0.12)
 		if entity.get("charge_ticks", 0) > 0 or entity.get("speed_boost_ticks", 0) > 0:
 			_circle(groups, point, 0.4, Color("f0d594"), "charge")
+		if entity.get("frenzy_ticks", 0) > 0:
+			_circle(groups, point, 0.52, Color("e07a5f"), "frenzy", bounds.end.y * 0.4)
 		if entity.get("sheltered", false):
 			_circle(groups, point, 0.48, Color("ae94e0"), "shelter", bounds.end.y * 0.5)
 		if float(rules.get("shelter_radius", 0.0)) > 0.0:
@@ -274,6 +276,9 @@ func _present_effects() -> void:
 		if armor > 0.0:
 			var max_armor: float = maxf(1.0, float(rules.get("scavenge_max_armor", 300.0)))
 			_circle(groups, point, 0.6 + clampf(armor / max_armor, 0.0, 1.0) * 0.2, Color("e0bd72"), "scavenge", bounds.end.y * 0.7)
+	for field: Dictionary in _state.get("frenzies", []):
+		var center: Vector2 = field["position"]
+		_circle(groups, center, float(field["radius"]), Color("e07a5f", 0.35), "frenzy_field", 0.06)
 	_effects.present(groups, _fog.material())
 
 

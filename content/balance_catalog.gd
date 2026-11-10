@@ -139,6 +139,10 @@ static func _fill_enemy(entry: Dictionary, rules: MechEnemyDefinition) -> String
 	rules.shelter_reduction = _f(entry, "shelter_reduction", rules.shelter_reduction)
 	rules.passes_walls = _b(entry, "passes_walls", rules.passes_walls)
 	rules.evasion_chance = _f(entry, "evasion_chance", rules.evasion_chance)
+	rules.frenzy_radius = _f(entry, "frenzy_radius", rules.frenzy_radius)
+	rules.frenzy_seconds = _f(entry, "frenzy_seconds", rules.frenzy_seconds)
+	rules.frenzy_speed_bonus = _f(entry, "frenzy_speed_bonus", rules.frenzy_speed_bonus)
+	rules.frenzy_damage_bonus = _f(entry, "frenzy_damage_bonus", rules.frenzy_damage_bonus)
 	var weights: Variant = entry.get("stage_weights", null)
 	if weights != null:
 		if typeof(weights) != TYPE_ARRAY:

@@ -759,11 +759,16 @@ func snapshot() -> Dictionary:
 			mineral["visible"] = _vision.state_at(mineral["cell"]) == MechVisionSystem.State.VISIBLE
 			minerals.append(mineral)
 	var wave_state: Dictionary = _waves.state()
+	var visible_frenzies: Array[Dictionary] = []
+	for field: Dictionary in _enemy_abilities.frenzy_snapshots():
+		var field_position: Vector2 = field["position"]
+		if _vision.is_visible(field_position):
+			visible_frenzies.append(field)
 	return {"clock": _clock.snapshot(), "entities": entities, "economy": economy, "minerals": minerals,
 		"garrisoned_unit_ids": garrisoned_unit_ids,
 		"vision": _vision.snapshot(), "repair_all": _repair_all_status(),
 		"scenario": _settings.scenario_name, "unit_catalog": _unit_catalog(),
-		"catalog": _catalog_snapshot(), "probe_id": _probe_id,
+		"catalog": _catalog_snapshot(), "probe_id": _probe_id, "frenzies": visible_frenzies,
 		"alloy_processing": {"ever_produced_alloy": _alloy_processing.ever_produced_alloy,
 			"produced_alloy": _alloy_processing.produced_alloy},
 		"dispatch": _dispatch.snapshot(),
@@ -1661,7 +1666,7 @@ func _damage_enemy(entity_id: int, damage: int, shelters: Array[MechEntityState]
 	if entity.hp > 0:
 		return true
 	if entity.enemy_definition != null:
-		_enemy_abilities.note_death(entity)
+		_enemy_abilities.note_death(entity, _tick_rate)
 	if entity.enemy_definition != null and entity.enemy_definition.jam_range > 0.0:
 		_enemy_abilities.release_source(entity_id, _construction.all())
 	# 敌人不持有格子或经济容量；只有注册表变化。建筑死亡由调用方的批量阶段结算。

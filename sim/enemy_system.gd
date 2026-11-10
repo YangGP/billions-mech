@@ -737,10 +737,11 @@ func _advance_engaged(enemy: MechEntityState, registry: MechEntityRegistry, grid
 			enemy.shot_target = aim_point
 			if _combat_noise.is_valid():
 				_combat_noise.call(aim_point)
+			var hit_damage: int = _attack_damage(enemy, rules.building_damage() if target_building != null else rules.damage)
 			if target_building != null:
-				result["building_hits"].append({"id": target_building.entity_id, "damage": rules.building_damage()})
+				result["building_hits"].append({"id": target_building.entity_id, "damage": hit_damage})
 			else:
-				target_unit.hp = maxi(0, target_unit.hp - rules.damage)
+				target_unit.hp = maxi(0, target_unit.hp - hit_damage)
 				if target_unit.hp == 0:
 					result["dead_units"].append(target_unit.entity_id)
 			if rules.splash_radius > 0.0:
@@ -797,25 +798,36 @@ func _movement_speed(enemy: MechEntityState, grid: MechGridState, cell: Vector2i
 	var speed: float = rules.move_speed + (rules.charge_bonus if enemy.charge_ticks > 0 else 0.0)
 	if enemy.speed_boost_ticks > 0:
 		speed = maxf(speed, rules.boost_speed)
+	if enemy.frenzy_ticks > 0:
+		speed *= 1.0 + enemy.frenzy_speed_bonus
 	return speed * enemy.slow_multiplier / (1.0 if rules.ignores_rough else grid.movement_weight(cell))
+
+
+## 狂暴只放大最终攻击伤害；建筑与单位各自走原伤害基值。
+func _attack_damage(enemy: MechEntityState, base: int) -> int:
+	if enemy.frenzy_ticks <= 0 or enemy.frenzy_damage_bonus <= 0.0:
+		return base
+	return ceili(float(base) * (1.0 + enemy.frenzy_damage_bonus))
 
 
 ## 炮击只影响固定落点附近的合法目标；直接命中已单独登记，不重复计伤。
 func _apply_splash(enemy: MechEntityState, point: Vector2, primary: int, registry: MechEntityRegistry,
 		buildings: Dictionary, grid: MechGridState, result: Dictionary) -> void:
 	var rules: MechEnemyDefinition = enemy.enemy_definition
+	var building_damage: int = _attack_damage(enemy, rules.building_damage())
+	var unit_damage: int = _attack_damage(enemy, rules.damage)
 	for building: MechBuildingState in buildings.values():
 		if building.entity_id == primary or building.hp <= 0:
 			continue
 		var area := Rect2(Vector2(building.origin), Vector2(building.definition.footprint))
 		var closest: Vector2 = point.clamp(area.position, area.end)
 		if point.distance_to(closest) <= rules.splash_radius and grid.terrain_line_clear(point, closest):
-			result["building_hits"].append({"id": building.entity_id, "damage": rules.building_damage()})
+			result["building_hits"].append({"id": building.entity_id, "damage": building_damage})
 	for unit: MechEntityState in registry.all():
 		if unit.entity_id == primary or unit.team != 1 or unit.unit_definition == null or unit.hp <= 0 or unit.garrisoned:
 			continue
 		if point.distance_to(unit.position) <= rules.splash_radius and grid.terrain_line_clear(point, unit.position):
-			unit.hp = maxi(0, unit.hp - rules.damage)
+			unit.hp = maxi(0, unit.hp - unit_damage)
 			if unit.hp == 0:
 				result["dead_units"].append(unit.entity_id)
 

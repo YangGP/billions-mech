@@ -71,6 +71,9 @@ func _draw() -> void:
 		elif entity.get("sheltered", false):
 			status = "偏转保护"
 			tint = Color("ae94e0")
+		elif entity.get("frenzy_ticks", 0) > 0:
+			status = "狂暴"
+			tint = Color("e07a5f")
 		elif entity.get("charge_ticks", 0) > 0:
 			status = "冲锋"
 			tint = Color("e0bd72")

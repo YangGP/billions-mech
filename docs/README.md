@@ -11,10 +11,10 @@
 | 验证三维操作和生命周期 | [统一人工清单](../validation/3d-manual-checklist.md)：基础1–8及27–38，全数待复验；3D肖像暂缓 |
 | 查看三维画面与规模测量 | [最新验证记录](../validation/3d-interaction-performance.md)：模型求交、墙连接、真实敌军压力；2000敌军模拟预算尚未达标 |
 | 交给其他 AI 继续实现 | [开发任务与验收规格](ai-development-handoff.md)；先查当前进度，再选未完成任务 |
-| 查当前运行数值 | [数值表](values.md)；最终以 `content/` Resource 和权威校验为准 |
+| 查当前运行数值 | [数值表](values.md)；单位/敌种运行值以 `content/unit_balance.json` 为准，Resource 仅作回退 |
 | 查验证证据与历史审核 | [验证索引](../validation/README.md)：当前实测、用户确认与历史专题分开保存 |
 | 理解产品方向 | [基础设定](game-design-concept.md)、[建筑目录 V2](building-roster-v2.md) |
-| 查敌人新设计与项目适配 | [机械敌人设计稿](enemy-roster.md)：普通建造者三形态/回收者与五类精英已接入，原型机已删除；机制与整局平衡待验收 |
+| 查敌人新设计与项目适配 | [机械敌人设计稿](enemy-roster.md)：普通建造者三形态/回收者/煽动者与五类精英已接入，原型机已删除；机制与整局平衡待验收 |
 | 查玩家兵种设计方向 | [玩家兵种设计稿（提案）](player-roster.md)：七兵种（三通用/三对策/一侦察），纯设计，未接入 |
 | 查全图/战略火力设计 | [全图打击设计稿（提案）](strategic-strike.md)：射程跟中继覆盖、覆盖外与盲射落点偏移、手动指定打击；纯设计，未接入 |
 

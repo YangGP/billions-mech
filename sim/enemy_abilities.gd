@@ -3,6 +3,7 @@ extends RefCounted
 ## 小量精英能力的业务适配；只写模拟实例，复用网格LOS及统一伤害入口。
 
 var _scavengers: Array[MechEntityState] = []
+var _frenzies: Array[Dictionary] = []
 
 
 ## 每战斗tick收集一次精英源，死亡事件只遍历少量拾荒者。
@@ -13,7 +14,7 @@ func prepare(registry: MechEntityRegistry) -> void:
 			_scavengers.append(entity)
 
 
-func note_death(dead: MechEntityState) -> void:
+func note_death(dead: MechEntityState, hz: int) -> void:
 	for source: MechEntityState in _scavengers:
 		if source.hp <= 0 or source.entity_id == dead.entity_id:
 			continue
@@ -21,6 +22,25 @@ func note_death(dead: MechEntityState) -> void:
 		if source.position.distance_to(dead.position) <= rules.scavenge_radius:
 			var gain: float = float(dead.max_hp) * rules.scavenge_armor_ratio
 			source.scavenge_armor = minf(rules.scavenge_max_armor, source.scavenge_armor + gain)
+	var frenzy_rules: MechEnemyDefinition = dead.enemy_definition
+	if frenzy_rules == null or frenzy_rules.frenzy_radius <= 0.0:
+		return
+	_frenzies.append({
+		"position": dead.position,
+		"team": dead.team,
+		"radius": frenzy_rules.frenzy_radius,
+		"ticks": maxi(1, ceili(frenzy_rules.frenzy_seconds * hz)),
+		"speed_bonus": frenzy_rules.frenzy_speed_bonus,
+		"damage_bonus": frenzy_rules.frenzy_damage_bonus,
+	})
+
+
+## 只读光环快照；表现层据此绘制死亡位置的范围。
+func frenzy_snapshots() -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	for field: Dictionary in _frenzies:
+		result.append({"position": field["position"], "radius": field["radius"], "ticks": field["ticks"]})
+	return result
 
 
 func armor(entity: MechEntityState) -> float:
@@ -57,6 +77,10 @@ func validate_links(registry: MechEntityRegistry, buildings: Array[MechBuildingS
 
 func advance(registry: MechEntityRegistry, buildings: Array[MechBuildingState], grid: MechGridState,
 		hz: int, max_jammed: int) -> void:
+	for index: int in range(_frenzies.size() - 1, -1, -1):
+		_frenzies[index]["ticks"] = int(_frenzies[index]["ticks"]) - 1
+		if _frenzies[index]["ticks"] <= 0:
+			_frenzies.remove_at(index)
 	var active: int = 0
 	for building: MechBuildingState in buildings:
 		building.jam_immunity_ticks = maxi(0, building.jam_immunity_ticks - 1)
@@ -73,6 +97,19 @@ func advance(registry: MechEntityRegistry, buildings: Array[MechBuildingState], 
 			continue
 		source.speed_boost_ticks = maxi(0, source.speed_boost_ticks - 1)
 		source.ability_cooldown_ticks = maxi(0, source.ability_cooldown_ticks - 1)
+		source.frenzy_ticks = 0
+		source.frenzy_speed_bonus = 0.0
+		source.frenzy_damage_bonus = 0.0
+		for field: Dictionary in _frenzies:
+			if int(field["team"]) != source.team:
+				continue
+			var center: Vector2 = field["position"]
+			var radius: float = float(field["radius"])
+			if source.position.distance_squared_to(center) > radius * radius:
+				continue
+			source.frenzy_ticks = maxi(source.frenzy_ticks, int(field["ticks"]))
+			source.frenzy_speed_bonus = maxf(source.frenzy_speed_bonus, float(field["speed_bonus"]))
+			source.frenzy_damage_bonus = maxf(source.frenzy_damage_bonus, float(field["damage_bonus"]))
 		var rules: MechEnemyDefinition = source.enemy_definition
 		if rules.jam_range <= 0.0:
 			continue

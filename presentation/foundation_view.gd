@@ -107,6 +107,7 @@ func _draw() -> void:
 	if _state.is_empty():
 		return
 	_draw_minerals()
+	_draw_frenzies()
 	_draw_cursor()
 	var entities: Array = _state["entities"]
 	for entity: Dictionary in entities:
@@ -182,12 +183,14 @@ func _draw_enemy(entity: Dictionary, point: Vector2) -> void:
 	var body := PackedVector2Array([point + Vector2(-10, -8), point + Vector2(-10, -24),
 		point + Vector2(0, -32), point + Vector2(10, -24), point + Vector2(10, -8), point])
 	var color: Color = {&"builder_worn": Color("8b7770"), &"builder_veteran": Color("db6464"),
-		&"recycler": Color("d9a15d")}.get(entity.get("enemy_id", &""), Color("c9908b"))
+		&"recycler": Color("d9a15d"), &"provoker": Color("e0a35e")}.get(entity.get("enemy_id", &""), Color("c9908b"))
 	draw_colored_polygon(body, color)
 	if entity.get("enemy_id", &"") == &"recycler":
 		draw_rect(Rect2(point + Vector2(-17, -16), Vector2(34, 10)), color.darkened(0.3))
 	if entity.get("charge_ticks", 0) > 0:
 		draw_line(point + Vector2(-6, 3), point + Vector2(6, 3), Color("f0d594"), 3.0, true)
+	if entity.get("frenzy_ticks", 0) > 0:
+		draw_arc(point + Vector2(0, -10), 18, 0, TAU, 16, Color("e07a5f"), 2.0, true)
 	draw_line(point + Vector2(-6, -21), point + Vector2(6, -21), Color("7a2e28"), 3.0, true)
 	draw_line(point + Vector2(-6, -13), point + Vector2(6, -13), Color("7a2e28"), 3.0, true)
 	draw_rect(Rect2(point + Vector2(-16, -42), Vector2(32, 3)), Color("213540"))
@@ -245,6 +248,17 @@ func _draw_minerals() -> void:
 			var rock := PackedVector2Array([point + offset + Vector2(-10, 2), point + offset + Vector2(-2, -14), point + offset + Vector2(11, 2)])
 			draw_colored_polygon(rock, Color("c4cdd2").darkened(dim))
 			draw_line(point + offset + Vector2(-2, -14), point + offset + Vector2(0, 2), Color("85939c").darkened(dim), 2.0, true)
+
+
+func _draw_frenzies() -> void:
+	for field: Dictionary in _state.get("frenzies", []):
+		var center: Vector2 = field["position"]
+		var radius: float = float(field["radius"])
+		var points := PackedVector2Array()
+		for index: int in range(32):
+			var angle: float = TAU * float(index) / 32.0
+			points.append(_project(center + Vector2(cos(angle), sin(angle)) * radius))
+		draw_polyline(points, Color("e07a5f", 0.35), 2.0, true)
 
 
 func _visual_sort(a: Dictionary, b: Dictionary) -> bool:

@@ -227,7 +227,7 @@ func _stress_advance(delta: float) -> void:
 	_stress_step += 1
 	if _stress_step % 4 == 0:
 		var center: Vector2 = Vector2(SETTINGS.map_definition.mainbrain_origin) + Vector2(24, 0)
-		var roster: Array[StringName] = [&"builder", &"builder_worn", &"builder_veteran", &"recycler",
+		var roster: Array[StringName] = [&"builder", &"builder_worn", &"builder_veteran", &"recycler", &"provoker",
 			&"scavenger", &"deflector", &"strider", &"mortar", &"silencer"]
 		var offset: int = (_stress_step / 4 - 1) * 2
 		_sim.spawn_diagnostic_enemy(roster[offset % roster.size()], center + Vector2(0, -6))

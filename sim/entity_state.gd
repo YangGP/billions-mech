@@ -26,6 +26,9 @@ var speed_boost_ticks: int = 0
 var ability_cooldown_ticks: int = 0
 var jam_target_id: int = 0
 var scavenge_armor: float = 0.0
+var frenzy_ticks: int = 0
+var frenzy_speed_bonus: float = 0.0
+var frenzy_damage_bonus: float = 0.0
 var team: int = 1
 var hp: int = 0
 var max_hp: int = 0
@@ -122,7 +125,7 @@ func snapshot() -> Dictionary:
 		"enemy_id": enemy_definition.enemy_id if enemy_definition != null else &"",
 		"elite": enemy_definition.elite if enemy_definition != null else false,
 		"charge_ticks": charge_ticks, "speed_boost_ticks": speed_boost_ticks,
-		"scavenge_armor": scavenge_armor, "jam_target_id": jam_target_id,
+		"scavenge_armor": scavenge_armor, "jam_target_id": jam_target_id, "frenzy_ticks": frenzy_ticks,
 		"order": order, "order_goal": order_goal, "attack_target_id": attack_target_id,
 		"facing": facing, "arrival_facing": arrival_facing, "has_arrival_facing": has_arrival_facing,
 		"formation_id": formation_id, "formation_center": formation_center, "formation_offset": formation_offset,

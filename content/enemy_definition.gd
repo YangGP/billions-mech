@@ -53,6 +53,13 @@ extends Resource
 @export var passes_walls: bool = false
 ## 受玩家攻击时的闪避概率（0–1）；陷阱等非攻击伤害不判定。
 @export_range(0.0, 1.0, 0.01) var evasion_chance: float = 0.0
+## 死亡时以死亡位置为中心，为周围同阵营敌人附加狂暴。
+@export var frenzy_radius: float = 0.0
+@export var frenzy_seconds: float = 6.0
+## 狂暴期的移速加成比例（0.2 = +20%）。
+@export_range(0.0, 2.0, 0.01) var frenzy_speed_bonus: float = 0.2
+## 狂暴期的伤害加成比例（0.1 = +10%）。
+@export_range(0.0, 2.0, 0.01) var frenzy_damage_bonus: float = 0.1
 
 
 ## 校验全部字段。返回空字符串表示通过，否则返回中文错误原因。
@@ -72,12 +79,14 @@ func validation_error() -> String:
 		return "敌种预算或阶段权重无效"
 	if max_alive < 1 or max_alive > 6 or minimum_stage < 1 or minimum_stage > 3 or first_wave < 1:
 		return "敌种配额或出场阶段无效"
-	for value: float in [charge_bonus, charge_linger_seconds, splash_radius, scavenge_radius, jam_range, boost_speed]:
+	for value: float in [charge_bonus, charge_linger_seconds, splash_radius, scavenge_radius, jam_range, boost_speed, frenzy_radius]:
 		if not is_finite(value) or value < 0.0:
 			return "敌种特殊距离或速度无效"
-	for value: float in [jam_seconds, jam_immunity_seconds, jam_cooldown_seconds, boost_seconds]:
+	for value: float in [jam_seconds, jam_immunity_seconds, jam_cooldown_seconds, boost_seconds, frenzy_seconds]:
 		if not is_finite(value) or value <= 0.0:
 			return "敌种特殊计时无效"
+	if not is_finite(frenzy_speed_bonus) or frenzy_speed_bonus < 0.0 or not is_finite(frenzy_damage_bonus) or frenzy_damage_bonus < 0.0:
+		return "敌种狂暴加成无效"
 	if scavenge_armor_ratio <= 0.0 or not is_finite(scavenge_armor_ratio) or scavenge_max_armor <= 0.0 or not is_finite(scavenge_max_armor):
 		return "拾荒护甲参数无效"
 	if not is_finite(evasion_chance) or evasion_chance < 0.0 or evasion_chance > 1.0:
@@ -113,4 +122,6 @@ func snapshot() -> Dictionary:
 		"boost_seconds": boost_seconds, "boost_speed": boost_speed,
 		"marches_to_core": marches_to_core, "wandering_speed_ratio": wandering_speed_ratio, "shelter_radius": shelter_radius,
 		"shelter_reduction": shelter_reduction, "shelter_self": shelter_self, "passes_walls": passes_walls,
-		"evasion_chance": evasion_chance}
+		"evasion_chance": evasion_chance, "frenzy_radius": frenzy_radius,
+		"frenzy_seconds": frenzy_seconds, "frenzy_speed_bonus": frenzy_speed_bonus,
+		"frenzy_damage_bonus": frenzy_damage_bonus}

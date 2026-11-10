@@ -140,7 +140,7 @@ content/build_menu_catalog.json  仅分类/展示，不是规则来源
 | --- | --- | --- | --- |
 | `MechFoundationSettings` | [foundation_settings.gd](../content/foundation_settings.gd) | 种子、`simulation_hz`、地图、建筑/单位/敌种表、`balance_data_path`、开局资源/建筑/单位格、`probe_speed`/`probe_sight_radius`、波次触发模式、噪声半径、`ordinary_per_elite`、`max_elite_types`、`max_jammed_towers`、`total_waves`、`campaign_mode`、`final_wave_budget` | 无；由 `SimCore.configure` 消费 |
 | `MechUnitDefinition` | [unit_definition.gd](../content/unit_definition.gd) | `unit_id`, `display_name`, `cost`, `production_seconds`, `capacity_cost`, `max_hp`, `damage`, `attack_seconds`, `attack_range`, `acquisition_range`, `move_speed`, `sight_radius` | `validation_error()`, `snapshot()` |
-| `MechEnemyDefinition` | [enemy_definition.gd](../content/enemy_definition.gd) | 战斗：`max_hp`, `damage`, `damage_vs_building`, `attack_seconds`, `attack_range`, `move_speed`, `vision_radius`, `threat_cost`；波次：`stage_weights`, `elite`；能力：`charge_bonus`, `charge_linger_seconds`, `ignores_rough`, `prefers_towers`, `prefers_buildings`, `splash_radius`, `scavenge_radius`, `scavenge_armor_ratio`, `scavenge_max_armor`, `jam_*`, `boost_*`, `shelter_*`, `passes_walls`, `evasion_chance`, `marches_to_core` | `validation_error()`, `building_damage()`, `snapshot()` |
+| `MechEnemyDefinition` | [enemy_definition.gd](../content/enemy_definition.gd) | 战斗：`max_hp`, `damage`, `damage_vs_building`, `attack_seconds`, `attack_range`, `move_speed`, `vision_radius`, `threat_cost`；波次：`stage_weights`, `elite`；能力：`charge_bonus`, `charge_linger_seconds`, `ignores_rough`, `prefers_towers`, `prefers_buildings`, `splash_radius`, `scavenge_radius`, `scavenge_armor_ratio`, `scavenge_max_armor`, `jam_*`, `boost_*`, `shelter_*`, `passes_walls`, `evasion_chance`, `frenzy_radius`, `frenzy_seconds`, `frenzy_speed_bonus`, `frenzy_damage_bonus`, `marches_to_core` | `validation_error()`, `building_damage()`, `snapshot()` |
 | `MechMapDefinition` | [map_definition.gd](../content/map_definition.gd) | `map_id`, `display_name`, `dimensions`, `playable_polygon`, `obstacle_rects`, `rough_rects`, `wind_cells`, `water_cells`, `mainbrain_origin/footprint`, `probe_cell`, `main_gate`, `flank`, `minerals` | `validation_error()`, `outline()`, `contains_cell()`, `playable_cells()`, `terrain_cells()`, `wind_mask()`, `water_mask()`, `wanderer_spawn_allowed()`, `terrain_snapshot()`, `mineral_snapshots()` |
 | `MechMineralDefinition` | [mineral_definition.gd](../content/mineral_definition.gd) | `mineral_id`, `cell`, `resource_kind`（`metal_ore`/`fuel`/`crystals`）, `amount` | `snapshot()`（`assigned_to` 为模拟层占位字段） |
 | `MechAlloyRecipe` | [alloy_recipe.gd](../sim/alloy_recipe.gd) | `recipe_id`, `cycle_seconds`, `fuel_cost`, `metal_cost`, `alloy_output`, `power_output` | `validation_error()`, `snapshot()` |
@@ -193,6 +193,7 @@ content/build_menu_catalog.json  仅分类/展示，不是规则来源
 | `unit_catalog` | `{unit_id: unit snapshot}` |
 | `catalog` | 可下单建筑目录；每项是建筑定义快照 + `unavailable_reason` |
 | `probe_id` | 诊断校验实体 ID，正常开局为 0 |
+| `frenzies` | 可见的煽动者死亡光环 `{position, radius, ticks}`；离开光环即失去增益 |
 | `alloy_processing` | `{ever_produced_alloy, produced_alloy}` |
 | `dispatch` | `{generation, regions: Array[Dictionary]}`；表现层另加 `selected_region_id` |
 | `mainbrain_id` | 主脑实体 ID |
@@ -219,7 +220,7 @@ unit_capacity, queued_capacity
 
 ```text
 id, kind, name, position, target, has_order, footprint, path, is_unit, team, hp, max_hp,
-is_enemy, enemy_id, elite, charge_ticks, speed_boost_ticks, scavenge_armor, jam_target_id,
+is_enemy, enemy_id, elite, charge_ticks, speed_boost_ticks, scavenge_armor, jam_target_id, frenzy_ticks,
 order, order_goal, attack_target_id, facing, arrival_facing, has_arrival_facing,
 formation_id, formation_center, formation_offset, shot_ticks, shot_target,
 capacity_cost, damage, attack_range
@@ -286,7 +287,7 @@ waiting_for_clearance, rebuild_cost, shot_ticks, shot_target
 | --- | --- | --- | --- |
 | `MechUnitSystem` | [unit_system.gd](../sim/unit_system.gd) | 玩家指令、编队应用与单位战斗循环 | `combat_noise: Callable`；`create(registry, rules, cell) -> int`, `capacity_used(registry)`, `plan_order(ids, kind, goal, target_id, registry, grid, navigation)`, `apply_order(plan, registry)`, `spawn(building, rally, rules, registry, grid, navigation) -> bool`, `advance(registry, grid, navigation, hz, vision) -> {enemy_hits}` |
 | `MechTowerSystem` | [tower_system.gd](../sim/tower_system.gd) | 运行中炮塔自动开火；扫描摊销到冷却结束时刻 | `combat_noise: Callable`；`advance(registry, buildings, hz, grid, vision) -> Array[命中]` |
-| `MechEnemyAbilities` | [enemy_abilities.gd](../sim/enemy_abilities.gd) | 拾荒护甲池、单塔干扰/免疫/提速与来源失效 | `prepare(registry)`, `note_death(dead)`, `armor(entity) -> float`, `release_source(id, buildings)`, `validate_links(registry, buildings, grid)`, `advance(registry, buildings, grid, hz, max_jammed)` |
+| `MechEnemyAbilities` | [enemy_abilities.gd](../sim/enemy_abilities.gd) | 拾荒护甲池、煽动者死亡光环、单塔干扰/免疫/提速与来源失效 | `prepare(registry)`, `note_death(dead, hz)`, `armor(entity) -> float`, `frenzy_snapshots() -> Array[Dictionary]`, `release_source(id, buildings)`, `validate_links(registry, buildings, grid)`, `advance(registry, buildings, grid, hz, max_jammed)` |
 | `MechEnemySystem` | [enemy_system.gd](../sim/enemy_system.gd) | 机潮行军/接敌；全局静态场 + 局部场；空间桶目标查询 | `profiling_enabled: bool`；`configure_noise(emitter)`, `reset(grid, goal, buildings)`, `shutdown()`, `create(registry, rules, position, ambient = false) -> int`, `advance(registry, grid, navigation, buildings, hz, noises, vision) -> {dead_units, building_hits}` |
 | `MechThreatSystem` | [threat_system.gd](../sim/threat_system.gd) | 游荡种群、噪声事件、感疫转化 | `configure(definitions, settings) -> String`, `reset(grid, map, active, hz)`, `advance(buildings) -> Array[生成请求]`, `noises()`, `infect(cost, position) -> Array[生成请求]`, `note_combat()`, `note_construction()`, `note_operation()`, `note_movement()` |
 | `MechWaveDirector` | [wave_director.gd](../sim/wave_director.gd) | 波次相位、预算编成、边缘流式投放、战役终波 | `configure(settings) -> String`, `reset(grid, map, active, hz)`, `advance(grid, buildings, entities) -> Array[生成请求]`, `request_final_wave() -> bool`, `set_campaign_stage(stage)`, `state() -> Dictionary`, `exhausted() -> bool` |
