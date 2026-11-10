@@ -57,7 +57,9 @@ func advance(buildings: Array[MechBuildingState], economy: MechEconomySystem, hz
 				building.processing_power = 0
 				changed = true
 			continue
-		building.processing_power = recipe.power_output
+		if building.processing_power != recipe.power_output:
+			building.processing_power = recipe.power_output
+			changed = true
 		building.processing_elapsed = mini(building.processing_elapsed + 1, building.processing_total)
 		if building.processing_elapsed < building.processing_total:
 			continue

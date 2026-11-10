@@ -312,15 +312,24 @@ waiting_for_clearance, rebuild_cost, shot_ticks, shot_target
 
 ### 5.1 组合根 `main.gd`
 
-无 `class_name`，由 `scenes/main_3d.tscn` 与 `scenes/main.tscn` 共用。职责：
+无 `class_name`，由唯一战场入口 `scenes/main_3d.tscn` 使用。职责：
 
-1. 装配 `MechSimCore`、`MechCommandQueue` 与全部视图；
+1. 装配 `MechSimCore`、`MechCommandQueue`、两个输入控制器与全部视图；
 2. 物理帧按 `simulation_hz` 调用 `advance_one_tick()`；
 3. 监听 `state_changed` 只标脏，每渲染帧至多构造一次快照；
-4. 把输入和 HUD 信号翻译成 `MechCommand` 后 `submit()`；
-5. 读取刚发布快照驱动选择、建造预览与提示。
+4. 路由全局快捷键和 HUD 信号，保持建造/选择/相机的事件优先级；
+5. 发布同一份快照给视图与选择控制器，协调建造预览与提示。
 
-它向视图约定的方法集合（视图按需实现，缺省方法由 2D/3D 各自适配）：
+输入控制器为组合根持有的 RefCounted，不额外注册 `_input`，不会改变场景树传播顺序：
+
+| 类 | 文件 | 主要接口 |
+| --- | --- | --- |
+| `MechSelectionController` | [selection_controller.gd](../presentation/selection_controller.gd) | `configure(sim, commands, hud, world, camera, viewport)`；`update_state(state, generation_changed)`、`left_click(event)`、`right_click()`、`handle_drag_event(event)`、`cancel_drag()`、`handle_group(number, store)`、`selected_units()`、`select_building(entity_id, origin)`、`select_starting_units()`、`present_selection()`；只读 `selected_ids`，复用 MechSelectionState |
+| `MechBuildController` | [build_controller.gd](../presentation/build_controller.gd) | `configure(sim, commands, hud, world, camera, coverage, viewport, window)`；`request(id, catalog)`、`cancel()`、`follow_mouse(event)`、`handle_key(key)`、`begin_wall(event)`、`handle_wall_event(event)`、`cancel_wall_drag()`、`place_at(map_position)`、`present_cursor(selected_cell, settings_open)` |
+
+两个控制器的 `cursor_changed` 信号由 main 接线后刷新光标；控制器不持有 main。选择使用最近发布快照，指令仍经同一 CommandQueue 提交；失焦/离窗直接取消控制器中的未完成手势，重开/新 generation 清除选择和编队时序。未确定的模拟功能暂不拆分。
+
+它向视图约定的方法集合（视图按需实现，缺省方法由 当前3D视图实现）：
 
 | 方法 | 用途 |
 | --- | --- |
@@ -342,26 +351,24 @@ waiting_for_clearance, rebuild_cost, shot_ticks, shot_target
 | `pick_entity/pick_unit/pick_building(point) -> int` | 拾取 |
 | `blocks_point(point)` / `selection_bounds(start, end)` / `battle_view_rect()` | HUD 面板占位与战场矩形 |
 
-### 5.2 2D/3D 视图
+### 5.2 战场与HUD视图
 
 | 类 | 文件 | 职责 | 主要接口 |
 | --- | --- | --- | --- |
-| `MechFoundationView` | [foundation_view.gd](../presentation/foundation_view.gd) | 2D 对照：集中绘制白模与拾取 | `present()`, `present_selection()`, `present_cursor()`, `pick_building()`；`@export preview_map` |
+| `MechPortraitView2D` | [portrait_view_2d.gd](../presentation/portrait_view_2d.gd) | HUD单对象肖像，保留既有二维外观 | `present(entity)`；不包含战场拾取/路径/光标/地图预览 |
 | `MechFoundationView3D` | [foundation_view_3d.gd](../presentation/foundation_view_3d.gd) | 3D 默认：共享 Mesh 实例、BVH 射线拾取、血条/范围/提示 | `configure(settings)`, `present()`, `present_selection()`, `present_cursor()`, `pick_entity()`, `pick_unit()`, `pick_building()` |
-| `MechTerrainView` | [terrain_view.gd](../presentation/terrain_view.gd) | 2D 地形一次性渲染进 SubViewport 纹理 | `present_map()`, `present_vision()`；`@export preview_map` |
 | `MechTerrainView3D` | [terrain_view_3d.gd](../presentation/terrain_view_3d.gd) | 3D 地形静态分块网格；复用多边形裁剪/三角化 | `present_map()`, `present_vision()` |
-| `MechFogView` | [fog_view.gd](../presentation/fog_view.gd) | 2D 单张迷雾投影纹理 | `present(vision, generation, outline)` |
 | `MechFogView3D` | [fog_view_3d.gd](../presentation/fog_view_3d.gd) | 三态迷雾纹理，供地面与模型材质共同采样 | `material(ground = false) -> ShaderMaterial`, `preview_material()`, `present(vision, generation, outline)` |
-| `MechCoverageView` / `MechCoverageView3D` | [coverage_view.gd](../presentation/coverage_view.gd) / [coverage_view_3d.gd](../presentation/coverage_view_3d.gd) | 建造时的供电覆盖；只显示已探索格 | `present_map(map_state)` |
+| `MechCoverageView3D` | [coverage_view_3d.gd](../presentation/coverage_view_3d.gd) | 建造时的供电覆盖；只显示已探索格 | `present_map(map_state)` |
 | `MechBattleOverlay3D` | [battle_overlay_3d.gd](../presentation/battle_overlay_3d.gd) | 集中绘制屏幕血条与状态，不逐实体建 Control | `present(state, selected: Array[int], bounds: Dictionary)` |
 | `MechInstanceBatches3D` | [instance_batches_3d.gd](../presentation/instance_batches_3d.gd) | 显示实例批管理，无实体逻辑 | `present(groups, shared_material)`, `clear()`, `static append(groups, key, mesh, transform, color)` |
 | `MechModelCatalog3D` | [model_catalog_3d.gd](../presentation/model_catalog_3d.gd) | 原生几何合并为共享 Mesh；覆盖建筑/单位/敌种 | `model(entity: Dictionary) -> Mesh` |
 | `MechSelectionState` | [selection_state.gd](../presentation/selection_state.gd) | 纯客户端选择与编组 | `ids`, `groups`；`reset()`, `select(next, additive, toggle)`, `reconcile(entities, garrisoned_unit_ids)`, `store_group(key)`, `recall_group(key)` |
-| `MechIsoGeometry` | [iso_geometry.gd](../presentation/iso_geometry.gd) | 2D 等距投影（仅 2D 对照与小地图使用） | `project()`, `unproject()`, `cell_at()`, `cell_center()`, `footprint_polygon()`, `project_polygon()`, `map_bounds()` |
+| `MechIsoGeometry` | [iso_geometry.gd](../presentation/iso_geometry.gd) | 2D 等距投影（仅小地图与肖像使用） | `project()`, `unproject()`, `cell_at()`, `footprint_polygon()`, `map_bounds()` |
 
 ### 5.3 镜头适配器
 
-`MechMapCamera`（Camera2D）与 `MechMapCamera3D`（Camera3D）暴露同名统一接口，`main.gd` 不依赖具体投影：
+`MechMapCamera3D`（Camera3D）提供唯一战场镜头接口，`main.gd` 不依赖具体投影：
 
 | 接口 | 说明 |
 | --- | --- |
@@ -371,7 +378,7 @@ waiting_for_clearance, rebuild_cost, shot_ticks, shot_target
 | `visible_map_polygon() -> PackedVector2Array` | 镜头取景多边形（供小地图） |
 | `zoom_factor() -> float` | 当前缩放 |
 | `focus_map(point)` / `focus_mainbrain()` / `fit_map()` | 聚焦与总览 |
-| `set_play_area(rect)`（仅 3D）/ `set_external_gesture(active)` | 战场矩形与外部手势占用 |
+| `set_play_area(rect)`/ `set_external_gesture(active)` | 战场矩形与外部手势占用 |
 | `handle_event(event) -> bool` | 中键拖拽/滚轮缩放；返回是否消费 |
 
 可调属性：`pan_speed_factor`, `zoom_speed_factor`, `edge_scroll_enabled`, `input_blocked`, `keyboard_pan_blocked`。

@@ -969,7 +969,7 @@ func _prepare_repair_stations() -> void:
 		for candidate: MechBuildingState in all:
 			if candidate.entity_id == station.entity_id or candidate.phase != MechBuildingState.Phase.OPERATING:
 				continue
-			if candidate.repair_auto_source < 0 or candidate.repair_manual_hold:
+			if candidate.repair_auto_source != 0 or candidate.repair_manual_hold:
 				continue
 			if candidate.hp >= candidate.definition.max_hp:
 				continue

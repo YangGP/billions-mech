@@ -8,7 +8,7 @@
 
 - 默认入口已为`scenes/main_3d.tscn`：二维地图逻辑＋实时三维工程模型＋正交Camera3D＋二维HUD。共享模型目录、状态/范围/能力提示与三维地图编辑预览已接入；保留二维模拟/导航，不重复实现玩法。[迁移方案](3d-presentation-migration.md)保留退出条件，当前优先级是交互/生命周期、完整整局和综合性能验收。
 
-- **用户要求3D肖像先不用，保留2D肖像，不继续开发该项。** 旧2D主画面对照在3D人工回归后清理，不能连同肖像/小地图依赖一起删除。统一待验项见[人工清单](../validation/3d-manual-checklist.md)，实测条件及尚未达到的2000敌军预算见[最新证据](../validation/3d-interaction-performance.md)；不能用2000几何实例或视野外敌军模拟证明集中战斗流畅。
+- **用户要求3D肖像先不用，保留2D肖像，不继续开发该项。** 2026-11-11按用户要求已移除旧2D战场，肖像已独立为portrait_view_2d.gd，小地图依赖保留，不能删除二维模拟/导航或现用HUD。统一待验项见[人工清单](../validation/3d-manual-checklist.md)，实测条件及尚未达到的2000敌军预算见[最新证据](../validation/3d-interaction-performance.md)；不能用2000几何实例或视野外敌军模拟证明集中战斗流畅。
 
 - 最新交互规则覆盖下文历史拆除规格：确认后瞬间拆除/清基座，暂停也立即结清，没有正常的取消拆除阶段；普通完工连通建筑默认4格视野。框选跨入UI松开时按裁剪后的战场矩形完成选择。用户9退款通过、11旧拆除成功；新规则复验见[反馈记录](../validation/demolition-vision-selection.md)。
 
@@ -91,7 +91,7 @@ SimCore在tick内建议按“既有收益/加工结算→工程/升级完成→�
 4. 冷却塔全基地供冷12、耗电1、零调度；中继耗电1、零调度。只有完工运行才提供服务；施工按需预留，拆除停服，被毁基座保留占地但撤供给；取消拆除恢复服务。
 5. HUD显示缺电、缺冷却、断覆盖各自原因；超载时恢复设施仍可按自身需求下单，不能对所有建筑一刀切拒绝。
 
-**主要文件：** `sim/grid_state.gd`、`economy_system.gd`、`construction_system.gd`、`sim_core.gd`、`content/building_definition.gd`、新增建筑`.tres`、`coverage_view.gd`、`vision_system.gd`。
+**主要文件：** `sim/grid_state.gd`、`economy_system.gd`、`construction_system.gd`、`sim_core.gd`、`content/building_definition.gd`、新增建筑`.tres`、`coverage_view_3d.gd`、`vision_system.gd`。
 
 **验收：** 串联断开使远端停运、平行冗余保活、补建恢复；孤立环不供电；拆除/取消/基座不残留供给；冷却塔不要求贴节点；普通受伤不算图；覆盖变化不重建全图导航。此包不单独把主脑电60改10。
 
@@ -108,7 +108,7 @@ SimCore在tick内建议按“既有收益/加工结算→工程/升级完成→�
    将实际电量放入实例运行状态/有效规则，改造`economy_system.gd.recompute`目前直接累加`definition.power_provided`的路径；不得给每个选址修改共享电源Resource，也不能只在HUD显示动态值而账本仍加固定电量。
 7. 原生预览绘制本体与采集区两个轮廓、预计电量及冲突格，鼠标移开HUD不误放置。
 
-**主要文件：** `building_definition.gd`、`building_state.gd`、`construction_system.gd`、`vision_system.gd`、`sim_core.gd`、`map_definition.gd`、`coverage_view.gd`和放置预览路径。
+**主要文件：** `building_definition.gd`、`building_state.gd`、`construction_system.gd`、`vision_system.gd`、`sim_core.gd`、`map_definition.gd`、`coverage_view_3d.gd`和放置预览路径。
 
 **验收：** 满分/边缘/黑雾/灰区、同类冲突、异类重叠、连续订单竞争、暂停、取消、摧毁基座/重建/清除均一致；同址强化未来乘2不改区。基础零燃料电源在电力/调度赤字时仍有恢复路径。
 

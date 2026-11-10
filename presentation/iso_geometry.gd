@@ -24,23 +24,11 @@ static func cell_at(point: Vector2) -> Vector2i:
 	return Vector2i(unproject(point).floor())
 
 
-## 逻辑格中心点的等距屏幕坐标。
-static func cell_center(cell: Vector2i) -> Vector2:
-	return project(Vector2(cell) + Vector2(0.5, 0.5))
-
-
 ## 建筑脚印（origin + 尺寸）的等距菱形多边形。
 static func footprint_polygon(origin: Vector2i, footprint: Vector2i) -> PackedVector2Array:
 	var start := Vector2(origin)
 	return PackedVector2Array([project(start), project(start + Vector2(footprint.x, 0)),
 		project(start + Vector2(footprint)), project(start + Vector2(0, footprint.y))])
-
-
-static func project_polygon(polygon: PackedVector2Array) -> PackedVector2Array:
-	var result := PackedVector2Array()
-	for point: Vector2 in polygon:
-		result.append(project(point))
-	return result
 
 
 ## 地图的等距包围盒；优先用真实轮廓计算，否则按尺寸估算。

@@ -66,7 +66,7 @@ godot --path .
 - [机械敌人设计稿](docs/enemy-roster.md)：普通建造者三形态/回收者与五类精英已接入，长足者可穿墙，旧原型机已删除；[接入与验证记录](validation/enemy-integration.md)。
 - [验证索引](validation/README.md)、[三维验证记录](validation/3d-interaction-performance.md)、[当前三维画面](validation/screens/3d-interaction-walls.png)。
 
-最新58个运行目录脚本（含vendor）解析、既有视野回归49/49、普通/战役启动和诊断压力运行无脚本错误。实际三维渲染及模型射线求交已检查；真实鼠标/键盘交互、完整四波/战役与综合规模性能仍待验收，详见[三维交互与性能记录](validation/3d-interaction-performance.md)。短时2000敌军模拟仍超过30Hz单步预算，不能用无头固定FPS证明流畅。
+移除旧2D战场后，57个运行目录脚本（含vendor）解析、既有视野回归49/49、默认3D无头与原生渲染短时启动无脚本错误，见[清理记录](validation/retire-2d-battlefield.md)。实际三维渲染及模型射线求交已检查；真实鼠标/键盘交互、完整四波/战役与综合规模性能仍待验收，详见[三维交互与性能记录](validation/3d-interaction-performance.md)。短时2000敌军模拟仍超过30Hz单步预算，不能用无头固定FPS证明流畅。
 
 ## 工程结构
 
@@ -83,4 +83,4 @@ validation/      有效验证记录、专题证据和地图生成材料
 archive/         非运行依赖的旧原型场景与素材
 ```
 
-编辑入口为 `scenes/main_3d.tscn`，`scenes/main.tscn`暂留2D对照；唯一玩法配置为 `content/development_128.tres`，地图为 `content/maps/development_basin_128.tres`。旧前哨、旧开局和训练场已移除。已删除的旧文档可从 Git 历史追溯。
+编辑入口为 `scenes/main_3d.tscn`；旧2D战场入口及专用相机、地形、迷雾和覆盖视图已移除，HUD、小地图和独立2D肖像保留。唯一玩法配置为 `content/development_128.tres`，地图为 `content/maps/development_basin_128.tres`。旧前哨、旧开局和训练场已移除。已删除的旧文档可从 Git 历史追溯。

@@ -2,20 +2,15 @@ extends Node
 ## 组合根：装配模拟、命令队列与全部表现层视图；只有命令可以改变模拟状态。
 
 const SETTINGS: MechFoundationSettings = preload("res://content/development_128.tres")
-## 双击判定窗口（毫秒）与两次按下之间的最大位移（像素）。
-const DOUBLE_CLICK_MS: int = 400
-const DOUBLE_CLICK_SLOP: float = 8.0
-## 双击链式扩选时，屏幕外同类单位与已选单位的最大间距（世界格）。
-const SAME_KIND_CHAIN_RADIUS: float = 2.0
 
 var _sim := MechSimCore.new()
 var _commands := MechCommandQueue.new()
-## 2D基线与3D开发场景共享同一模拟、命令和交互；只读视图使用相同present接口。
-@onready var _terrain = $Terrain
-@onready var _coverage = $Coverage
-@onready var _world = $Entities
-@onready var _fog = $Fog
-@onready var _camera = $MapCamera
+## 三维战场只消费快照；只有命令可以改变模拟。
+@onready var _terrain: MechTerrainView3D = $Terrain
+@onready var _coverage: MechCoverageView3D = $Coverage
+@onready var _world: MechFoundationView3D = $Entities
+@onready var _fog: MechFogView3D = $Fog
+@onready var _camera: MechMapCamera3D = $MapCamera
 @onready var _hud: MechMapHud = $HUD
 @onready var _settings: MechSettingsMenu = $Settings
 var _resume_after_settings: bool = false
@@ -29,28 +24,9 @@ var _stress_population_generation: int = -1
 var _session_logged: bool = false
 var _selected_dispatch_region: int = 0
 var _last_coverage_revision: int = -1
-var _selected := Vector2i(-1, -1)
-var _build_id: StringName = &""
-var _build_cell := Vector2i(-1, -1)
-var _keyboard_build := false
-var _wall_dragging: bool = false
-var _wall_start := Vector2i.ZERO
-var _wall_end := Vector2i.ZERO
-var _dimensions := Vector2i.ZERO
 var _map_outline := PackedVector2Array()
-var _selection := MechSelectionState.new()
-var _selection_dragging: bool = false
-var _selection_start := Vector2.ZERO
-var _selection_end := Vector2.ZERO
-var _selection_bounds := Rect2()
-var _selection_additive: bool = false
-var _selection_toggle: bool = false
-var _attack_move_mode: bool = false
-var _last_group: int = -1
-var _last_group_time: int = 0
-## 上一次选择模式左键按下的时间与位置，用于双击判定；0 表示没有可续接的点击。
-var _last_click_ms: int = 0
-var _last_click_position := Vector2.ZERO
+var _selection := MechSelectionController.new()
+var _build := MechBuildController.new()
 var _last_threat_key: String = ""
 var _last_alert_key: String = ""
 var _state: Dictionary = {}
@@ -68,13 +44,6 @@ var _perf_frame_peak: float = 0.0
 
 
 func _ready() -> void:
-	if OS.get_cmdline_user_args().has("--3d") and not _camera is Camera3D:
-		get_tree().call_deferred("change_scene_to_file", "res://scenes/main_3d.tscn")
-		set_process(false)
-		set_physics_process(false)
-		set_process_input(false)
-		set_process_unhandled_input(false)
-		return
 	# 部分 Windows/DPI 配置会把窗口恢复到屏幕外，这里把启动位置钳制回可用区域，确保工具栏始终可及。
 	var window := get_window()
 	var usable: Rect2i = DisplayServer.screen_get_usable_rect()
@@ -100,8 +69,11 @@ func _ready() -> void:
 		get_tree().quit(1)
 		return
 	_commands.configure(_sim.execute_command)
-	if _world.has_method("configure"):
-		_world.configure(initial_settings)
+	_selection.configure(_sim, _commands, _hud, _world, _camera, get_viewport())
+	_build.configure(_sim, _commands, _hud, _world, _camera, _coverage, get_viewport(), get_window())
+	_selection.cursor_changed.connect(_update_cursor)
+	_build.cursor_changed.connect(_update_cursor)
+	_world.configure(initial_settings)
 	_commands.command_finished.connect(_on_command_finished)
 	_coverage.hide()
 	_hud.pause_requested.connect(_toggle_pause)
@@ -109,7 +81,7 @@ func _ready() -> void:
 	_hud.focus_requested.connect(_focus_mainbrain)
 	_hud.fit_requested.connect(_fit_map)
 	_hud.build_requested.connect(_request_build)
-	_hud.build_cancelled.connect(_cancel_build)
+	_hud.build_cancelled.connect(_build.cancel)
 	_hud.building_action_requested.connect(_building_action)
 	_hud.production_requested.connect(_queue_unit)
 	_hud.production_cancelled.connect(_cancel_production)
@@ -122,19 +94,18 @@ func _ready() -> void:
 	_settings.close_requested.connect(_close_settings)
 	_settings.settings_applied.connect(_apply_camera_settings)
 	_apply_camera_settings(_settings.preferences())
-	if _camera.has_method("set_play_area"):
-		_camera.set_play_area(_hud.battle_view_rect())
-	get_window().focus_exited.connect(_cancel_wall_drag)
-	get_window().mouse_exited.connect(_cancel_wall_drag)
-	get_window().focus_exited.connect(_cancel_selection_drag)
-	get_window().mouse_exited.connect(_cancel_selection_drag)
+	_camera.set_play_area(_hud.battle_view_rect())
+	get_window().focus_exited.connect(_build.cancel_wall_drag)
+	get_window().mouse_exited.connect(_build.cancel_wall_drag)
+	get_window().focus_exited.connect(_selection.cancel_drag)
+	get_window().mouse_exited.connect(_selection.cancel_drag)
 	_sim.state_changed.connect(_refresh)
 	_publish_state()
 	if OS.get_cmdline_user_args().has("--overview"):
 		_fit_map()
 	if OS.get_cmdline_user_args().has("--settings"):
 		_open_settings()
-	print("[Billions Mech] vision fog ready; 1920x1080; ", "3D development whitebox" if _camera is Camera3D else "2D whitebox", "; ", initial_settings.scenario_name)
+	print("[Billions Mech] vision fog ready; 1920x1080; ", "3D development whitebox", "; ", initial_settings.scenario_name)
 
 
 func _physics_process(_delta: float) -> void:
@@ -159,8 +130,7 @@ func _exit_tree() -> void:
 
 func _process(delta: float) -> void:
 	var started: int = Time.get_ticks_usec() if _perf_enabled else 0
-	if _camera.has_method("set_play_area"):
-		_camera.set_play_area(_hud.battle_view_rect())
+	_camera.set_play_area(_hud.battle_view_rect())
 	_publish_state()
 	_update_cursor()
 	_hud.present_zoom(_camera.zoom_factor())
@@ -189,11 +159,10 @@ func _process(delta: float) -> void:
 					if entity.get("team", 1) == 2:
 						visible_enemies += 1
 				print("[perf:population] total=%s visible_enemies=%d" % [profile["population"], visible_enemies])
-				if _world.has_method("pick_entity"):
-					# 只读采样真实模型求交耗时；不合成输入或改变选择。
-					var pick_started: int = Time.get_ticks_usec()
-					var picked_id: int = _world.pick_entity(_hud.battle_view_rect().get_center())
-					print("[perf:pick] center_id=%d cpu_ms=%.3f" % [picked_id, (Time.get_ticks_usec() - pick_started) / 1000.0])
+				# 只读采样真实模型求交耗时；不合成输入或改变选择。
+				var pick_started: int = Time.get_ticks_usec()
+				var picked_id: int = _world.pick_entity(_hud.battle_view_rect().get_center())
+				print("[perf:pick] center_id=%d cpu_ms=%.3f" % [picked_id, (Time.get_ticks_usec() - pick_started) / 1000.0])
 				var avg_stages: Dictionary = {}
 				var peak_stages: Dictionary = {}
 				for stage: String in profile["stages"]:
@@ -264,55 +233,22 @@ func _input(event: InputEvent) -> void:
 			_close_settings()
 			get_viewport().set_input_as_handled()
 		return
-	# 鼠标回到战场即恢复跟随，不必先放下第一座建筑。
-	if event is InputEventMouseMotion and _build_id != &"" and not event.relative.is_zero_approx() \
-			and get_viewport().get_visible_rect().has_point(event.position) and not _hud.blocks_point(event.position):
-		_keyboard_build = false
-	# 建造快捷键必须先于获得焦点的 HUD 按钮处理，否则按键会被按钮吞掉。
-	if event is InputEventKey and event.pressed and not event.echo and not _wall_dragging:
+	_build.follow_mouse(event)
+	# 建造快捷键先于获得焦点的HUD按钮；拖墙期间不切换类型。
+	if event is InputEventKey and event.pressed and not event.echo and not _build.wall_dragging:
 		var key: int = _event_key(event)
 		if key in [KEY_Q, KEY_W, KEY_E]:
 			_request_build(&"compute_node" if key == KEY_Q else (&"armored_wall" if key == KEY_W else &"sentry_tower"))
 			get_viewport().set_input_as_handled()
 			return
-		if _build_id != &"" and key in [KEY_LEFT, KEY_RIGHT, KEY_UP, KEY_DOWN, KEY_ENTER]:
-			_handle_key(key)
+		if _build.handle_key(key):
 			get_viewport().set_input_as_handled()
 			return
-	if _selection_dragging:
-		if event is InputEventMouseMotion:
-			_selection_end = _clamped_selection_point(event.position)
-			_hud.present_drag(Rect2(_selection_start, _selection_end - _selection_start).abs(), _selection_start.distance_to(_selection_end) >= 6.0)
-			get_viewport().set_input_as_handled()
-		elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and not event.pressed:
-			_selection_end = _clamped_selection_point(event.position)
-			# 从战场开始的框选允许在HUD上松开，仍按裁剪后的战场矩形提交。
-			if _selection_bounds.has_area() and get_viewport().get_visible_rect().has_point(event.position):
-				_finish_selection()
-			_cancel_selection_drag()
-			get_viewport().set_input_as_handled()
-		elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT:
-			_cancel_selection_drag()
+	if _selection.dragging:
+		if _selection.handle_drag_event(event):
 			get_viewport().set_input_as_handled()
 		return
-	if not _wall_dragging:
-		return
-	if event is InputEventMouseMotion:
-		_wall_end = _clamped_line_cell(_mouse_cell())
-		_update_cursor()
-		get_viewport().set_input_as_handled()
-	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and not event.pressed:
-		_wall_end = _clamped_line_cell(_mouse_cell())
-		var cells: Array[Vector2i] = _wall_cells()
-		var can_commit: bool = not _hud.blocks_point(event.position) and get_viewport().get_visible_rect().has_point(event.position)
-		_cancel_wall_drag()
-		if can_commit:
-			_commands.submit(MechCommand.new(MechCommand.Type.PLACE_WALL_LINE, {"cells": cells}))
-		else:
-			_hud.feedback("已取消墙线，没有下单或扣款。")
-		get_viewport().set_input_as_handled()
-	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
-		_cancel_build()
+	if _build.handle_wall_event(event):
 		get_viewport().set_input_as_handled()
 
 
@@ -320,80 +256,39 @@ func _unhandled_input(event: InputEvent) -> void:
 	if _settings.is_open():
 		return
 	if event is InputEventMouseButton and (not get_viewport().get_visible_rect().has_point(event.position) or _hud.blocks_point(event.position)):
-		if event.pressed and event.button_index == MOUSE_BUTTON_RIGHT and _build_id != &"":
-			_cancel_build()
+		if event.pressed and event.button_index == MOUSE_BUTTON_RIGHT and _build.building_id != &"":
+			_build.cancel()
 		return
 	if event is InputEventKey and event.pressed and not event.echo:
 		if _event_key(event) >= KEY_1 and _event_key(event) <= KEY_9:
-			_handle_group(_event_key(event) - KEY_0, event.ctrl_pressed)
+			_selection.handle_group(_event_key(event) - KEY_0, event.ctrl_pressed)
 			get_viewport().set_input_as_handled()
 			return
 		if _handle_key(_event_key(event)):
 			get_viewport().set_input_as_handled()
 			return
-	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT and event.shift_pressed and _build_id == &"armored_wall":
-		var cell: Vector2i = _mouse_cell()
-		if _sim.inspect_cell(cell)["inside"]:
-			_wall_dragging = true
-			_wall_start = cell
-			_wall_end = cell
-			_camera.set_external_gesture(true)
-			_update_cursor()
-			get_viewport().set_input_as_handled()
-			return
+	if _build.begin_wall(event):
+		get_viewport().set_input_as_handled()
+		return
 	if _camera.handle_event(event):
 		get_viewport().set_input_as_handled()
 		return
 	if not event is InputEventMouseButton or not event.pressed:
 		return
 	if event.button_index == MOUSE_BUTTON_LEFT:
-		if _build_id != &"":
-			_select_map_position(_camera.screen_to_map(event.position))
-		elif _attack_move_mode:
-			_issue_unit_order(true)
-		elif _is_double_click(event.position):
-			_select_same_kind(event.position)
-		else:
-			_selection_bounds = _hud.selection_bounds(event.position, event.position)
-			if not _selection_bounds.has_area():
-				return
-			_selection_dragging = true
-			_selection_start = event.position
-			_selection_end = event.position
-			_selection_additive = event.shift_pressed
-			_selection_toggle = event.ctrl_pressed
-			_camera.set_external_gesture(true)
+		if _build.building_id != &"":
+			_build.place_at(_camera.screen_to_map(event.position))
+		elif not _selection.left_click(event):
+			return
 		get_viewport().set_input_as_handled()
 		return
 	if event.button_index == MOUSE_BUTTON_RIGHT:
-		_last_click_ms = 0
-		if _build_id != &"":
-			_cancel_build()
-		elif _attack_move_mode:
-			_attack_move_mode = false
-			_hud.feedback("已取消攻击移动模式。")
+		if _build.building_id != &"":
+			_selection.reset_click()
+			_build.cancel()
 		else:
-			_issue_unit_order(false)
+			_selection.right_click()
 		get_viewport().set_input_as_handled()
-
-
-func _select_map_position(map_position: Vector2) -> void:
-	if _hud.blocks_point(get_viewport().get_mouse_position()):
-		return
-	var cell: Vector2i = _map_cell(map_position)
-	if _build_id != &"":
-		_keyboard_build = false
-	if _build_id != &"":
-		_commands.submit(MechCommand.new(MechCommand.Type.PLACE_BUILDING, {"building_id": _build_id, "origin": cell}))
-		return
-	var info: Dictionary = _sim.inspect_cell(cell)
-	if info["inside"]:
-		_selected = cell
-		_hud.feedback("已选中 (%d, %d)；建筑操作在右侧面板。" % [cell.x, cell.y])
-		_refresh_selection()
-		_update_cursor()
-	else:
-		_hud.feedback("请选择地图内的格子。", true)
 
 
 func _event_key(event: InputEventKey) -> int:
@@ -402,27 +297,7 @@ func _event_key(event: InputEventKey) -> int:
 
 
 func _handle_key(key: int) -> bool:
-	if _build_id != &"" and key in [KEY_LEFT, KEY_RIGHT, KEY_UP, KEY_DOWN]:
-		if not _keyboard_build:
-			_build_cell = _mouse_cell()
-		_keyboard_build = true
-		match key:
-			KEY_LEFT:
-				_build_cell += Vector2i(-1, 0)
-			KEY_RIGHT:
-				_build_cell += Vector2i(1, 0)
-			KEY_UP:
-				_build_cell += Vector2i(0, -1)
-			KEY_DOWN:
-				_build_cell += Vector2i(0, 1)
-		_update_cursor()
-		return true
-	if _build_id != &"" and key == KEY_ENTER:
-		var mouse: Vector2 = get_viewport().get_mouse_position()
-		if not _keyboard_build and (not get_viewport().get_visible_rect().has_point(mouse) or _hud.blocks_point(mouse)):
-			return true
-		var cell: Vector2i = _build_cell if _keyboard_build else _mouse_cell()
-		_commands.submit(MechCommand.new(MechCommand.Type.PLACE_BUILDING, {"building_id": _build_id, "origin": cell}))
+	if _build.handle_key(key):
 		return true
 	match key:
 		KEY_F10:
@@ -434,8 +309,8 @@ func _handle_key(key: int) -> bool:
 		KEY_E:
 			_request_build(&"sentry_tower")
 		KEY_A:
-			if not _sim.session_ended() and not _selected_units().is_empty() and _build_id == &"":
-				_attack_move_mode = true
+			if not _sim.session_ended() and not _selection.selected_units().is_empty() and _build.building_id == &"":
+				_selection.attack_move_mode = true
 				_hud.feedback("攻击移动：左键指定目的地，右键或 Esc 取消。")
 		KEY_X:
 			_hud.request_demolition()
@@ -472,17 +347,14 @@ func _handle_key(key: int) -> bool:
 		KEY_ESCAPE:
 			if _hud.is_minimap_fullscreen():
 				_hud.set_minimap_fullscreen(false)
-			elif _selection_dragging:
-				_cancel_selection_drag()
-			elif _build_id != &"" or _wall_dragging:
-				_cancel_build()
-			elif _attack_move_mode:
-				_attack_move_mode = false
+			elif _selection.dragging:
+				_selection.cancel_drag()
+			elif _build.building_id != &"" or _build.wall_dragging:
+				_build.cancel()
+			elif _selection.attack_move_mode:
+				_selection.attack_move_mode = false
 			else:
-				_selection.ids.clear()
-				_selected = Vector2i(-1, -1)
-				_refresh_selection()
-				_update_cursor()
+				_selection.clear_selection()
 		_:
 			return false
 	return true
@@ -495,9 +367,9 @@ func _toggle_pause() -> void:
 func _open_settings() -> void:
 	if _settings.is_open():
 		return
-	_cancel_selection_drag()
-	_cancel_build()
-	_attack_move_mode = false
+	_selection.cancel_drag()
+	_build.cancel()
+	_selection.attack_move_mode = false
 	_hud.dismiss_dialogs()
 	_resume_after_settings = not _sim.is_paused() and not _sim.session_ended()
 	if _resume_after_settings:
@@ -523,13 +395,13 @@ func _apply_camera_settings(preferences: Dictionary) -> void:
 
 
 func _restart() -> void:
-	_cancel_selection_drag()
-	_cancel_build()
+	_selection.cancel_drag()
+	_build.cancel()
 	_commands.submit(MechCommand.new(MechCommand.Type.RESET_SESSION))
 
 
 func _focus_mainbrain() -> void:
-	_cancel_wall_drag()
+	_build.cancel_wall_drag()
 	_camera.focus_mainbrain()
 
 
@@ -539,49 +411,8 @@ func _focus_minimap(map_position: Vector2) -> void:
 
 
 func _fit_map() -> void:
-	_cancel_wall_drag()
+	_build.cancel_wall_drag()
 	_camera.fit_map()
-
-
-func _request_build(id: StringName) -> void:
-	if _sim.session_ended():
-		_hud.feedback("本局已结束，请重新开始或切换场景。", true)
-		return
-	_cancel_selection_drag()
-	_attack_move_mode = false
-	_cancel_wall_drag()
-	var state: Dictionary = _state
-	for entry: Dictionary in state["catalog"]:
-		if entry["building_id"] != id:
-			continue
-		if not entry["unavailable_reason"].is_empty():
-			_hud.feedback(entry["unavailable_reason"], true)
-			return
-		_build_id = id
-		_keyboard_build = false
-		_build_cell = _mouse_cell()
-		_camera.keyboard_pan_blocked = true
-		_hud.present_build(id)
-		_coverage.show()
-		_hud.feedback("%s：左键下单；方向键移动、Enter下单；右键退出。%s" % [entry["name"], "Shift＋左键拖线可连放墙。" if id == &"armored_wall" else ""])
-		_update_cursor()
-		return
-
-
-func _cancel_wall_drag() -> void:
-	_wall_dragging = false
-	_camera.set_external_gesture(false)
-
-
-func _cancel_build() -> void:
-	_cancel_wall_drag()
-	_build_id = &""
-	_keyboard_build = false
-	_camera.keyboard_pan_blocked = false
-	_hud.present_build(&"")
-	_coverage.hide()
-	_hud.feedback("已退出建造。左键点选/框选，右键下令；选中工厂右键设集结点。")
-	_update_cursor()
 
 
 func _building_action(action: int, entity_id: int) -> void:
@@ -611,24 +442,10 @@ func _cancel_upgrade(entity_id: int) -> void:
 	_commands.submit(MechCommand.new(MechCommand.Type.CANCEL_UPGRADE, {"entity_id": entity_id}))
 
 
-func _select_starting_units() -> void:
-	var ids: Array[int] = []
-	for entity: Dictionary in _state["entities"]:
-		if entity.get("is_unit", false) and entity["team"] == 1:
-			ids.append(entity["id"])
-	var has_units: bool = not ids.is_empty()
-	if ids.is_empty():
-		ids.append(_state["mainbrain_id"])
-	_selection.select(ids)
-	_refresh_selection()
-	if has_units:
-		_hud.feedback("已选择 %d 个单位。右键移动或攻击；选工厂可生产部队。" % ids.size())
-
-
 func _garrison_selected() -> void:
 	if _sim.session_ended():
 		return
-	var units: Array[int] = _selected_units()
+	var units: Array[int] = _selection.selected_units()
 	if units.is_empty():
 		_hud.feedback("先选择卫兵，再按 G 前往附近碉堡进驻。", true)
 		return
@@ -638,9 +455,9 @@ func _garrison_selected() -> void:
 
 
 func _ungarrison_selected() -> void:
-	if _sim.session_ended() or _selection.ids.is_empty():
+	if _sim.session_ended() or _selection.selected_ids.is_empty():
 		return
-	_commands.submit(MechCommand.new(MechCommand.Type.UNGARRISON_UNIT, {"building_id": _selection.ids[0]}))
+	_commands.submit(MechCommand.new(MechCommand.Type.UNGARRISON_UNIT, {"building_id": _selection.selected_ids[0]}))
 	_hud.feedback("已请求撤离该碉堡内的驻防单位。")
 
 
@@ -699,221 +516,11 @@ func _request_final_wave() -> void:
 
 
 func _contract_selected(accept: bool) -> void:
-	if _sim.session_ended() or _selection.ids.is_empty():
+	if _sim.session_ended() or _selection.selected_ids.is_empty():
 		return
 	var command: MechCommand.Type = MechCommand.Type.ACCEPT_CONTRACT if accept else MechCommand.Type.CANCEL_CONTRACT
-	_commands.submit(MechCommand.new(command, {"building_id": _selection.ids[0]}))
+	_commands.submit(MechCommand.new(command, {"building_id": _selection.selected_ids[0]}))
 	_hud.feedback("已请求接受合同。" if accept else "已请求取消合同并退款。")
-
-
-func _cancel_selection_drag() -> void:
-	_selection_dragging = false
-	_camera.set_external_gesture(false)
-	_hud.present_drag(Rect2(), false)
-	_selection_bounds = Rect2()
-
-
-func _clamped_selection_point(point: Vector2) -> Vector2:
-	_selection_bounds = _hud.selection_bounds(_selection_start, point)
-	if not _selection_bounds.has_area():
-		return _selection_start
-	return point.clamp(_selection_bounds.position, _selection_bounds.end - Vector2.ONE)
-
-
-func _screen_position(entity: Dictionary) -> Vector2:
-	return _camera.map_to_screen(entity["position"])
-
-
-func _hit_entity(point: Vector2, enemy: bool = false) -> int:
-	if _world.has_method("pick_unit"):
-		return _world.pick_unit(point, enemy)
-	var best: float = INF
-	var result: int = 0
-	for entity: Dictionary in _state["entities"]:
-		if (entity.get("team", 1) == 2) != enemy or entity.get("is_building", false):
-			continue
-		var factor: float = _camera.zoom_factor()
-		var distance: float = (_screen_position(entity) - Vector2(0, 15) * factor).distance_to(point)
-		if distance <= 24.0 * factor and distance < best:
-			best = distance
-			result = entity["id"]
-	return result
-
-
-## 3D只认可射线实际命中的最前方模型，不回退到地面格建筑；2D对照保留旧拾取。
-func _picked_friendly_entity(point: Vector2) -> Dictionary:
-	var id: int = 0
-	if _world.has_method("pick_entity"):
-		id = _world.pick_entity(point)
-	else:
-		id = _hit_entity(point)
-		if id == 0:
-			id = _world.pick_building(point)
-		if id == 0:
-			var building: Dictionary = _sim.building_at(_map_cell(_camera.screen_to_map(point)))
-			id = int(building.get("entity_id", 0))
-	for entity: Dictionary in _state["entities"]:
-		if entity["id"] == id and entity.get("team", 1) == 1:
-			return entity
-	return {}
-
-
-func _finish_selection() -> void:
-	var ids: Array[int] = []
-	var release_cell: Vector2i = _map_cell(_camera.screen_to_map(_selection_end))
-	if _selection_start.distance_to(_selection_end) < 6.0:
-		var picked: Dictionary = _picked_friendly_entity(_selection_end)
-		if not picked.is_empty():
-			ids.append(picked["id"])
-	else:
-		var rect := Rect2(_selection_start, _selection_end - _selection_start).abs()
-		var units: Array[int] = []
-		var buildings: Array[int] = []
-		for entity: Dictionary in _state["entities"]:
-			if entity.get("team", 1) != 1 or not rect.has_point(_screen_position(entity)):
-				continue
-			if entity.get("is_building", false):
-				buildings.append(entity["id"])
-			else:
-				units.append(entity["id"])
-		# 框选优先生效于单位：只要矩形内有任一己方单位，建筑就不进入选择集，避免拖拽时整片基地被连带选中。
-		ids = units if not units.is_empty() else buildings
-		# 拖框不作为点击起点，重置双击状态，避免紧接着的单击被误判为双击。
-		_last_click_ms = 0
-	_selection.select(ids, _selection_additive, _selection_toggle)
-	_selected = release_cell if _sim.inspect_cell(release_cell)["inside"] else Vector2i(-1, -1)
-	_refresh_selection()
-	_update_cursor()
-	_hud.feedback("已选择 %d 个己方实体；右键下令，A＋左键攻击移动。" % _selection.ids.size())
-
-
-## 双击判定：同一位置窗口内的第二次左键按下算作双击，并清空状态避免三击重复触发。
-func _is_double_click(position: Vector2) -> bool:
-	var now: int = Time.get_ticks_msec()
-	var doubled: bool = _last_click_ms > 0 and now - _last_click_ms <= DOUBLE_CLICK_MS \
-		and _last_click_position.distance_to(position) <= DOUBLE_CLICK_SLOP
-	_last_click_ms = 0 if doubled else now
-	_last_click_position = position
-	return doubled
-
-
-## 双击选择同种：单位按 kind，建筑按升级链族根（升级前后视为同种）。
-func _select_same_kind(point: Vector2) -> void:
-	if _hud.blocks_point(point):
-		return
-	var target: Dictionary = _picked_friendly_entity(point)
-	if target.is_empty():
-		return
-	if not target.get("is_building", false):
-		var hit: int = target["id"]
-		var kind: StringName = target.get("kind", &"")
-		if kind == &"":
-			return
-		# 同类单位先取屏幕内的；屏幕外单位只有与已选单位相邻时才经链式扩选纳入，
-		# 避免一次双击把地图远端零散的同种部队也拉进选择集。
-		var same_kind: Array[Dictionary] = []
-		var positions: Dictionary[int, Vector2] = {}
-		for entity: Dictionary in _state["entities"]:
-			if entity.get("team", 1) == 1 and not entity.get("is_building", false) and entity.get("kind", &"") == kind:
-				same_kind.append(entity)
-				positions[entity["id"]] = entity["position"]
-		var chosen: Dictionary[int, bool] = {}
-		var units: Array[int] = []
-		for entity: Dictionary in same_kind:
-			# 屏幕范围由实际相机投影判断，命中的单位始终作为扩选起点。
-			if entity["id"] == hit or (_camera.map_point_on_screen(entity["position"]) and not _hud.blocks_point(_screen_position(entity))):
-				chosen[entity["id"]] = true
-				units.append(entity["id"])
-		while not units.is_empty():
-			var additions: Array[int] = []
-			for entity: Dictionary in same_kind:
-				var id: int = entity["id"]
-				if chosen.get(id, false):
-					continue
-				for selected_id: int in units:
-					if positions[id].distance_to(positions[selected_id]) <= SAME_KIND_CHAIN_RADIUS:
-						additions.append(id)
-						break
-			if additions.is_empty():
-				break
-			for id: int in additions:
-				chosen[id] = true
-			units.append_array(additions)
-		_selection.select(units)
-		_refresh_selection()
-		_update_cursor()
-		_hud.feedback("已选择 %d 个同类单位；右键下令。" % units.size())
-		return
-	var family: StringName = target.get("family_id", &"")
-	if family == &"":
-		return
-	var buildings: Array[int] = []
-	for entity: Dictionary in _state["entities"]:
-		if entity.get("is_building", false) and entity.get("team", 1) == 1 and entity.get("family_id", &"") == family:
-			buildings.append(entity["id"])
-	_selection.select(buildings)
-	_refresh_selection()
-	_update_cursor()
-	_hud.feedback("已选择 %d 座同类建筑（升级前后视为同种）。" % buildings.size())
-
-
-func _selected_units() -> Array[int]:
-	var ids: Array[int] = []
-	for entity: Dictionary in _state["entities"]:
-		if entity["id"] in _selection.ids and entity.get("is_unit", false) and entity["team"] == 1:
-			ids.append(entity["id"])
-	return ids
-
-
-func _issue_unit_order(attack_move: bool) -> void:
-	if _sim.session_ended():
-		_hud.feedback("本局已结束，请重新开始或切换场景。", true)
-		return
-	var ids: Array[int] = _selected_units()
-	var cell: Vector2i = _mouse_cell()
-	var goal: Vector2 = _camera.screen_to_map(get_viewport().get_mouse_position())
-	if not goal.is_finite():
-		return
-	if not ids.is_empty():
-		var target_id: int = _hit_entity(get_viewport().get_mouse_position(), true)
-		_commands.submit(MechCommand.new(MechCommand.Type.ISSUE_UNIT_ORDER, {
-			"ids": ids, "kind": &"attack" if target_id > 0 else (&"attack_move" if attack_move else &"move"),
-			"goal": goal, "target_id": target_id}))
-	else:
-		for entity: Dictionary in _state["entities"]:
-			if not entity["id"] in _selection.ids:
-				continue
-			if not entity.get("produced_units", []).is_empty():
-				_commands.submit(MechCommand.new(MechCommand.Type.SET_RALLY, {"factory_id": entity["id"], "cell": cell}))
-				break
-			elif entity["kind"] == &"probe":
-				_commands.submit(MechCommand.new(MechCommand.Type.MOVE_ENTITY, {"entity_id": entity["id"], "target": goal}))
-	_attack_move_mode = false
-
-
-func _handle_group(number: int, store: bool) -> void:
-	if store:
-		var now: int = Time.get_ticks_msec()
-		if _last_group == number and now - _last_group_time < 400:
-			var kind: StringName = &""
-			for entity: Dictionary in _state["entities"]:
-				if entity["id"] in _selection.ids and entity.get("is_building", false):
-					kind = entity["kind"]
-					break
-			if kind != &"":
-				var ids: Array[int] = []
-				for entity: Dictionary in _state["entities"]:
-					if entity["kind"] == kind:
-						ids.append(entity["id"])
-				_selection.select(ids)
-		_selection.store_group(number)
-		_last_group = number
-		_last_group_time = now
-		_hud.feedback("编队 %d 已保存：%d 个实体。" % [number, _selection.ids.size()])
-	else:
-		_selection.recall_group(number)
-		_hud.feedback("已召回编队 %d：%d 个实体。" % [number, _selection.ids.size()])
-	_refresh_selection()
 
 
 func _on_command_finished(command_type: int, result: Dictionary) -> void:
@@ -931,9 +538,7 @@ func _on_command_finished(command_type: int, result: Dictionary) -> void:
 		MechCommand.Type.SET_PAUSED:
 			_hud.feedback("已暂停，可继续建造、取消和下令；施工与收入已冻结。" if _sim.is_paused() else "模拟已恢复。")
 		MechCommand.Type.PLACE_BUILDING:
-			_selected = result["origin"]
-			_selection.select([int(result["entity_id"])])
-			_refresh_selection()
+			_selection.select_building(int(result["entity_id"]), result["origin"])
 			_hud.feedback("已下单，支付 %s；保持建造模式，可连续放置。" % MechResources.text(result["cost"]))
 		MechCommand.Type.PLACE_WALL_LINE:
 			_hud.feedback("墙线已下单 %d 段，跳过 %d 格，共支付 %s。" % [result["placed"], result["skipped"], MechResources.text(result["cost"])])
@@ -987,9 +592,6 @@ func _publish_state() -> void:
 	var state: Dictionary = _state
 	var generation_changed: bool = _last_generation != state["generation"]
 	if generation_changed:
-		_last_click_ms = 0
-		_last_click_position = Vector2.ZERO
-		_last_group_time = 0
 		_stress_timer = 0.0
 		_stress_step = 0
 		_stress_population_generation = -1
@@ -1019,11 +621,7 @@ func _publish_state() -> void:
 		if key != _last_alert_key:
 			_last_alert_key = key
 			_hud.feedback(alert["text"], true)
-	if _last_generation != state["generation"]:
-		_selection.reset()
-		_attack_move_mode = false
-		_last_group = -1
-	_selection.reconcile(state["entities"], state.get("garrisoned_unit_ids", []))
+	_selection.update_state(state, generation_changed)
 	_world.present(state)
 	_hud.present_state(state)
 	if _last_generation != state["generation"] or _last_map_revision != state["map_revision"] \
@@ -1033,10 +631,9 @@ func _publish_state() -> void:
 			_terrain.present_map(map_state)
 		_coverage.present_map(map_state)
 		_hud.present_map(map_state)
-		_dimensions = map_state["dimensions"]
+		_build.dimensions = map_state["dimensions"]
 		_map_outline = map_state["outline"]
 		if _last_generation != state["generation"]:
-			_selected = Vector2i(-1, -1)
 			_camera.configure_map(map_state)
 		_last_generation = state["generation"]
 		_last_map_revision = state["map_revision"]
@@ -1044,13 +641,13 @@ func _publish_state() -> void:
 	_fog.present(state["vision"], state["generation"], _map_outline)
 	_terrain.present_vision(state["vision"])
 	if generation_changed:
-		_select_starting_units()
+		_selection.select_starting_units()
 	else:
-		_refresh_selection()
+		_selection.present_selection()
 	if ended and not _last_session_ended:
-		_cancel_selection_drag()
-		_cancel_build()
-		_attack_move_mode = false
+		_selection.cancel_drag()
+		_build.cancel()
+		_selection.attack_move_mode = false
 		if state["session"]["outcome"] == &"victory":
 			_hud.feedback("威胁已清除，防守胜利。可查看战场或重新开始。", true)
 		else:
@@ -1070,66 +667,6 @@ func _present_threat(state: Dictionary) -> void:
 	_last_threat_key = key
 	if threat.get("phase", &"") == &"announced":
 		_hud.feedback("侦测到%s机潮，方向：%s。" % [threat.get("tier", ""), threat.get("edge_name", "")])
-
-
-func _refresh_selection() -> void:
-	var state: Dictionary = _state
-	var building: Dictionary = {}
-	var units: Array[Dictionary] = []
-	for entity: Dictionary in state["entities"]:
-		if not entity["id"] in _selection.ids:
-			continue
-		if entity.get("is_building", false) and building.is_empty():
-			building = entity
-		elif entity.get("is_unit", false):
-			units.append(entity)
-	var errors: Dictionary = {}
-	if not building.is_empty():
-		var entity_id: int = building["entity_id"]
-		errors = {"cancel": _sim.building_action_error(MechCommand.Type.CANCEL_CONSTRUCTION, entity_id),
-			"demolish": _sim.building_action_error(MechCommand.Type.DEMOLISH, entity_id),
-			"cancel_demolish": _sim.building_action_error(MechCommand.Type.CANCEL_DEMOLISH, entity_id),
-			"repair": _sim.building_action_error(MechCommand.Type.TOGGLE_REPAIR, entity_id),
-			"rebuild": _sim.building_action_error(MechCommand.Type.REBUILD, entity_id)}
-	_hud.present_selection(building, errors)
-	if building.is_empty() and not units.is_empty():
-		_hud.present_units(units)
-	_world.present_selection(_selection.ids)
-
-
-func _mouse_cell() -> Vector2i:
-	return _map_cell(_camera.screen_to_map(get_viewport().get_mouse_position()))
-
-
-func _map_cell(point: Vector2) -> Vector2i:
-	return Vector2i(point.floor()) if point.is_finite() else Vector2i(-1, -1)
-
-
-func _clamped_line_cell(cell: Vector2i) -> Vector2i:
-	return Vector2i(clampi(cell.x, -1, _dimensions.x), clampi(cell.y, -1, _dimensions.y))
-
-
-func _wall_cells() -> Array[Vector2i]:
-	return Geometry2D.bresenham_line(_wall_start, _wall_end)
-
-
-func _update_cursor() -> void:
-	var mouse: Vector2 = get_viewport().get_mouse_position()
-	var cursor_visible: bool = not _settings.is_open() and get_window().has_focus() and get_viewport().get_visible_rect().has_point(mouse) and not _hud.blocks_point(mouse)
-	var keyboard_cursor_visible: bool = _build_id != &"" and _keyboard_build and not _settings.is_open() and get_window().has_focus()
-	var cell: Vector2i = _build_cell if _build_id != &"" and _keyboard_build else _mouse_cell()
-	var info: Dictionary = {}
-	if cursor_visible or keyboard_cursor_visible:
-		info = _sim.inspect_cell(cell)
-	elif _selected.x >= 0:
-		info = _sim.inspect_cell(_selected)
-	var preview: Dictionary = {}
-	if _wall_dragging:
-		preview = _sim.preview_wall_line(_wall_cells())
-	elif (cursor_visible or keyboard_cursor_visible) and _build_id != &"":
-		preview = _sim.preview_build(_build_id, cell)
-	_world.present_cursor(cell, _selected, preview, cursor_visible or _wall_dragging or keyboard_cursor_visible)
-	_hud.present_cell(info, preview)
 
 
 func _selected_region(regions: Array) -> Dictionary:
@@ -1155,3 +692,16 @@ func _cycle_dispatch_region() -> void:
 			break
 	_state_dirty = true
 	_hud.feedback("已选择授权区域 #%d；F8启停，F9删除。" % _selected_dispatch_region)
+
+
+func _request_build(id: StringName) -> void:
+	if _sim.session_ended():
+		_hud.feedback("本局已结束，请重新开始或切换场景。", true)
+		return
+	_selection.cancel_drag()
+	_selection.attack_move_mode = false
+	_build.request(id, _state["catalog"])
+
+
+func _update_cursor() -> void:
+	_build.present_cursor(_selection.selected_cell, _settings.is_open())

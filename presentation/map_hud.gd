@@ -392,7 +392,7 @@ func _layout_fullscreen_minimap() -> void:
 
 
 func present_zoom(factor: float) -> void:
-	_zoom_label.text = "%d%% · %s" % [roundi(factor * 100.0), "全图" if factor < MechMapCamera.MIN_ZOOM else "战术"]
+	_zoom_label.text = "%d%% · %s" % [roundi(factor * 100.0), "全图" if factor < MechMapCamera3D.MIN_ZOOM else "战术"]
 
 
 func present_build(id: StringName) -> void:
@@ -674,7 +674,7 @@ func _present_portrait(entity: Dictionary) -> void:
 	if key == _portrait_key:
 		return
 	_portrait_key = key
-	var model: MechFoundationView = $Root/Inspector/Portrait/Viewport/Model
+	var model: MechPortraitView2D = $Root/Inspector/Portrait/Viewport/Model
 	var copy: Dictionary = entity.duplicate(true)
 	copy["position"] = Vector2(copy["footprint"]) * 0.5 if copy.get("is_building", false) else Vector2.ZERO
 	copy["origin"] = Vector2i.ZERO
@@ -686,7 +686,7 @@ func _present_portrait(entity: Dictionary) -> void:
 	factor *= portrait.size.x / 160.0
 	model.scale = Vector2.ONE * factor
 	model.position = portrait.size * Vector2(0.5, 0.725) - MechIsoGeometry.project(copy["position"]) * factor
-	model.present({"entities": [copy], "minerals": []})
+	model.present(copy)
 	$Root/Inspector/Portrait/Viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
 
 
