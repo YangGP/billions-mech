@@ -132,7 +132,7 @@ func _present_selection() -> void:
 		var footprint: Vector2 = Vector2(entity["footprint"]) if entity.get("is_building", false) else Vector2(0.85, 0.85)
 		_outline(groups, point - footprint * 0.5, footprint, CYAN, "selected")
 		if entity.get("hp", 1) > 0:
-			for field: String in ["attack_range", "coverage_radius", "repair_radius", "aura_radius"]:
+			for field: String in ["attack_range", "coverage_radius"]:
 				var radius: float = float(entity.get(field, 0.0))
 				if radius > 0.0:
 					_circle(groups, point, radius, Color("e0bd72") if field == "attack_range" else CYAN, field)
@@ -187,7 +187,7 @@ func present_cursor(hover: Vector2i, selected: Vector2i, preview: Dictionary, vi
 				_outline(groups, origin, footprint, color, "draft_top", height)
 				for corner: Vector2 in [origin, origin + Vector2(footprint.x, 0), origin + footprint, origin + Vector2(0, footprint.y)]:
 					_part(groups, "draft_posts", _box, corner, Vector3(0.035, height, 0.035), height * 0.5, color)
-				for field: String in ["attack_range", "coverage_radius", "repair_radius", "aura_radius"]:
+				for field: String in ["attack_range", "coverage_radius"]:
 					var radius: float = float(definition.get(field, 0.0))
 					if radius > 0.0:
 						_circle(groups, origin + footprint * 0.5, radius, color, field)

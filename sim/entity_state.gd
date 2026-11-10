@@ -46,8 +46,6 @@ var slow_ticks: int = 0
 var slow_multiplier: float = 1.0
 var slow_effect_multiplier: float = 1.0
 var _slow_effects: Dictionary = {}
-var fence_slow_multiplier: float = 1.0
-var last_fence_cell: Vector2i = Vector2i(-999, -999)
 var fog_coarse: bool = false
 var garrison_target_id: int = 0
 var garrisoned: bool = false
@@ -163,4 +161,4 @@ func _refresh_slow() -> void:
 	for multiplier: float in _slow_effects:
 		slow_ticks = maxi(slow_ticks, int(_slow_effects[multiplier]))
 		slow_effect_multiplier = minf(slow_effect_multiplier, multiplier)
-	slow_multiplier = minf(slow_effect_multiplier, fence_slow_multiplier)
+	slow_multiplier = slow_effect_multiplier

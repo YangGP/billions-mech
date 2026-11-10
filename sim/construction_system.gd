@@ -99,7 +99,7 @@ func catalog(economy: MechEconomySystem) -> Array[Dictionary]:
 ## 建造预览：逐格校验地形、覆盖、占用，再校验水冷邻水、矿点、
 ## 环境源评分与经济预留；错误按 地形→覆盖→占用 的优先级返回。
 ## planned_cells 用于墙线等连续下单时排除本批已计划的格子。
-func preview_placement(id: StringName, origin: Vector2i, grid: MechGridState, economy: MechEconomySystem, minerals: MechMineralSystem, available: Dictionary = {}, planned_cells: Dictionary = {}, environment: MechEnvironmentEnergy = null, vision: MechVisionSystem = null, cooling_multiplier: float = 1.0) -> Dictionary:
+func preview_placement(id: StringName, origin: Vector2i, grid: MechGridState, economy: MechEconomySystem, minerals: MechMineralSystem, available: Dictionary = {}, planned_cells: Dictionary = {}, environment: MechEnvironmentEnergy = null, vision: MechVisionSystem = null) -> Dictionary:
 	var rules: MechBuildingDefinition = definition(id)
 	if rules == null or not rules.buildable:
 		return {"ok": false, "reason": "该建筑不可下单", "cells": [], "origin": origin, "footprint": Vector2i.ONE}
@@ -150,7 +150,7 @@ func preview_placement(id: StringName, origin: Vector2i, grid: MechGridState, ec
 				if environment_power <= 0:
 					reason = "环境评分不足（需已探索有效地形）"
 	if reason.is_empty():
-		reason = economy.reservation_error(rules, available, {}, cooling_multiplier)
+		reason = economy.reservation_error(rules, available)
 	if not reason.is_empty() and terrain_error.is_empty() and coverage_error.is_empty() and overlap_error.is_empty():
 		for cell_info: Dictionary in result["cells"]:
 			cell_info["ok"] = false

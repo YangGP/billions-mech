@@ -78,8 +78,6 @@
 | `REQUEST_FINAL_WAVE` | `{}` | `final_wave: bool` |
 | `GARRISON_UNIT` | `{unit_id: int}` | `building_id: int` |
 | `UNGARRISON_UNIT` | `{building_id: int}` | `ejected: int` |
-| `ACCEPT_CONTRACT` | `{building_id: int}` | `unit_id: StringName` |
-| `CANCEL_CONTRACT` | `{building_id: int}` | `refund` |
 | `DELETE_DISPATCH_REGION` | `{region_id: int}` | `region_id` |
 
 校验阶段的扩展结果：
@@ -115,11 +113,10 @@ content/build_menu_catalog.json  仅分类/展示，不是规则来源
 | 采集与加工 | `mined_resource`, `extraction_per_minute`, `alloy_recipe` |
 | 覆盖与视野 | `coverage_radius`, `sight_radius`, `radar_warning_seconds` |
 | 生产 | `produced_units: Array[StringName]`, `queue_limit` |
-| 战斗与维修 | `attack_damage`, `attack_seconds`, `attack_range`, `splash_radius`, `repair_radius`, `repair_rate` |
-| 特殊设施 | `requires_water`, `is_gate`, `trap_kind`, `trigger_radius`, `trap_damage`, `slow_multiplier`, `slow_seconds`, `one_shot`, `slow_fence_ratio` |
+| 战斗 | `attack_damage`, `attack_seconds`, `attack_range`, `splash_radius` |
+| 特殊设施 | `requires_water`, `is_gate`, `slow_multiplier`, `slow_seconds` |
 | 环境能源 | `environment_energy`（`none`/`wind`/`solar`）, `environment_output_multiplier`, `environment_output_cap` |
-| 驻防与合同 | `garrison_capacity`, `garrison_range_bonus`, `contract_interval_seconds`, `contract_delivery_seconds`, `contract_price_multiplier` |
-| 经济光环 | `aura_kind`（`none`/`mining`/`cooling`/`income`）, `aura_radius`, `aura_multiplier` |
+| 驻防 | `garrison_capacity`, `garrison_range_bonus` |
 | 升级链 | `required_tech_level`, `required_mainbrain_level`, `upgrade_to`, `upgrade_cost`, `upgrade_seconds` |
 | 其他 | `infectable` |
 
@@ -270,7 +267,7 @@ waiting_for_clearance, rebuild_cost, shot_ticks, shot_target
 | 类 | 文件 | 职责 | 主要公开接口 |
 | --- | --- | --- | --- |
 | `MechConstructionSystem` | [construction_system.gd](../sim/construction_system.gd) | 共享放置规则 + 各建筑独立生命周期 | `configure(definitions) -> String`, `clear()`, `definition(id)`, `family_root(id)`, `get_building(entity_id)`, `all()`, `add(entity_id, id, origin, hz, completed)`, `remove()`, `catalog(economy)`, `preview_placement(...)`, `preview_wall_line(...)`, `advance(try_clear_footprint) -> {completed, demolished}` |
-| `MechBuildingState` | [building_state.gd](../sim/building_state.gd) | 单建筑进度、HP、拆除、维修、升级、驻防、合同、冶炼运行时 | `Phase` 枚举 `CONSTRUCTING/OPERATING/DEMOLISHING/RUINED`；常量 `REBUILD_COST_RATIO = 0.5`, `THREAT_RADIUS = 6.0`；`configure()`, `operating()`, `refresh_definition_ticks()`, `advance_construction()`, `refund()`, `rebuild_cost()`, `mark_ruined()`, `reset_repair_state()`, `convert_repair_denominator()`, `cycle_refund()`, `upgrade_refund()`, `status()`, `snapshot()` |
+| `MechBuildingState` | [building_state.gd](../sim/building_state.gd) | 单建筑进度、HP、拆除、维修、升级、驻防、冶炼运行时 | `Phase` 枚举 `CONSTRUCTING/OPERATING/DEMOLISHING/RUINED`；常量 `REBUILD_COST_RATIO = 0.5`, `THREAT_RADIUS = 6.0`；`configure()`, `operating()`, `refresh_definition_ticks()`, `advance_construction()`, `refund()`, `rebuild_cost()`, `mark_ruined()`, `reset_repair_state()`, `convert_repair_denominator()`, `cycle_refund()`, `upgrade_refund()`, `status()`, `snapshot()` |
 | `MechEconomySystem` | [economy_system.gd](../sim/economy_system.gd) | 整数钱包与容量/电力/冷却预留；短缺不冻结既有设施 | `repair_authorized: Callable`, `repair_paid: Callable`；`reset()`, `coins()`, `balance()`, `spend_error(amount, available)`, `try_spend(amount)`, `credit(amount)`, `recompute(buildings, grid, unit_capacity, queued_capacity)`, `contract_error()`, `reservation_error()`, `upgrade_error()`, `production_error()`, `advance_income()`, `advance_repairs()`, `snapshot()` |
 | `MechResources` | [resources.gd](../sim/resources.gd) | 五项稳定资源 ID 的纯静态工具 | 常量 `KEYS`, `NAMES`, `WORTH`；`empty()`, `copy()`, `single()`, `valid()`, `mineable()`, `text()`, `add()`, `subtract()`, `scaled()`, `worth()` |
 | `MechMineralSystem` | [mineral_system.gd](../sim/mineral_system.gd) | 有限矿点；下单时预留、提交时绑定 | `reset(definitions)`, `at(cell)`, `deposit(id)`, `snapshots()`, `placement(rules, origin)`, `bind(id, entity_id)`, `release(entity_id)`, `advance(buildings, economy, hz)`, `has_produced(resource)`, `production_rate(buildings)` |
@@ -292,7 +289,7 @@ waiting_for_clearance, rebuild_cost, shot_ticks, shot_target
 | `MechThreatSystem` | [threat_system.gd](../sim/threat_system.gd) | 游荡种群、噪声事件、感疫转化 | `configure(definitions, settings) -> String`, `reset(grid, map, active, hz)`, `advance(buildings) -> Array[生成请求]`, `noises()`, `infect(cost, position) -> Array[生成请求]`, `note_combat()`, `note_construction()`, `note_operation()`, `note_movement()` |
 | `MechWaveDirector` | [wave_director.gd](../sim/wave_director.gd) | 波次相位、预算编成、边缘流式投放、战役终波 | `configure(settings) -> String`, `reset(grid, map, active, hz)`, `advance(grid, buildings, entities) -> Array[生成请求]`, `request_final_wave() -> bool`, `set_campaign_stage(stage)`, `state() -> Dictionary`, `exhausted() -> bool` |
 
-生成请求统一为 `{enemy_id: StringName, position: Vector2, delay: int}`，由 SimCore 交给 `MechEnemySystem.create()`。伤害与死亡统一由 SimCore 结算：单位/炮塔/驻军/陷阱只返回命中结果，不直接扣血。
+生成请求统一为 `{enemy_id: StringName, position: Vector2, delay: int}`，由 SimCore 交给 `MechEnemySystem.create()`。伤害与死亡统一由 SimCore 结算：单位/炮塔/驻军只返回命中结果，不直接扣血。
 
 ### 4.7 视野 `MechVisionSystem`（[vision_system.gd](../sim/vision_system.gd)）
 

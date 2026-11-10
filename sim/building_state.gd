@@ -33,16 +33,9 @@ var repair_remainder: int = 0
 ## 在维修开关、满血与废墟重建之间保留；升级时换算分母。
 var repair_material_remainder: Dictionary[StringName, int] = {}
 var repair_hp_accumulator: int = 0
-var repair_rate_override: float = 0.0
 var repair_auto_source: int = 0
 var repair_manual_hold: bool = false
 var garrison_unit_ids: Array[int] = []
-var contract_offer: Dictionary = {}
-var contract_timer_ticks: int = -1
-var contract_delivery_ticks: int = 0
-var contract_unit_id: StringName = &""
-var contract_paid: Dictionary = {}
-var contract_normal_cost: Dictionary = {}
 var income_remainder: int = 0
 ## 环境源（风/光）的运行时发电量；定义字段保持不可变且共享，
 ## 仅在已探索地图变化时重算。
@@ -59,10 +52,6 @@ var upgrade_target: MechBuildingDefinition
 var upgrade_elapsed: int = 0
 var upgrade_total: int = 0
 var upgrade_paid: Dictionary[StringName, int] = MechResources.empty()
-## 光环运行时倍率（百分比）；无光环生效时回到 100。
-var income_multiplier_percent: int = 100
-var extraction_multiplier_percent: int = 100
-var cooling_multiplier_percent: int = 100
 var attack_cooldown_ticks: int = 0
 ## 干扰只暂停火力，不改变运营、供电或经济；免疫窗归目标所有。
 var jam_ticks: int = 0
@@ -145,9 +134,6 @@ func mark_ruined() -> void:
 	upgrade_elapsed = 0
 	upgrade_total = 0
 	upgrade_paid = MechResources.empty()
-	income_multiplier_percent = 100
-	extraction_multiplier_percent = 100
-	cooling_multiplier_percent = 100
 	attack_cooldown_ticks = 0
 	jam_ticks = 0
 	jam_immunity_ticks = 0
@@ -162,7 +148,6 @@ func reset_repair_state() -> void:
 	repair_remainder = 0
 	repair_hp_accumulator = 0
 	repair_waiting_for_funds = false
-	repair_rate_override = 0.0
 	repair_auto_source = 0
 	repair_manual_hold = false
 
@@ -226,9 +211,6 @@ func snapshot() -> Dictionary:
 		"repairing": repairing, "threatened": threatened, "powered": powered,
 		"repair_waiting_for_materials": repair_waiting_for_funds,
 		"repair_material_remainder": MechResources.copy(repair_material_remainder),
-		"income_multiplier_percent": income_multiplier_percent,
-		"extraction_multiplier_percent": extraction_multiplier_percent,
-		"cooling_multiplier_percent": cooling_multiplier_percent,
 		"environment_power": environment_power,
 		"processing": {"active": processing_active, "elapsed": processing_elapsed,
 			"total": processing_total, "paid": MechResources.copy(processing_paid),

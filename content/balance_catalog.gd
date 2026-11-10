@@ -80,14 +80,19 @@ static func _read_enemies(value: Variant, output: Array[MechEnemyDefinition]) ->
 
 
 static func _fill_unit(entry: Dictionary, rules: MechUnitDefinition) -> String:
+	var type_error: String = _validate_entry(entry, rules)
+	if not type_error.is_empty():
+		return type_error
 	rules.unit_id = StringName(str(entry.get("unit_id", "")))
 	rules.display_name = str(entry.get("display_name", ""))
-	var cost_data: Variant = entry.get("cost", {})
+	var cost_data: Variant = entry.get("cost", rules.cost)
 	if typeof(cost_data) != TYPE_DICTIONARY:
 		return "cost 必须是对象"
 	var cost_entries: Dictionary = cost_data
 	var cost: Dictionary[StringName, int] = {}
 	for key: Variant in cost_entries:
+		if not _is_integer(cost_entries[key]):
+			return "cost.%s 必须是整数" % str(key)
 		cost[StringName(str(key))] = int(cost_entries[key])
 	rules.cost = cost
 	rules.production_seconds = _f(entry, "production_seconds", rules.production_seconds)
@@ -103,6 +108,9 @@ static func _fill_unit(entry: Dictionary, rules: MechUnitDefinition) -> String:
 
 
 static func _fill_enemy(entry: Dictionary, rules: MechEnemyDefinition) -> String:
+	var type_error: String = _validate_entry(entry, rules)
+	if not type_error.is_empty():
+		return type_error
 	rules.enemy_id = StringName(str(entry.get("enemy_id", "")))
 	rules.display_name = str(entry.get("display_name", ""))
 	rules.max_hp = _i(entry, "max_hp", rules.max_hp)
@@ -144,13 +152,51 @@ static func _fill_enemy(entry: Dictionary, rules: MechEnemyDefinition) -> String
 	rules.frenzy_speed_bonus = _f(entry, "frenzy_speed_bonus", rules.frenzy_speed_bonus)
 	rules.frenzy_damage_bonus = _f(entry, "frenzy_damage_bonus", rules.frenzy_damage_bonus)
 	var weights: Variant = entry.get("stage_weights", null)
-	if weights != null:
+	if entry.has("stage_weights"):
 		if typeof(weights) != TYPE_ARRAY:
 			return "stage_weights 必须是长度为 3 的数组"
 		var values: Array = weights
 		if values.size() != 3:
 			return "stage_weights 必须是长度为 3 的数组"
+		for value: Variant in values:
+			if not _is_integer(value):
+				return "stage_weights 必须包含整数"
+			if value < 0 or value > 2147483647:
+				return "stage_weights 必须是非负 32 位整数"
 		rules.stage_weights = Vector3i(int(values[0]), int(values[1]), int(values[2]))
+	return ""
+
+
+## JSON 将数字解析为浮点数；整数栏位允许 20.0，但不允许截断或溢出。
+static func _is_integer(value: Variant) -> bool:
+	if typeof(value) == TYPE_INT:
+		return true
+	return typeof(value) == TYPE_FLOAT and is_finite(value) and floor(value) == value \
+		and value >= -9223372036854775808.0 and value < 9223372036854775808.0
+
+
+## 复用 Resource 的属性类型，在任何强制转换前校验 JSON 原值。
+static func _validate_entry(entry: Dictionary, rules: Resource) -> String:
+	for property: Dictionary in rules.get_property_list():
+		var key: String = property["name"]
+		if not entry.has(key):
+			continue
+		var value: Variant = entry[key]
+		match int(property["type"]):
+			TYPE_INT:
+				if not _is_integer(value):
+					return "%s 必须是整数" % key
+			TYPE_FLOAT:
+				if typeof(value) not in [TYPE_INT, TYPE_FLOAT]:
+					return "%s 必须是数值" % key
+				if not is_finite(float(value)):
+					return "%s 必须是有限数值" % key
+			TYPE_BOOL:
+				if typeof(value) != TYPE_BOOL:
+					return "%s 必须是布尔值" % key
+			TYPE_STRING, TYPE_STRING_NAME:
+				if typeof(value) != TYPE_STRING:
+					return "%s 必须是字符串" % key
 	return ""
 
 

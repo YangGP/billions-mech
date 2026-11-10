@@ -75,17 +75,10 @@ func _building(id: String, footprint: Vector2, level: int, connections: int) -> 
 				_block(Vector3(0.52, 1.1, depth * 0.82), Vector3(side * 0.45, 0.72, 0), STEEL)
 				for stripe: int in range(3):
 					_block(Vector3(0.4, 0.06, 0.06), Vector3(side * 0.45, 0.5 + stripe * 0.25, -depth * 0.43), CYAN)
-		"relay_node", "load_balancer":
+		"relay_node":
 			_cyl(Vector3(width * 0.65, 0.25, depth * 0.65), Vector3(0, 0.28, 0), STEEL)
 			_block(Vector3(0.16, 1.5, 0.16), Vector3(0, 1.05, 0), LIGHT)
 			_block(Vector3(width * 0.8, 0.1, 0.12), Vector3(0, 1.65, 0), CYAN)
-			if id == "load_balancer":
-				for side: float in [-1.0, 1.0]:
-					_cyl(Vector3(0.6, 0.8, 0.6), Vector3(side * 0.85, 0.55, 0), BLUE)
-		"resource_depot", "settlement_center":
-			_block(Vector3(width * 0.88, 0.65, depth * 0.8), Vector3(0, 0.49, 0), STEEL)
-			for side: float in [-1.0, 1.0]:
-				_block(Vector3(0.65, 0.5, depth * 0.5), Vector3(side * width * 0.24, 1.05, 0), GOLD if id == "settlement_center" else BLUE)
 		"mining_station", "crystal_extractor":
 			_block(Vector3(width * 0.8, 0.35, depth * 0.8), Vector3(0, 0.35, 0), STEEL)
 			for side: float in [-1.0, 1.0]:
@@ -116,17 +109,14 @@ func _building(id: String, footprint: Vector2, level: int, connections: int) -> 
 				_cyl(Vector3(width * 0.3, 0.12, depth * 0.5), Vector3(side * width * 0.24, 1.25, 0), BLUE)
 			if id == "water_cooler":
 				_block(Vector3(width * 0.8, 0.15, 0.16), Vector3(0, 0.3, -depth * 0.4), BLUE)
-		"armored_wall", "alloy_wall", "slow_fence", "alloy_slow_fence":
-			var fence: bool = "fence" in id
+		"armored_wall", "alloy_wall":
 			var metal: Color = VIOLET if id.begins_with("alloy") else STEEL
-			_block(Vector3(0.78, 0.28 if fence else 0.65, 0.3), Vector3(0, 0.3 if fence else 0.48, 0), metal)
+			_block(Vector3(0.78, 0.65, 0.3), Vector3(0, 0.48, 0), metal)
 			for direction: int in range(4):
 				if (connections & (1 << direction)) != 0:
 					# 快照位序为左、上、右、下，与地图XZ坐标一致。
 					var offset: Vector2 = [Vector2.LEFT, Vector2.UP, Vector2.RIGHT, Vector2.DOWN][direction]
-					_block(Vector3(0.3 if offset.x == 0 else 0.55, 0.22 if fence else 0.6, 0.55 if offset.x == 0 else 0.3), Vector3(offset.x * 0.3, 0.4, offset.y * 0.3), metal)
-			if fence:
-				_block(Vector3(0.8, 0.07, 0.08), Vector3(0, 0.55, 0), CYAN)
+					_block(Vector3(0.3 if offset.x == 0 else 0.55, 0.6, 0.55 if offset.x == 0 else 0.3), Vector3(offset.x * 0.3, 0.4, offset.y * 0.3), metal)
 		"gate", "alloy_gate":
 			for side: float in [-1.0, 1.0]:
 				_block(Vector3(width * 0.82, 1.0, 0.2), Vector3(0, 0.65, side * depth * 0.4), VIOLET if id == "alloy_gate" else STEEL)
@@ -135,44 +125,30 @@ func _building(id: String, footprint: Vector2, level: int, connections: int) -> 
 			_block(Vector3(width * 0.88, 0.6, depth * 0.88), Vector3(0, 0.48, 0), STEEL)
 			_block(Vector3(width, 0.18, depth), Vector3(0, 0.9, 0), VIOLET if id == "alloy_bunker" else LIGHT)
 			_block(Vector3(width * 0.55, 0.1, 0.06), Vector3(0, 0.6, -depth * 0.46), DARK)
-		"sentry_tower", "rapid_cannon", "arc_tower", "heavy_tower", "annihilator_tower", "emp_tower":
+		"sentry_tower", "arc_tower", "heavy_tower", "annihilator_tower", "emp_tower":
 			var tint: Color = VIOLET if id in ["arc_tower", "emp_tower"] else GOLD
 			_cyl(Vector3(width * 0.7, 0.9, depth * 0.7), Vector3(0, 0.7, 0), STEEL)
 			_block(Vector3(width * 0.72, 0.35, depth * 0.65), Vector3(0, 1.3, 0), tint)
 			if id == "emp_tower":
 				_sph(Vector3(0.65, 0.65, 0.65), Vector3(0, 1.85, 0), VIOLET)
 			else:
-				var barrels: int = 2 if id in ["rapid_cannon", "annihilator_tower"] else 1
+				var barrels: int = 2 if id == "annihilator_tower" else 1
 				for barrel: int in range(barrels):
 					_block(Vector3(0.17, 0.17, 1.0 if id == "heavy_tower" else 0.7), Vector3((barrel - (barrels - 1) * 0.5) * 0.28, 1.4, -depth * 0.35), LIGHT)
-		"lookout_post", "radar_station":
+		"radar_station":
 			_block(Vector3(0.2, 1.7, 0.2), Vector3(0, 1.0, 0), LIGHT)
-			if id == "radar_station":
-				_cyl(Vector3(1.1, 0.16, 1.1), Vector3(0, 1.95, 0), BLUE, Vector3(0.6, 0, 0))
-			else:
-				_block(Vector3(0.7, 0.35, 0.7), Vector3(0, 1.9, 0), CYAN)
+			_cyl(Vector3(1.1, 0.16, 1.1), Vector3(0, 1.95, 0), BLUE, Vector3(0.6, 0, 0))
 		"tech_center", "dispatch_center":
 			_block(Vector3(width * 0.8, 0.7, depth * 0.8), Vector3(0, 0.55, 0), STEEL)
 			_sph(Vector3(width * 0.6, 0.8, depth * 0.6), Vector3(0, 1.1, 0), VIOLET if id == "tech_center" else CYAN)
 			if id == "dispatch_center":
 				_block(Vector3(0.12, 0.8, 0.12), Vector3(width * 0.3, 1.35, 0), LIGHT)
-		"repair_station":
-			_block(Vector3(width * 0.85, 0.6, depth * 0.85), Vector3(0, 0.5, 0), STEEL)
-			_block(Vector3(0.75, 0.1, 0.2), Vector3(0, 0.86, 0), CYAN)
-			_block(Vector3(0.2, 0.1, 0.75), Vector3(0, 0.86, 0), CYAN)
 		"assembly_plant", "heavy_factory", "advanced_heavy_factory":
 			_block(Vector3(width * 0.9, 0.9, depth * 0.8), Vector3(0, 0.65, 0), STEEL)
 			_block(Vector3(width * 0.55, 0.6, 0.08), Vector3(0, 0.48, -depth * 0.43), DARK)
 			var count: int = 1 if id == "assembly_plant" else (3 if id == "advanced_heavy_factory" else 2)
 			for index: int in range(count):
 				_cyl(Vector3(0.4, 0.4, 0.4), Vector3((index - (count - 1) * 0.5) * 0.65, 1.3, 0), GOLD)
-		"expedition_dock":
-			_block(Vector3(width * 0.85, 0.12, depth * 0.85), Vector3(0, 0.25, 0), BLUE)
-			_block(Vector3(0.12, 1.3, depth * 0.9), Vector3(-width * 0.4, 0.9, 0), STEEL)
-			_block(Vector3(width * 0.85, 0.12, 0.18), Vector3(0, 1.6, depth * 0.3), LIGHT)
-		"blast_mine", "emp_trap":
-			_cyl(Vector3(width * 0.65, 0.18, depth * 0.65), Vector3(0, 0.26, 0), RED if id == "blast_mine" else VIOLET)
-			_sph(Vector3(0.18, 0.12, 0.18), Vector3(0, 0.4, 0), GOLD if id == "blast_mine" else CYAN)
 		_:
 			push_warning("Missing 3D building binding: " + id)
 			_block(Vector3(width * 0.8, 0.8, depth * 0.8), Vector3(0, 0.6, 0), Color.MAGENTA)

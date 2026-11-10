@@ -318,10 +318,6 @@ func _handle_key(key: int) -> bool:
 			_garrison_selected()
 		KEY_U:
 			_ungarrison_selected()
-		KEY_C:
-			_contract_selected(true)
-		KEY_V:
-			_contract_selected(false)
 		KEY_T:
 			_request_final_wave()
 		KEY_F6:
@@ -513,14 +509,6 @@ func _request_final_wave() -> void:
 		return
 	_commands.submit(MechCommand.new(MechCommand.Type.REQUEST_FINAL_WAVE))
 	_hud.feedback("已请求终波；需主脑 III 与科技 III，且在 campaign 配置下生效。")
-
-
-func _contract_selected(accept: bool) -> void:
-	if _sim.session_ended() or _selection.selected_ids.is_empty():
-		return
-	var command: MechCommand.Type = MechCommand.Type.ACCEPT_CONTRACT if accept else MechCommand.Type.CANCEL_CONTRACT
-	_commands.submit(MechCommand.new(command, {"building_id": _selection.selected_ids[0]}))
-	_hud.feedback("已请求接受合同。" if accept else "已请求取消合同并退款。")
 
 
 func _on_command_finished(command_type: int, result: Dictionary) -> void:

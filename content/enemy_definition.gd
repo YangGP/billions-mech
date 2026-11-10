@@ -51,7 +51,7 @@ extends Resource
 ## 长足者穿墙：以正常速度越过墙；其他建筑与障碍地形仍然阻挡
 ## （一路攻击开道）。
 @export var passes_walls: bool = false
-## 受玩家攻击时的闪避概率（0–1）；陷阱等非攻击伤害不判定。
+## 受玩家攻击时的闪避概率（0–1）。
 @export_range(0.0, 1.0, 0.01) var evasion_chance: float = 0.0
 ## 死亡时以死亡位置为中心，为周围同阵营敌人附加狂暴。
 @export var frenzy_radius: float = 0.0

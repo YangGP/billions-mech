@@ -28,14 +28,8 @@ extends Resource
 @export var environment_output_cap: int = 0
 @export var requires_water: bool = false
 @export var is_gate: bool = false
-## 陷阱类型：none（无）/emp（电磁减速）/blast（爆破地雷）。
-@export_enum("none", "emp", "blast") var trap_kind: String = "none"
-@export_range(0.0, 8.0, 0.5) var trigger_radius: float = 2.0
-@export var trap_damage: int = 0
 @export_range(0.0, 1.0, 0.05) var slow_multiplier: float = 1.0
 @export var slow_seconds: float = 0.0
-## 陷阱是否一次性（触发后自毁）。
-@export var one_shot: bool = true
 ## 可选的独立工艺配方（热熔炉的合金循环）。
 @export var alloy_recipe: MechAlloyRecipe
 @export var income_per_minute: int = 0
@@ -67,25 +61,12 @@ extends Resource
 @export_range(0.1, 10.0, 0.1) var attack_seconds: float = 1.0
 @export_range(0.0, 24.0, 0.5) var attack_range: float = 0.0
 @export_range(0.0, 8.0, 0.5) var splash_radius: float = 0.0
-@export_range(0.0, 16.0, 0.5) var repair_radius: float = 0.0
-@export var repair_rate: float = 0.0
 ## 雷达预警提前量（秒）；0 表示非雷达视野源。
 @export var radar_warning_seconds: float = 0.0
-## 减速栅减速生效比例（0–1）。
-@export_range(0.0, 1.0, 0.05) var slow_fence_ratio: float = 1.0
 ## 可驻防单位数。
 @export var garrison_capacity: int = 0
 ## 驻防单位带来的射程加成。
 @export var garrison_range_bonus: float = 0.0
-## 接驳合同生成间隔（秒，0 表示无合同）。
-@export var contract_interval_seconds: float = 0.0
-## 接驳合同交付耗时（秒）。
-@export var contract_delivery_seconds: float = 0.0
-@export var contract_price_multiplier: float = 1.0
-## 经济光环类型：none（无）/mining（采矿）/cooling（冷却）/income（收入）。
-@export_enum("none", "mining", "cooling", "income") var aura_kind: String = "none"
-@export_range(0.0, 16.0, 0.5) var aura_radius: float = 0.0
-@export_range(0.1, 3.0, 0.01) var aura_multiplier: float = 1.0
 
 
 ## 是否属于墙类建筑（装甲墙/合金墙）；敌人系统对墙有特殊的攻击与寻路规则。
@@ -111,10 +92,6 @@ func validation_error() -> String:
 		return "建筑等级或科技等级无效"
 	if environment_output_multiplier < 1 or environment_output_cap < 0:
 		return "环境电源倍率或上限无效"
-	if trap_kind == "emp" and (slow_multiplier <= 0.0 or slow_seconds <= 0.0):
-		return "电磁陷阱减速参数无效"
-	if trap_kind == "blast" and trap_damage <= 0:
-		return "爆破地雷伤害无效"
 	if upgrade_to != null:
 		if upgrade_seconds <= 0.0 or not MechResources.valid(upgrade_cost) or upgrade_cost.is_empty():
 			return "建筑升级费用或工期无效"
@@ -122,14 +99,12 @@ func validation_error() -> String:
 			return "建筑升级目标占地或等级无效"
 	if not is_finite(sight_radius) or sight_radius < 0.0 or sight_radius > 64.0:
 		return "建筑视野半径无效"
-	if not is_finite(splash_radius) or splash_radius < 0.0 or not is_finite(repair_radius) or repair_radius < 0.0 or repair_rate < 0.0:
-		return "建筑范围或维修参数无效"
+	if not is_finite(splash_radius) or splash_radius < 0.0:
+		return "建筑范围参数无效"
 	if radar_warning_seconds < 0.0:
 		return "雷达预警提前量无效"
-	if aura_kind != "none" and (aura_radius <= 0.0 or aura_multiplier <= 0.0):
-		return "经济光环参数无效"
-	if slow_fence_ratio < 0.0 or slow_fence_ratio > 1.0 or garrison_capacity < 0 or contract_interval_seconds < 0.0 or contract_delivery_seconds < 0.0 or contract_price_multiplier <= 0.0:
-		return "减速栅、驻防或接驳合同参数无效"
+	if garrison_capacity < 0:
+		return "驻防容量无效"
 	if extraction_per_minute < 0 or (mined_resource != &"" and not MechResources.mineable(mined_resource)):
 		return "采集类型或产率无效"
 	if (mined_resource == &"") != (extraction_per_minute == 0):
@@ -163,20 +138,12 @@ func snapshot() -> Dictionary:
 		"produced_units": produced_units.duplicate(), "queue_limit": queue_limit,
 		"attack_damage": attack_damage, "attack_seconds": attack_seconds, "attack_range": attack_range,
 		"splash_radius": splash_radius, "sight_radius": sight_radius, "coverage_radius": coverage_radius,
-		"repair_radius": repair_radius, "repair_rate": repair_rate,
 		"radar_warning_seconds": radar_warning_seconds,
-		"aura_kind": aura_kind, "aura_radius": aura_radius, "aura_multiplier": aura_multiplier,
-		"slow_fence_ratio": slow_fence_ratio,
 		"garrison_capacity": garrison_capacity, "garrison_range_bonus": garrison_range_bonus,
-		"contract_interval_seconds": contract_interval_seconds,
-		"contract_delivery_seconds": contract_delivery_seconds,
-		"contract_price_multiplier": contract_price_multiplier,
 		"environment_energy": environment_energy, "infectable": infectable,
 		"environment_output_multiplier": environment_output_multiplier,
 		"environment_output_cap": environment_output_cap, "requires_water": requires_water,
-		"is_gate": is_gate, "trap_kind": trap_kind, "trigger_radius": trigger_radius,
-		"trap_damage": trap_damage, "slow_multiplier": slow_multiplier,
-		"slow_seconds": slow_seconds, "one_shot": one_shot,
+		"is_gate": is_gate, "slow_multiplier": slow_multiplier, "slow_seconds": slow_seconds,
 		"level": level, "tech_level": tech_level,
 		"required_tech_level": required_tech_level,
 		"required_mainbrain_level": required_mainbrain_level,
