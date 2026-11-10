@@ -270,9 +270,10 @@ func _present_effects() -> void:
 		if jam_target > 0 and _entities.has(jam_target):
 			var target: Vector2 = _entities[jam_target]["position"]
 			_line(groups, muzzle, Vector3(target.x, 1.0, target.y), Color("77c7db"), "jam_link", 0.06)
-		var stacks: int = int(entity.get("scavenge_stacks", 0))
-		if stacks > 0:
-			_circle(groups, point, 0.6 + minf(stacks, 10) * 0.02, Color("e0bd72"), "scavenge", bounds.end.y * 0.7)
+		var armor: float = float(entity.get("scavenge_armor", 0.0))
+		if armor > 0.0:
+			var max_armor: float = maxf(1.0, float(rules.get("scavenge_max_armor", 300.0)))
+			_circle(groups, point, 0.6 + clampf(armor / max_armor, 0.0, 1.0) * 0.2, Color("e0bd72"), "scavenge", bounds.end.y * 0.7)
 	_effects.present(groups, _fog.material())
 
 

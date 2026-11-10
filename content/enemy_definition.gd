@@ -26,8 +26,10 @@ extends Resource
 @export var prefers_towers: bool = false
 @export var splash_radius: float = 0.0
 @export var scavenge_radius: float = 0.0
-@export var scavenge_reduction_per_death: float = 0.03
-@export var scavenge_max_reduction: float = 0.30
+## 拾荒护甲池：附近同阵营单位死亡时，按死亡单位最大生命值的该比例累积护甲。
+@export var scavenge_armor_ratio: float = 0.5
+## 护甲池上限（点）。
+@export var scavenge_max_armor: float = 300.0
 @export var jam_range: float = 0.0
 @export var jam_seconds: float = 4.0
 @export var jam_immunity_seconds: float = 8.0
@@ -49,6 +51,8 @@ extends Resource
 ## 长足者穿墙：以正常速度越过墙；其他建筑与障碍地形仍然阻挡
 ## （一路攻击开道）。
 @export var passes_walls: bool = false
+## 受玩家攻击时的闪避概率（0–1）；陷阱等非攻击伤害不判定。
+@export_range(0.0, 1.0, 0.01) var evasion_chance: float = 0.0
 
 
 ## 校验全部字段。返回空字符串表示通过，否则返回中文错误原因。
@@ -74,8 +78,10 @@ func validation_error() -> String:
 	for value: float in [jam_seconds, jam_immunity_seconds, jam_cooldown_seconds, boost_seconds]:
 		if not is_finite(value) or value <= 0.0:
 			return "敌种特殊计时无效"
-	if scavenge_reduction_per_death <= 0.0 or not is_finite(scavenge_reduction_per_death) or scavenge_max_reduction < 0.0 or scavenge_max_reduction >= 1.0 or not is_finite(scavenge_max_reduction):
-		return "拾荒防护比例无效"
+	if scavenge_armor_ratio <= 0.0 or not is_finite(scavenge_armor_ratio) or scavenge_max_armor <= 0.0 or not is_finite(scavenge_max_armor):
+		return "拾荒护甲参数无效"
+	if not is_finite(evasion_chance) or evasion_chance < 0.0 or evasion_chance > 1.0:
+		return "敌种闪避率无效"
 	if not is_finite(wandering_speed_ratio) or wandering_speed_ratio < 0.1 or wandering_speed_ratio > 1.0:
 		return "游荡速度倍率无效"
 	if shelter_radius < 0.0 or not is_finite(shelter_radius):
@@ -101,9 +107,10 @@ func snapshot() -> Dictionary:
 		"splash_radius": splash_radius, "jam_range": jam_range,
 		"stage_weights": stage_weights, "minimum_stage": minimum_stage, "first_wave": first_wave, "max_alive": max_alive,
 		"charge_linger_seconds": charge_linger_seconds, "prefers_towers": prefers_towers,
-		"scavenge_radius": scavenge_radius, "scavenge_reduction_per_death": scavenge_reduction_per_death,
-		"scavenge_max_reduction": scavenge_max_reduction, "jam_seconds": jam_seconds,
+		"scavenge_radius": scavenge_radius, "scavenge_armor_ratio": scavenge_armor_ratio,
+		"scavenge_max_armor": scavenge_max_armor, "jam_seconds": jam_seconds,
 		"jam_immunity_seconds": jam_immunity_seconds, "jam_cooldown_seconds": jam_cooldown_seconds,
 		"boost_seconds": boost_seconds, "boost_speed": boost_speed,
 		"marches_to_core": marches_to_core, "wandering_speed_ratio": wandering_speed_ratio, "shelter_radius": shelter_radius,
-		"shelter_reduction": shelter_reduction, "shelter_self": shelter_self, "passes_walls": passes_walls}
+		"shelter_reduction": shelter_reduction, "shelter_self": shelter_self, "passes_walls": passes_walls,
+		"evasion_chance": evasion_chance}

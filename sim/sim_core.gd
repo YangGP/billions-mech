@@ -51,6 +51,7 @@ var _dispatch := MechDispatchModel.new()
 var _dispatch_unit_orders: Dictionary[int, int] = {}
 var _dispatch_buildings: Dictionary[int, Dictionary] = {}
 var _contract_rng := RandomNumberGenerator.new()
+var _combat_rng := RandomNumberGenerator.new()
 var _garrison_pending: Dictionary[int, bool] = {}
 var _environment_dirty: bool = true
 var _environment_full_refresh: bool = true
@@ -184,6 +185,9 @@ func tick_rate() -> int:
 
 ## 装配全局设置并重置开局；返回配置是否成功（失败时进入错误态）。
 func configure(settings: MechFoundationSettings) -> bool:
+	var balance_error: String = MechBalanceCatalog.apply(settings)
+	if not balance_error.is_empty():
+		return _configuration_error(balance_error)
 	var settings_error: String = _settings_error(settings)
 	if not settings_error.is_empty():
 		return _configuration_error(settings_error)
@@ -639,8 +643,8 @@ func advance_one_tick() -> void:
 	_profile_mark(&"vision_post")
 	var tower_hits: Array[Dictionary] = _towers.advance(_registry, _construction.all(), _tick_rate, _grid, _vision)
 	for hit: Dictionary in tower_hits:
-		_damage_enemy(hit["id"], hit["damage"], shelters)
-		if float(hit.get("slow_multiplier", 1.0)) < 1.0:
+		var landed: bool = _damage_enemy(hit["id"], hit["damage"], shelters)
+		if landed and float(hit.get("slow_multiplier", 1.0)) < 1.0:
 			var target: MechEntityState = _registry.get_entity(hit["id"])
 			if target != null and target.hp > 0:
 				target.apply_slow(float(hit.get("slow_multiplier", 1.0)), maxi(1, ceili(float(hit.get("slow_seconds", 0.0)) * _tick_rate)))
@@ -1630,27 +1634,39 @@ func _collect_shelter_sources() -> Array[MechEntityState]:
 	return sources
 
 
-## 敌人的唯一伤害入口（单位与炮塔火力同样适用）：每次命中只应用一次
-## 庇护减伤，随后经共享移除路径结算死亡。感疫绝不在此触发；
-## 它只覆盖玩家资产。
-func _damage_enemy(entity_id: int, damage: int, shelters: Array[MechEntityState]) -> void:
+## 敌人的唯一伤害入口（单位与炮塔火力同样适用）：每次命中先判定闪避，
+## 再应用一次庇护减伤与护甲池，随后经共享移除路径结算死亡。感疫绝不在此触发；
+## 它只覆盖玩家资产。allow_evade=false 用于陷阱等非攻击伤害。
+## 返回是否真正命中（护甲吸收全部伤害仍算命中）。
+func _damage_enemy(entity_id: int, damage: int, shelters: Array[MechEntityState], allow_evade: bool = true) -> bool:
 	var entity: MechEntityState = _registry.get_entity(entity_id)
 	if entity == null or entity.hp <= 0 or damage <= 0:
-		return
+		return false
+	if allow_evade and entity.enemy_definition != null and entity.enemy_definition.evasion_chance > 0.0:
+		if _combat_rng.randf() < entity.enemy_definition.evasion_chance:
+			return false
 	var source: MechEntityState = _sheltered_by(entity, shelters)
-	var reduction: float = _enemy_abilities.defense(entity)
+	var reduction: float = 0.0
 	if source != null:
-		reduction = maxf(reduction, source.enemy_definition.shelter_reduction)
+		reduction = source.enemy_definition.shelter_reduction
 	damage = maxi(1, ceili(damage * (1.0 - reduction)))
+	var armor: float = _enemy_abilities.armor(entity)
+	if armor > 0.0:
+		var absorbed: float = minf(armor, float(damage))
+		entity.scavenge_armor = armor - absorbed
+		damage = ceili(float(damage) - absorbed)
+		if damage <= 0:
+			return true
 	entity.hp = maxi(0, entity.hp - damage)
 	if entity.hp > 0:
-		return
+		return true
 	if entity.enemy_definition != null:
 		_enemy_abilities.note_death(entity)
 	if entity.enemy_definition != null and entity.enemy_definition.jam_range > 0.0:
 		_enemy_abilities.release_source(entity_id, _construction.all())
 	# 敌人不持有格子或经济容量；只有注册表变化。建筑死亡由调用方的批量阶段结算。
 	_remove_entity(entity_id)
+	return true
 
 
 ## 覆盖该实体的活跃庇护源（若有）；首个命中即生效，重叠庇护绝不叠加。
@@ -2084,7 +2100,7 @@ func _trigger_traps() -> bool:
 		var shelters: Array[MechEntityState] = _collect_shelter_sources()
 		for enemy: MechEntityState in enemies_hit:
 			if building.definition.trap_kind == "blast":
-				_damage_enemy(enemy.entity_id, building.definition.trap_damage, shelters)
+				_damage_enemy(enemy.entity_id, building.definition.trap_damage, shelters, false)
 			elif building.definition.trap_kind == "emp":
 				var ticks: int = maxi(1, ceili(building.definition.slow_seconds * _tick_rate))
 				enemy.apply_slow(building.definition.slow_multiplier, ticks)
@@ -2328,6 +2344,7 @@ func _reset() -> void:
 	_dispatch_buildings.clear()
 	_garrison_pending.clear()
 	_contract_rng.seed = _settings.session_seed
+	_combat_rng.seed = _settings.session_seed + 7919
 	_economy.reset(_starting_resources)
 	_minerals.reset(_map_definition.minerals)
 	var brain: MechBuildingDefinition = _construction.definition(&"mainbrain")

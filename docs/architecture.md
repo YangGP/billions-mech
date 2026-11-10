@@ -42,7 +42,7 @@ UI预览不授予免检权限，自动化也走普通命令。自动内部命令
 | `production_system.gd` / `unit_system.gd` | 工厂票据、队列、合法出口、容量转移、单位指令与战斗 |
 | `dispatch_model.gd` | 区域授权、承诺/已花、退款归属接口和generation；策略由核心消费 |
 | `enemy_system.gd` / `march_field.gd` | 敌方行军/接敌、全局和局部场、空间桶及任务缓存 |
-| `enemy_abilities.gd` | 拾荒死亡叠防护、单塔干扰/免疫/提速及来源失效，状态保存在实体和建筑实例 |
+| `enemy_abilities.gd` | 拾荒死亡叠护甲池、单塔干扰/免疫/提速及来源失效，状态保存在实体和建筑实例 |
 | `wave_director.gd` / `threat_system.gd` / `tower_system.gd` | 排波、游荡/噪声/感染、火力命中结果 |
 | `vision_system.gd` | 无遮挡探索、实时LOS、记忆和源缓存 |
 
@@ -57,7 +57,7 @@ UI预览不授予免检权限，自动化也走普通命令。自动内部命令
   - **机潮接敌 = sim 侧 A\***：进入攻击范围或被攻击时切出流场，做局部战术机动；脱离接敌（目标死亡、周围无敌）→ 回流场继续向主脑。
   - **玩家单位 = sim 侧 A\***：目标任意、数量少（容量约束保证），始终走 A\* 库。
   - **接敌判定必须空间分区**（网格桶，§9 规模的硬前提）：Marching/Engaged 切换的三条件见 vision-fog.md §5，判定半径为参数槽；实现上按桶内近邻查询，禁止全表扫描。
-  - **对敌伤害单一入口**：单位、炮塔、驻军与陷阱的命中由SimCore统一结算（`_damage_enemy`）；偏转场与拾荒防护取最强，每hit只减免一次。拾荒源每tick收集一次，死亡事件只查询少量源；来源死亡立即撤销其干扰，不增加部位结算。
+  - **对敌伤害单一入口**：单位、炮塔、驻军与陷阱的命中由SimCore统一结算（`_damage_enemy`）；先判定长足者闪避（陷阱等非攻击伤害除外），再应用偏转场百分比减伤，最后扣拾荒护甲池。拾荒源每tick收集一次，死亡事件只查询少量源；来源死亡立即撤销其干扰，不增加部位结算。
 - 状态机：`Marching(流场) ⇄ Engaged(A*)`，切换由现有敌军系统执行。
 
 ## 6. 表现与发布
@@ -78,7 +78,7 @@ UI预览不授予免检权限，自动化也走普通命令。自动内部命令
 
 图纸入口为 `content/building_definition.gd`、`unit_definition.gd`、`enemy_definition.gd`、`alloy_recipe.gd`、`foundation_settings.gd` 和 `map_definition.gd`。建筑等级通过 `upgrade_to` 连接不同定义ID，注册表实体ID不变；不能按旧提案假定所有等级共用building_id。
 
-唯一正常配置为 `content/development_128.tres`，显式覆盖兼容默认值。建造目录JSON只负责分类/展示。敌人的普通阶段权重、精英开放条件及存活上限由MechEnemyDefinition表达，全局精英比例/种类上限与干扰上限由FoundationSettings表达，WaveDirector执行预算和在场/在途配额；没有另建WaveDef资源池。完整阶段事件系统仍待开发。
+唯一正常配置为 `content/development_128.tres`，显式覆盖兼容默认值。单位与敌种数值由 `content/unit_balance.json` 在启动时加载并覆盖设置中的数组；`.tres` 保留为 JSON 缺失时的回退。建造目录JSON只负责分类/展示。敌人的普通阶段权重、精英开放条件及存活上限由MechEnemyDefinition表达，全局精英比例/种类上限与干扰上限由FoundationSettings表达，WaveDirector执行预算和在场/在途配额；没有另建WaveDef资源池。完整阶段事件系统仍待开发。
 
 ## 8. 订单、回执和事件
 

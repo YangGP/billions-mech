@@ -4,9 +4,9 @@
 script = ExtResource("1")
 enemy_id = &"builder_veteran"
 display_name = "建造者·精锐型"
-max_hp = 30
+max_hp = 45
 damage = 6
-move_speed = 1.65
+move_speed = 1.8
 charge_bonus = 0.3
 wandering_speed_ratio = 0.5
 stage_weights = Vector3i(0, 10, 25)

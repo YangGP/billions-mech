@@ -221,7 +221,7 @@ func _draw_elite(entity: Dictionary, point: Vector2) -> void:
 			draw_arc(point + Vector2(0, -25), 29, 0, TAU, 24, tint, 2.0, true)
 		&"scavenger":
 			draw_rect(Rect2(point + Vector2(-22, -29), Vector2(44, 12)), tint)
-			if entity.get("scavenge_stacks", 0) > 0:
+			if entity.get("scavenge_armor", 0.0) > 0.0:
 				draw_arc(point + Vector2(0, -17), 25, 0, TAU, 20, tint, 3.0, true)
 	draw_rect(Rect2(point + Vector2(-24, -58), Vector2(48, 4)), Color("213540"))
 	draw_rect(Rect2(point + Vector2(-24, -58), Vector2(48.0 * float(entity["hp"]) / entity["max_hp"], 4)), tint)

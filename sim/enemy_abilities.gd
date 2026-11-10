@@ -19,15 +19,14 @@ func note_death(dead: MechEntityState) -> void:
 			continue
 		var rules: MechEnemyDefinition = source.enemy_definition
 		if source.position.distance_to(dead.position) <= rules.scavenge_radius:
-			var cap: int = ceili(rules.scavenge_max_reduction / rules.scavenge_reduction_per_death)
-			source.scavenge_stacks = mini(cap, source.scavenge_stacks + 1)
+			var gain: float = float(dead.max_hp) * rules.scavenge_armor_ratio
+			source.scavenge_armor = minf(rules.scavenge_max_armor, source.scavenge_armor + gain)
 
 
-func defense(entity: MechEntityState) -> float:
+func armor(entity: MechEntityState) -> float:
 	if entity.enemy_definition == null:
 		return 0.0
-	var rules: MechEnemyDefinition = entity.enemy_definition
-	return minf(rules.scavenge_max_reduction, entity.scavenge_stacks * rules.scavenge_reduction_per_death)
+	return minf(entity.enemy_definition.scavenge_max_armor, entity.scavenge_armor)
 
 
 func _end_jam(building: MechBuildingState) -> void:

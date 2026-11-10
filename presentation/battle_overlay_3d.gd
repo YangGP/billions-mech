@@ -65,8 +65,8 @@ func _draw() -> void:
 		if entity.get("jam_ticks", 0) > 0:
 			status = "干扰"
 			tint = Color("77c7db")
-		elif entity.get("scavenge_stacks", 0) > 0:
-			status = "拾荒 %d" % int(entity["scavenge_stacks"])
+		elif entity.get("scavenge_armor", 0.0) > 0.0:
+			status = "护甲 %d" % int(round(float(entity["scavenge_armor"])))
 			tint = Color("e0bd72")
 		elif entity.get("sheltered", false):
 			status = "偏转保护"
