@@ -568,7 +568,7 @@ func advance_one_tick() -> void:
 	var shelters: Array[MechEntityState] = _collect_shelter_sources()
 	var unit_result: Dictionary = _units.advance(_registry, _grid, _navigation, _tick_rate, _vision)
 	for hit: Dictionary in unit_result["enemy_hits"]:
-		_damage_enemy(hit["id"], hit["damage"], shelters)
+		_apply_unit_hit(hit, shelters)
 	_enemy_abilities.advance(_registry, _construction.all(), _grid, _tick_rate, _settings.max_jammed_towers)
 	_profile_mark(&"units")
 	var enemy_result: Dictionary = _enemies.advance(_registry, _grid, _navigation, _construction.all(), _tick_rate, noises, _vision)
@@ -825,7 +825,7 @@ func _catalog_snapshot() -> Array[Dictionary]:
 		if entry["building_id"] == &"tech_center" and not _alloy_processing.ever_produced_alloy:
 			entry["unavailable_reason"] = "需先产出第一份合金"
 		elif entry["building_id"] == &"crystal_extractor" and _mainbrain_level() < 3:
-			entry["unavailable_reason"] = "晶体采掘需要主脑 III"
+			entry["unavailable_reason"] = "超导矿采掘需要主脑 III"
 		elif entry["building_id"] == &"dispatch_center" and _tech_level() < 3:
 			entry["unavailable_reason"] = "调度中心需要科技 III"
 		elif entry.get("unavailable_reason", "").is_empty():
@@ -1399,6 +1399,21 @@ func _collect_shelter_sources() -> Array[MechEntityState]:
 ## 再应用一次庇护减伤与护甲池，随后经共享移除路径结算死亡。感疫绝不在此触发；
 ## 它只覆盖玩家资产。伤害按统一攻击规则判定闪避。
 ## 返回是否真正命中（护甲吸收全部伤害仍算命中）。
+func _apply_unit_hit(hit: Dictionary, shelters: Array[MechEntityState]) -> void:
+	var target: MechEntityState = _registry.get_entity(int(hit["id"]))
+	var center: Vector2 = target.position if target != null else Vector2.ZERO
+	var radius: float = float(hit.get("splash_radius", 0.0))
+	_damage_enemy(int(hit["id"]), int(hit["damage"]), shelters)
+	if radius <= 0.0 or target == null:
+		return
+	var candidates: Array = _registry.all()
+	for other: MechEntityState in candidates:
+		if other.entity_id == int(hit["id"]) or other.team != 2 or other.hp <= 0:
+			continue
+		if other.position.distance_to(center) <= radius:
+			_damage_enemy(other.entity_id, int(hit["damage"]), shelters)
+
+
 func _damage_enemy(entity_id: int, damage: int, shelters: Array[MechEntityState]) -> bool:
 	var entity: MechEntityState = _registry.get_entity(entity_id)
 	if entity == null or entity.hp <= 0 or damage <= 0:
@@ -1486,7 +1501,7 @@ func preview_build(id: StringName, origin: Vector2i) -> Dictionary:
 			cell_info["reason"] = result["reason"]
 	elif id == &"crystal_extractor" and _mainbrain_level() < 3:
 		result["ok"] = false
-		result["reason"] = "晶体采掘需要主脑 III"
+		result["reason"] = "超导矿采掘需要主脑 III"
 		for cell_info: Dictionary in result["cells"]:
 			cell_info["ok"] = false
 			cell_info["reason"] = result["reason"]
@@ -1833,7 +1848,7 @@ func _validate_upgrade_command(command: MechCommand) -> Dictionary:
 		if _mainbrain_level() < 3:
 			return _reject("科技中心 III 需要主脑 III")
 		if not _minerals.has_produced(&"crystals"):
-			return _reject("科技中心 III 需要先产出晶体")
+			return _reject("科技中心 III 需要先产出超导矿")
 	elif target.level >= 3 and _tech_level() < 3:
 		return _reject("三级升级需要科技中心 III")
 	var error: String = _economy.upgrade_error(

@@ -10,7 +10,7 @@ construction_seconds = 60.0
 max_hp = 800
 capacity_cost = 2
 power_cost = 4
-produced_units = Array[StringName]([&"scout", &"sentinel"])
+produced_units = Array[StringName]([&"scout", &"sentinel", &"grenadier"])
 queue_limit = 5
 
 infectable = true

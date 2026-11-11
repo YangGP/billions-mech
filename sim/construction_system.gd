@@ -162,6 +162,7 @@ func preview_placement(id: StringName, origin: Vector2i, grid: MechGridState, ec
 	result["mineral_id"] = mineral_check["mineral_id"]
 	result["environment_energy"] = String(energy_type)
 	result["environment_power"] = environment_power
+	result["environment_output_is_cooling"] = rules.environment_output_is_cooling
 	result["collection_bounds"] = collection_bounds
 	result["conflict_cells"] = conflict_cells
 	return result

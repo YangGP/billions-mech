@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="MechUnitDefinition" load_steps=2 format=3]
+[ext_resource type="Script" path="res://content/unit_definition.gd" id="1"]
+[resource]
+script = ExtResource("1")
+unit_id = &"fortress_mech"
+display_name = "堡垒机甲"
+cost = Dictionary[StringName, int]({&"coins": 500, &"metal_ore": 16, &"alloy": 30, &"crystals": 20})
+production_seconds = 120.0
+capacity_cost = 8
+max_hp = 1800
+damage = 80
+attack_seconds = 1.0
+attack_range = 10.0
+acquisition_range = 10.0
+move_speed = 1.9
+sight_radius = 8.0
+splash_radius = 1.25
+primary_range = 3.0
+secondary_damage = 90
+secondary_attack_seconds = 8.0
+secondary_range = 10.0
+weapon_switch_range = 3.0

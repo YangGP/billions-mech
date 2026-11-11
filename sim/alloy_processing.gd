@@ -1,10 +1,10 @@
 class_name MechAlloyProcessing
 extends RefCounted
-## 热能冶炼周期。燃料在开局一次性原子扣款；金属矿开局可选投入一次。
+## 热能冶炼周期。碳晶在开局一次性原子扣款；金属矿开局可选投入一次。
 ## 已开始的周期不再接收投入，暂停或失去覆盖也不退款；
 ## 只有主动拆除才退还未完成的周期投入。
-## 周期完成且燃料充足时在同一 tick 内开启下一周期，
-## 保证有燃料的冶炼站持续发电而不是隔 tick 断电。
+## 周期完成且碳晶充足时在同一 tick 内开启下一周期，
+## 保证有碳晶的冶炼站持续发电而不是隔 tick 断电。
 
 ## 开局至今是否产出过合金（用于进度门槛判定）。
 var ever_produced_alloy: bool = false
@@ -17,7 +17,7 @@ func reset() -> void:
 	produced_alloy = 0
 
 
-## 尝试开启冶炼周期：一次性扣除燃料，金属充足时一并投入；任一不足则不开。
+## 尝试开启冶炼周期：一次性扣除碳晶，金属充足时一并投入；任一不足则不开。
 func _try_start(building: MechBuildingState, recipe: MechAlloyRecipe, economy: MechEconomySystem, hz: int) -> bool:
 	if building.upgrade_target != null:
 		return false

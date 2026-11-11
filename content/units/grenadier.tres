@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="MechUnitDefinition" load_steps=2 format=3]
+[ext_resource type="Script" path="res://content/unit_definition.gd" id="1"]
+[resource]
+script = ExtResource("1")
+unit_id = &"grenadier"
+display_name = "榴弹兵"
+cost = Dictionary[StringName, int]({&"coins": 60, &"metal_ore": 6})
+production_seconds = 30.0
+capacity_cost = 2
+max_hp = 130
+damage = 18
+attack_seconds = 1.6
+attack_range = 4.5
+acquisition_range = 6.0
+move_speed = 2.1
+sight_radius = 7.0
+splash_radius = 1.0

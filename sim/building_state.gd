@@ -37,10 +37,10 @@ var repair_auto_source: int = 0
 var repair_manual_hold: bool = false
 var garrison_unit_ids: Array[int] = []
 var income_remainder: int = 0
-## 环境源（风/光）的运行时发电量；定义字段保持不可变且共享，
-## 仅在已探索地图变化时重算。
+## 环境源（风冷/光伏）的运行时输出；定义字段保持不可变且共享，
+## 仅在已探索地图变化时重算。按定义进入冷却或电力池。
 var environment_power: int = 0
-## 热能冶炼周期运行时。已付燃料/金属在周期开局即移出账本，
+## 热能冶炼周期运行时。已付碳晶/金属在周期开局即移出账本，
 ## 只有主动拆除完成时才退还。
 var processing_active: bool = false
 var processing_elapsed: int = 0
@@ -195,7 +195,7 @@ func status() -> String:
 	if definition.alloy_recipe != null:
 		if processing_active:
 			return "燃烧中 · 缺金属" if int(processing_paid.get(&"metal_ore", 0)) <= 0 else "燃烧中"
-		return "待燃料"
+		return "待碳晶"
 	return "运转中"
 
 

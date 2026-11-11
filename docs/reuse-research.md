@@ -81,7 +81,7 @@
 
 后续目标漂移反馈修正的是项目指令适配：友军临时占位不再替换点击格/阵型终点；最后路点在原生位移实际提交后确认，空路径重试原目标。单兵静态不可达时拒绝下令，不寻找附近替代终点。求路与避让仍分别直接调用原生 AStarGrid2D 与 RVO，没有新增避让或寻路算法。
 
-按 [官方回调时序](https://docs.godotengine.org/en/stable/tutorials/navigation/navigation_using_navigationservers.html)，提交发生在固定物理帧，移动提交和视图刷新在同帧的原生回调收齐后执行，不在每个单独回调中各自刷新。已知限制：RVO 不能保证所有拥堵场景都能解开，[官方说明](https://docs.godotengine.org/en/stable/tutorials/navigation/navigation_using_navigationagents.html) 提示完全对称的迎面情形可能失败。当前 36 个脚本语法与双场景启动已通过，窄口通行/编队已有用户人工复验；暂停、资源生命周期与其余交互仍待补验，范围见 [历史性能专题](../validation/performance-wanderers.md)。
+按 [官方回调时序](https://docs.godotengine.org/en/stable/tutorials/navigation/navigation_using_navigationservers.html)，提交发生在固定物理帧，移动提交和视图刷新在同帧的原生回调收齐后执行，不在每个单独回调中各自刷新。已知限制：RVO 不能保证所有拥堵场景都能解开，[官方说明](https://docs.godotengine.org/en/stable/tutorials/navigation/navigation_using_navigationagents.html) 提示完全对称的迎面情形可能失败。当前 36 个脚本语法与双场景启动已通过，窄口通行/编队已有用户人工复验；暂停、资源生命周期与其余交互仍待补验，历史性能数据可从 Git 查询。
 
 ## 7. RTS Advanced Lite 整框架采用结论
 
@@ -206,19 +206,19 @@ Agent-Reach 不可用，使用网页检索。先核对高星候选 [Mindustry](h
 
 不兼容原因：代理克隆要求每个实体（含敌人）持有常驻场景节点并逐帧同步位置，与本项目无头 sim、快照读模型（实体仅是 `snapshot()` 字典、非节点）及千级机潮性能目标冲突；其独立 Viewport 子世界会把世界重渲染一遍，抵消静态地形 UPDATE_ONCE 缓存的收益；圆形 Light2D 遮罩与 Unity 风格素材亦非本项目形态。演示素材来自 Unity CodeMonkey 教程，本来也不导入。
 
-实际实现：复用项目既有 `fog_view.gd` 读模型贴图模式——地形（playable/terrain 三色）与三态迷雾各一张逻辑格 `ImageTexture`，经投影轮廓多边形 + UV 贴到小地图 `Control._draw`；实体/矿点/主脑图标/镜头视野框按快照数据以点阵绘制。项目自写部分仅为坐标拟合（letterbox 居中、控件本地↔投影世界互逆换算）与全屏切换布局，不新增算法或 vendor 依赖；将来区域范围叠加层预留绘制位。检查记录见 [小地图检查](../validation/minimap.md)。
+实际实现：复用项目既有 `fog_view.gd` 读模型贴图模式——地形（playable/terrain 三色）与三态迷雾各一张逻辑格 `ImageTexture`，经投影轮廓多边形 + UV 贴到小地图 `Control._draw`；实体/矿点/主脑图标/镜头视野框按快照数据以点阵绘制。项目自写部分仅为坐标拟合（letterbox 居中、控件本地↔投影世界互逆换算）与全屏切换布局，不新增算法或 vendor 依赖；将来区域范围叠加层预留绘制位。
 
 ## 20. 基座与维修规则（2026-11-07）
 
 纯 sim 规则变更：维修暂停（被攻击后交战状态判定，周边无敌军即恢复）、被毁留基座、重建/清除、一键修复。先核对 [Mindustry](https://github.com/Anuken/Mindustry)（GPL-3.0，Java）与 [OpenRA](https://github.com/OpenRA/OpenRA)（GPL）的废墟/重建处理：两者均把废墟作为引擎内地图实体或 Actor 特性，绑定其各自世界/规则运行时，不能作为本项目无头纯数据 GDScript 模块接入，未复制源码；仅确认"废墟保留占位、付费重建"是成熟 RTS 常见形态。
 
-实际全部复用项目与引擎既有能力：基座复用 `MechBuildingState` 的 Phase 枚举扩展与 CONSTRUCTING 进度/血量爬升机制、`MechResources.scaled` 比例计价、`remove_factory` 队列清理、`_wall_connections` 邻接查询与 ConfirmationDialog 确认框；一键修复复用命令队列与 `building_action_error` 同源校验模式；交战状态复用注册表位置与矩形距离判定。无新增 vendor、无新算法；基座通行豁免（grid 占用保留、寻路放行）是项目自有规则接线。检查记录见 [基座与维修检查](../validation/ruins-repair.md)。
+实际全部复用项目与引擎既有能力：基座复用 `MechBuildingState` 的 Phase 枚举扩展与 CONSTRUCTING 进度/血量爬升机制、`MechResources.scaled` 比例计价、`remove_factory` 队列清理、`_wall_connections` 邻接查询与 ConfirmationDialog 确认框；一键修复复用命令队列与 `building_action_error` 同源校验模式；交战状态复用注册表位置与矩形距离判定。无新增 vendor、无新算法；基座通行豁免（grid 占用保留、寻路放行）是项目自有规则接线。
 
 ## 21. 卡顿优化与游荡节奏（2026-11-07）
 
 维护现有导航/战斗模块，不更换行军场算法。直接复用 Godot 原生 [WorkerThreadPool](https://docs.godotengine.org/en/stable/classes/class_workerthreadpool.html)、Mutex、AStarGrid2D 和 NavigationServer2D。按官方[线程安全约束](https://docs.godotengine.org/en/stable/tutorials/performance/thread_safe_apis.html)，工作线程只读取独立地图与建筑状态副本，图纸 Resource 在会话内只读；AStarGrid2D 为任务私有实例，任务完成后交接主线程，禁止同一实例并发读写。主线程轮询完成状态，不等待未完成任务；重开/退出才回收仍在运行的任务。只保留一个在途任务，旧地图版本结果丢弃后按最新状态补算。
 
-项目适配仅负责需要判定、版本/脏格记录、输入复制、结果交接和原生 API 调用：玩家 A* 就地更新变更格，RVO 沿用既有按行合并算法但只更新变更行，视野通过原生 PackedByteArray 复制已有探索状态。没有新增线程池、路径求解器、避让算法或 vendor。游荡敌调整复用原有资源字段、状态与移速计算，详见[实施与检查](../validation/performance-wanderers.md)。
+项目适配仅负责需要判定、版本/脏格记录、输入复制、结果交接和原生 API 调用：玩家 A* 就地更新变更格，RVO 沿用既有按行合并算法但只更新变更行，视野通过原生 PackedByteArray 复制已有探索状态。没有新增线程池、路径求解器、避让算法或 vendor。游荡敌调整复用原有资源字段、状态与移速计算。
 
 
 ## 22. 局部场规则完善（2026-11-08）
@@ -251,7 +251,7 @@ Agent-Reach 不可用，使用网页检索。先核对高星候选 [Mindustry](h
 
 ## 27. 新敌人运行接入（2026-11-09）
 
-检索官方Godot示例与GDQuest Steering AI后，继续直接复用项目已接入的原生AStarGrid2D、WorkerThreadPool、Resource、现有Steering vendor和MechMarchField。没有从外部框架移植或重新实现导航算法。项目新增部分为敌人数据、阶段/配额编成及战斗状态适配；候选来源、复用边界和验证见[接入记录](../validation/enemy-integration.md)。
+检索官方Godot示例与GDQuest Steering AI后，继续直接复用项目已接入的原生AStarGrid2D、WorkerThreadPool、Resource、现有Steering vendor和MechMarchField。没有从外部框架移植或重新实现导航算法。项目新增部分为敌人数据、阶段/配额编成及战斗状态适配；候选来源、复用边界和验证见[三维验证](../validation/3d-interaction-performance.md)。
 
 ## 28. 三维表现迁移首阶段（2026-11-09）
 
@@ -263,7 +263,7 @@ Agent-Reach 不可用，使用网页检索。先核对高星候选 [Mindustry](h
 
 继续检索[官方Godot示例](https://github.com/godotengine/godot-demo-projects)（MIT）与官方[SurfaceTool](https://docs.godotengine.org/en/stable/tutorials/3d/procedural_geometry/surfacetool.html)、[MultiMesh](https://docs.godotengine.org/en/stable/tutorials/performance/using_multimesh.html)及TorusMesh/Label3D能力。没有引入外部RTS/模型运行框架，未下载或按外部源码重写核心算法；Agent-Reach工具未提供，使用网页检索。完整框架仍与本项目纯数据模拟/既有命令不兼容，理由沿用第28节。
 
-实际直接复用原生PrimitiveMesh、ArrayMesh、SurfaceTool.append_from/index进行模型组合合并，MultiMesh进行批量绘制，TorusMesh绘制范围，AABB/Camera3D/Plane处理显示包围盒/投影/拾取，Control/字体绘制集中血条/进度，Label3D显示少量静态地标，ImageTexture和ShaderMaterial接线迷雾/建造预览。自写部分为每类内容的几何组合、不可变规则绑定、快照状态到颜色/标记的映射、HUD可用矩形和实例缓存生命周期。没有新增模型合并求解器、相机数学、导航、避让或模拟算法；工程模型由项目自行定义，不包含外部美术素材或逐实体玩法节点。用户暂缓3D肖像，保留其2D依赖，详见[接入记录](../validation/3d-content-and-overlay.md)。
+实际直接复用原生PrimitiveMesh、ArrayMesh、SurfaceTool.append_from/index进行模型组合合并，MultiMesh进行批量绘制，TorusMesh绘制范围，AABB/Camera3D/Plane处理显示包围盒/投影/拾取，Control/字体绘制集中血条/进度，Label3D显示少量静态地标，ImageTexture和ShaderMaterial接线迷雾/建造预览。自写部分为每类内容的几何组合、不可变规则绑定、快照状态到颜色/标记的映射、HUD可用矩形和实例缓存生命周期。没有新增模型合并求解器、相机数学、导航、避让或模拟算法；工程模型由项目自行定义，不包含外部美术素材或逐实体玩法节点。用户暂缓3D肖像，保留其2D依赖，详见[三维验证](../validation/3d-interaction-performance.md)。
 
 ## 30. 模型拾取与既有敌军性能（2026-11-10）
 

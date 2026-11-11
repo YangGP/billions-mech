@@ -1,11 +1,11 @@
 class_name MechEnvironmentEnergy
 extends RefCounted
-## 风能/太阳能的集能区计分与同类型预留。计分只读取地图地形与探索状态，
+## 风冷/太阳能的集能区计分与同类型预留。计分只读取地图地形与探索状态，
 ## 绝不读取实时敌人或单位状态。
 
 ## 集能区向建筑脚印外扩的格数。
 const EXTENSION: int = 3
-## 风能/太阳能的发电上限。
+## 风冷/太阳能的环境输出上限。
 const WIND_CAP: int = 18
 const SOLAR_CAP: int = 20
 

@@ -320,9 +320,9 @@ func present_state(state: Dictionary) -> void:
 	var balances: Dictionary = economy["resources"]
 	var rates: Dictionary = economy["production_per_minute"]
 	_ore_label.text = "金属矿  %d   +%d/分钟" % [balances[&"metal_ore"], rates[&"metal_ore"]]
-	_fuel_label.text = "燃料  %d   +%d/分钟" % [balances[&"fuel"], rates[&"fuel"]]
+	_fuel_label.text = "碳晶  %d   +%d/分钟" % [balances[&"fuel"], rates[&"fuel"]]
 	_alloy_label.text = "合金  %d   +%d/分钟" % [balances[&"alloy"], rates[&"alloy"]]
-	_crystals_label.text = "稀有晶体  %d   +%d/分钟" % [balances[&"crystals"], rates[&"crystals"]]
+	_crystals_label.text = "超导矿  %d   +%d/分钟" % [balances[&"crystals"], rates[&"crystals"]]
 	_capacity_label.text = "调度  %d / %d%s" % [economy["capacity_used"], economy["capacity_supply"], "  超载" if economy["overloaded"] else ""]
 	_capacity_label.modulate = Color("f27c78") if economy["overloaded"] else INK
 	_capacity_label.tooltip_text = "总算力 %d，系统预留 %d，可调度 %d\n单位占用 %d，队列预留 %d；出厂不重复占用" % [economy["capacity_total"], economy["capacity_system_reserved"], economy["capacity_supply"], economy["unit_capacity"], economy["queued_capacity"]]
@@ -430,8 +430,10 @@ func present_cell(info: Dictionary, preview: Dictionary) -> void:
 		var energy_type: String = String(preview.get("environment_energy", "none"))
 		if energy_type != "none":
 			var bounds: Rect2i = preview.get("collection_bounds", Rect2i())
-			_space_label.text += "\n环境预计 +%d 电 · 采集区 %d×%d%s" % [
-				int(preview.get("environment_power", 0)), bounds.size.x, bounds.size.y,
+			_space_label.text += "\n环境预计 +%d %s · 采集区 %d×%d%s" % [
+				int(preview.get("environment_power", 0)),
+				"冷" if preview.get("environment_output_is_cooling", false) else "电",
+				bounds.size.x, bounds.size.y,
 				" · 同类采集区冲突" if not preview.get("conflict_cells", []).is_empty() else ""]
 		_space_label.modulate = ACCENT if preview["ok"] else Color("f27c78")
 
@@ -476,7 +478,9 @@ func present_selection(building: Dictionary, errors: Dictionary) -> void:
 		if building.get("repair_waiting_for_materials", false):
 			_details.text += "\n维修等待材料"
 	if String(building.get("environment_energy", "none")) != "none":
-		_details.text += "\n环境供电  +%d（已探索选址）" % int(building.get("environment_power", 0))
+		_details.text += "\n环境%s  +%d（已探索选址）" % [
+			"供冷" if building.get("environment_output_is_cooling", false) else "供电",
+			int(building.get("environment_power", 0))]
 	if int(building.get("garrison_capacity", 0)) > 0:
 		_details.text += "\n驻防  %d/%d名卫兵 · 射程+%.0f · G进驻/U撤离" % [
 			int(building.get("garrison_count", 0)), int(building.get("garrison_capacity", 0)),
@@ -484,7 +488,7 @@ func present_selection(building: Dictionary, errors: Dictionary) -> void:
 	var recipe: Dictionary = building.get("alloy_recipe", {})
 	if not recipe.is_empty():
 		var processing: Dictionary = building.get("processing", {})
-		_details.text += "\n周期 %.0fs · 燃料%d + 金属%d → 合金%d · 燃烧 +%d电" % [
+		_details.text += "\n周期 %.0fs · 碳晶%d + 金属%d → 合金%d · 燃烧 +%d电" % [
 			float(recipe.get("cycle_seconds", 15.0)), int(recipe.get("fuel_cost", 2)),
 			int(recipe.get("metal_cost", 1)), int(recipe.get("alloy_output", 1)),
 			int(recipe.get("power_output", 30))]
@@ -493,7 +497,7 @@ func present_selection(building: Dictionary, errors: Dictionary) -> void:
 				roundi(float(processing.get("progress", 0.0)) * 100.0),
 				MechResources.text(processing.get("paid", {}))]
 		else:
-			_details.text += "\n待燃料；满负荷 %.0f 合金/分钟" % (
+			_details.text += "\n待碳晶；满负荷 %.0f 合金/分钟" % (
 				60.0 * float(recipe.get("alloy_output", 1)) / float(recipe.get("cycle_seconds", 15.0)))
 	var mineral: Dictionary = building.get("mineral", {})
 	if building["phase"] == MechBuildingState.Phase.RUINED:

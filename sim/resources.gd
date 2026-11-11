@@ -4,7 +4,7 @@ extends RefCounted
 
 ## 资源 ID 顺序与 NAMES、WORTH 一一对应。
 const KEYS: Array[StringName] = [&"coins", &"metal_ore", &"fuel", &"alloy", &"crystals"]
-const NAMES: Array[String] = ["算力币", "金属矿", "燃料", "合金", "稀有晶体"]
+const NAMES: Array[String] = ["算力币", "金属矿", "碳晶", "合金", "超导矿"]
 ## 感疫折算用的价值权重（values.md §14）。
 const WORTH: Array[int] = [1, 2, 2, 3, 10]
 
@@ -43,7 +43,7 @@ static func valid(amount: Dictionary) -> bool:
 	return true
 
 
-## 该资源是否为可采集矿物（金属矿、燃料、稀有晶体）。
+## 该资源是否为可采集矿物（金属矿、碳晶、超导矿）。
 static func mineable(key: StringName) -> bool:
 	return key in [&"metal_ore", &"fuel", &"crystals"]
 

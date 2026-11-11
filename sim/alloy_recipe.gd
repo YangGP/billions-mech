@@ -1,12 +1,12 @@
 class_name MechAlloyRecipe
 extends Resource
-## 热能冶炼站的不可变冶炼周期。周期以一次性燃料扣款开局；
+## 热能冶炼站的不可变冶炼周期。周期以一次性碳晶扣款开局；
 ## 金属矿在开局时可选投入，周期中途不可追加。
 
 @export var recipe_id: StringName = &"thermal_smelter_basic"
 ## 单个冶炼周期的时长（秒）。
 @export var cycle_seconds: float = 15.0
-## 周期开局一次性扣除的燃料数。
+## 周期开局一次性扣除的碳晶数。
 @export var fuel_cost: int = 2
 ## 周期开局可选投入的金属矿数。
 @export var metal_cost: int = 1

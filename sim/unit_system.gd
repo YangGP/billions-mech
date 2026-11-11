@@ -185,8 +185,19 @@ func advance(registry: MechEntityRegistry, grid: MechGridState, navigation: Mech
 				unit.face_direction(target.position - unit.position)
 				unit.set_move_path(PackedVector2Array())
 				if unit.cooldown_ticks == 0:
-					enemy_hits.append({"id": target.entity_id, "damage": unit.unit_definition.damage})
-					unit.cooldown_ticks = maxi(1, ceili(unit.unit_definition.attack_seconds * hz))
+					var stats: Dictionary = _attack_stats(unit, target)
+					enemy_hits.append({"id": target.entity_id, "damage": int(stats["damage"]),
+						"splash_radius": float(stats["splash_radius"])})
+					var hit_ids: Dictionary = {target.entity_id: true}
+					for extra: int in range(maxi(0, unit.unit_definition.cleave_targets - 1)):
+						var secondary: MechEntityState = _cleave_target(unit, target, enemies, grid, hit_ids)
+						if secondary == null:
+							break
+						hit_ids[secondary.entity_id] = true
+						enemy_hits.append({"id": secondary.entity_id,
+							"damage": maxi(1, roundi(float(stats["damage"]) * unit.unit_definition.cleave_secondary_ratio)),
+							"splash_radius": 0.0})
+					unit.cooldown_ticks = maxi(1, ceili(float(stats["cooldown"]) * hz))
 					# shot_ticks 仅用于表现层的开火闪烁时长（0.1 秒）。
 					unit.shot_ticks = maxi(1, ceili(0.1 * hz))
 					unit.shot_target = target.position
@@ -222,8 +233,44 @@ func _nearest_enemy(unit: MechEntityState, buckets: Dictionary, grid: MechGridSt
 
 
 func _can_hit(unit: MechEntityState, target: MechEntityState, grid: MechGridState) -> bool:
-	var range_cells: float = unit.unit_definition.attack_range
+	var range_cells: float = _weapon_range(unit, unit.position.distance_to(target.position))
 	return unit.position.distance_squared_to(target.position) <= range_cells * range_cells and _line_clear(unit.position, target.position, grid)
+
+
+func _weapon_range(unit: MechEntityState, distance: float) -> float:
+	var rules: MechUnitDefinition = unit.unit_definition
+	if rules.secondary_damage > 0 and distance > rules.weapon_switch_range:
+		return rules.secondary_range
+	return rules.primary_range if rules.primary_range > 0.0 else rules.attack_range
+
+
+func _attack_stats(unit: MechEntityState, target: MechEntityState) -> Dictionary:
+	var rules: MechUnitDefinition = unit.unit_definition
+	var distance: float = unit.position.distance_to(target.position)
+	if rules.secondary_damage > 0 and distance > rules.weapon_switch_range:
+		return {"damage": rules.secondary_damage, "cooldown": rules.secondary_attack_seconds,
+			"splash_radius": rules.secondary_splash_radius}
+	return {"damage": rules.damage, "cooldown": rules.attack_seconds, "splash_radius": rules.splash_radius}
+
+
+func _cleave_target(unit: MechEntityState, primary: MechEntityState, buckets: Dictionary,
+		grid: MechGridState, hit_ids: Dictionary) -> MechEntityState:
+	var radius: int = ceili(unit.unit_definition.attack_range)
+	var center := Vector2i(unit.position.floor())
+	var best: float = INF
+	var result: MechEntityState
+	for y: int in range(center.y - radius, center.y + radius + 1):
+		for x: int in range(center.x - radius, center.x + radius + 1):
+			for candidate: MechEntityState in buckets.get(Vector2i(x, y), []):
+				if candidate.entity_id == primary.entity_id or hit_ids.has(candidate.entity_id):
+					continue
+				if candidate.hp <= 0 or not _can_hit(unit, candidate, grid):
+					continue
+				var distance: float = unit.position.distance_squared_to(candidate.position)
+				if distance < best:
+					best = distance
+					result = candidate
+	return result
 
 
 func _line_clear(from: Vector2, to: Vector2, grid: MechGridState) -> bool:

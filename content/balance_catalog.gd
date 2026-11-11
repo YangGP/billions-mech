@@ -104,6 +104,15 @@ static func _fill_unit(entry: Dictionary, rules: MechUnitDefinition) -> String:
 	rules.acquisition_range = _f(entry, "acquisition_range", rules.acquisition_range)
 	rules.move_speed = _f(entry, "move_speed", rules.move_speed)
 	rules.sight_radius = _f(entry, "sight_radius", rules.sight_radius)
+	rules.splash_radius = _f(entry, "splash_radius", rules.splash_radius)
+	rules.cleave_targets = _i(entry, "cleave_targets", rules.cleave_targets)
+	rules.cleave_secondary_ratio = _f(entry, "cleave_secondary_ratio", rules.cleave_secondary_ratio)
+	rules.primary_range = _f(entry, "primary_range", rules.primary_range)
+	rules.secondary_damage = _i(entry, "secondary_damage", rules.secondary_damage)
+	rules.secondary_attack_seconds = _f(entry, "secondary_attack_seconds", rules.secondary_attack_seconds)
+	rules.secondary_range = _f(entry, "secondary_range", rules.secondary_range)
+	rules.secondary_splash_radius = _f(entry, "secondary_splash_radius", rules.secondary_splash_radius)
+	rules.weapon_switch_range = _f(entry, "weapon_switch_range", rules.weapon_switch_range)
 	return ""
 
 

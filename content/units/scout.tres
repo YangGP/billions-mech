@@ -3,7 +3,7 @@
 [resource]
 script = ExtResource("1")
 unit_id = &"scout"
-display_name = "侦察机"
+display_name = "侦察兵"
 cost = Dictionary[StringName, int]({&"coins": 20, &"metal_ore": 2})
 production_seconds = 12.0
 capacity_cost = 1

@@ -4,7 +4,7 @@
 [resource]
 script = ExtResource("1")
 building_id = &"fuel_extractor"
-display_name = "燃料采集站"
+display_name = "碳晶采集站"
 footprint = Vector2i(2, 2)
 cost = Dictionary[StringName, int]({&"coins": 50, &"metal_ore": 8})
 construction_seconds = 35.0

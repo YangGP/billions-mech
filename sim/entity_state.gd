@@ -130,7 +130,8 @@ func snapshot() -> Dictionary:
 		"shot_ticks": shot_ticks, "shot_target": shot_target,
 		"capacity_cost": unit_definition.capacity_cost if unit_definition != null else 0,
 		"damage": unit_definition.damage if unit_definition != null else 0,
-		"attack_range": unit_definition.attack_range if unit_definition != null else 0.0}
+		"attack_range": unit_definition.attack_range if unit_definition != null else 0.0,
+		"splash_radius": unit_definition.splash_radius if unit_definition != null else 0.0}
 
 
 ## 施加一层减速控制；同倍率刷新时长，不同倍率各自独立计时。

@@ -101,7 +101,10 @@ func recompute(buildings: Array[MechBuildingState], grid: MechGridState, unit_ca
 			if rules.alloy_recipe != null:
 				_power_supply += building.processing_power
 			elif rules.environment_energy != "none":
-				_power_supply += building.environment_power
+				if rules.environment_output_is_cooling:
+					_cooling_supply += building.environment_power * 10
+				else:
+					_power_supply += building.environment_power
 			else:
 				_power_supply += rules.power_provided
 			_cooling_supply += rules.cooling_provided * 10

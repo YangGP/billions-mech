@@ -18,7 +18,7 @@
     },
     {
       "unit_id": "scout",
-      "display_name": "侦察机",
+      "display_name": "侦察兵",
       "cost": {"coins": 20, "metal_ore": 2},
       "production_seconds": 12.0,
       "capacity_cost": 1,
@@ -39,10 +39,27 @@
       "max_hp": 700,
       "damage": 45,
       "attack_seconds": 1.5,
-      "attack_range": 5.0,
-      "acquisition_range": 7.0,
+      "attack_range": 1.0,
+      "acquisition_range": 6.0,
       "move_speed": 1.8,
-      "sight_radius": 7.0
+      "sight_radius": 7.0,
+      "cleave_targets": 2,
+      "cleave_secondary_ratio": 0.6
+    },
+    {
+      "unit_id": "grenadier",
+      "display_name": "榴弹兵",
+      "cost": {"coins": 60, "metal_ore": 6},
+      "production_seconds": 30.0,
+      "capacity_cost": 2,
+      "max_hp": 130,
+      "damage": 18,
+      "attack_seconds": 1.6,
+      "attack_range": 4.5,
+      "acquisition_range": 6.0,
+      "move_speed": 2.1,
+      "sight_radius": 7.0,
+      "splash_radius": 1.0
     },
     {
       "unit_id": "rail_mech",
@@ -57,6 +74,26 @@
       "acquisition_range": 11.0,
       "move_speed": 1.8,
       "sight_radius": 9.0
+    },
+    {
+      "unit_id": "fortress_mech",
+      "display_name": "堡垒机甲",
+      "cost": {"coins": 500, "metal_ore": 16, "alloy": 30, "crystals": 20},
+      "production_seconds": 120.0,
+      "capacity_cost": 8,
+      "max_hp": 1800,
+      "damage": 80,
+      "attack_seconds": 1.0,
+      "attack_range": 10.0,
+      "acquisition_range": 10.0,
+      "move_speed": 1.9,
+      "sight_radius": 8.0,
+      "splash_radius": 1.25,
+      "primary_range": 3.0,
+      "secondary_damage": 90,
+      "secondary_attack_seconds": 8.0,
+      "secondary_range": 10.0,
+      "weapon_switch_range": 3.0
     }
   ],
   "enemies": [

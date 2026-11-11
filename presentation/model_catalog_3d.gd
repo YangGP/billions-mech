@@ -171,6 +171,20 @@ func _unit(id: String) -> void:
 			_block(Vector3(0.3, 0.25, 0.28), Vector3(0, 1.05, 0), LIGHT)
 			_block(Vector3(0.22, 0.07, 0.04), Vector3(0, 1.08, -0.16), CYAN)
 			_block(Vector3(0.16, 0.16, 1.0 if id == "rail_mech" else 0.5), Vector3(width * 0.55, 0.85, -0.3), BLUE if id == "rail_mech" else GOLD)
+		"grenadier":
+			_legs(0.28, 0.22, 0.42, 2, DARK)
+			_block(Vector3(0.62, 0.42, 0.52), Vector3(0, 0.64, 0), Color("c9a06b"))
+			_block(Vector3(0.28, 0.26, 0.28), Vector3(0, 0.98, 0), LIGHT)
+			_block(Vector3(0.16, 0.16, 0.16), Vector3(0, 1.16, 0), GOLD)
+			_cyl(Vector3(0.16, 0.72, 0.16), Vector3(0.28, 0.84, -0.18), STEEL, Vector3(-0.55, 0, 0.25))
+		"fortress_mech":
+			_legs(0.48, 0.38, 0.5, 2, DARK)
+			_block(Vector3(1.15, 0.62, 0.85), Vector3(0, 0.78, 0), STEEL)
+			_block(Vector3(0.55, 0.38, 0.55), Vector3(0, 1.18, 0.05), LIGHT)
+			_block(Vector3(0.22, 0.2, 0.3), Vector3(0, 1.42, -0.12), CYAN)
+			_block(Vector3(0.18, 0.18, 0.78), Vector3(0.38, 0.94, -0.5), GOLD)
+			for side: float in [-1.0, 1.0]:
+				_cyl(Vector3(0.13, 0.7, 0.13), Vector3(side * 0.5, 0.8, -0.48), BLUE, Vector3(-0.4, 0, 0))
 		"builder", "builder_worn", "builder_veteran", "provoker":
 			var tint: Color = {"builder_worn": Color("8b7770"), "builder_veteran": RED, "provoker": Color("e0a35e")}.get(id, Color("c9908b"))
 			_legs(0.27, 0.18, 0.45, 2, DARK)

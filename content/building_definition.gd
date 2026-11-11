@@ -26,6 +26,8 @@ extends Resource
 @export var environment_output_multiplier: int = 1
 ## 环境能源输出上限（0 表示不设上限）。
 @export var environment_output_cap: int = 0
+## 环境输出进入冷却池；false 时进入电力池。
+@export var environment_output_is_cooling: bool = false
 @export var requires_water: bool = false
 @export var is_gate: bool = false
 @export_range(0.0, 1.0, 0.05) var slow_multiplier: float = 1.0
@@ -142,7 +144,8 @@ func snapshot() -> Dictionary:
 		"garrison_capacity": garrison_capacity, "garrison_range_bonus": garrison_range_bonus,
 		"environment_energy": environment_energy, "infectable": infectable,
 		"environment_output_multiplier": environment_output_multiplier,
-		"environment_output_cap": environment_output_cap, "requires_water": requires_water,
+		"environment_output_cap": environment_output_cap,
+		"environment_output_is_cooling": environment_output_is_cooling, "requires_water": requires_water,
 		"is_gate": is_gate, "slow_multiplier": slow_multiplier, "slow_seconds": slow_seconds,
 		"level": level, "tech_level": tech_level,
 		"required_tech_level": required_tech_level,

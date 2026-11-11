@@ -4,13 +4,14 @@
 [resource]
 script = ExtResource("1")
 building_id = &"wind_station"
-display_name = "风能站"
+display_name = "风冷站"
 footprint = Vector2i(1, 1)
 cost = Dictionary[StringName, int]({&"coins": 60, &"metal_ore": 8})
 construction_seconds = 30.0
 max_hp = 250
 environment_energy = "wind"
 environment_output_cap = 18
+environment_output_is_cooling = true
 level = 1
 upgrade_to = ExtResource("2")
 upgrade_cost = Dictionary[StringName, int]({&"coins": 100, &"metal_ore": 4, &"alloy": 8})
