@@ -1,0 +1,8 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://presentation/map_overview_3d.gd" id="1"]
+[ext_resource type="Resource" path="res://content/maps/tutorial_coast_64.tres" id="2"]
+
+[node name="TutorialCoastOverview" type="Node3D"]
+script = ExtResource("1")
+preview_map = ExtResource("2")

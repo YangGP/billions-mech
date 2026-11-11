@@ -2,6 +2,7 @@ extends Node
 ## 组合根：装配模拟、命令队列与全部表现层视图；只有命令可以改变模拟状态。
 
 const SETTINGS: MechFoundationSettings = preload("res://content/development_128.tres")
+var _session_settings: MechFoundationSettings = SETTINGS
 
 var _sim := MechSimCore.new()
 var _commands := MechCommandQueue.new()
@@ -13,7 +14,9 @@ var _commands := MechCommandQueue.new()
 @onready var _camera: MechMapCamera3D = $MapCamera
 @onready var _hud: MechMapHud = $HUD
 @onready var _settings: MechSettingsMenu = $Settings
+@onready var _return_dialog: ConfirmationDialog = $ReturnDialog
 var _resume_after_settings: bool = false
+var _resume_after_return: bool = false
 var _last_generation: int = -1
 var _last_map_revision: int = -1
 var _stress_mode: bool = false
@@ -60,8 +63,15 @@ func _ready() -> void:
 		if _stress_enemies > 0:
 			_perf_enabled = true
 	_sim.profiling_enabled = _perf_enabled
-	var initial_settings: MechFoundationSettings = SETTINGS.duplicate(true)
-	if OS.get_cmdline_user_args().has("--campaign"):
+	if get_tree().has_meta(&"mech_session_settings"):
+		_session_settings = get_tree().get_meta(&"mech_session_settings")
+		get_tree().remove_meta(&"mech_session_settings")
+	var initial_settings: MechFoundationSettings = _session_settings.duplicate(true)
+	var campaign_mode: bool = OS.get_cmdline_user_args().has("--campaign")
+	if get_tree().has_meta(&"mech_campaign_mode"):
+		campaign_mode = bool(get_tree().get_meta(&"mech_campaign_mode"))
+		get_tree().remove_meta(&"mech_campaign_mode")
+	if campaign_mode:
 		initial_settings.campaign_mode = true
 		initial_settings.scenario_name += " · 三阶段战役"
 	Engine.physics_ticks_per_second = initial_settings.simulation_hz
@@ -78,6 +88,7 @@ func _ready() -> void:
 	_coverage.hide()
 	_hud.pause_requested.connect(_toggle_pause)
 	_hud.restart_requested.connect(_restart)
+	_hud.main_menu_requested.connect(_request_main_menu)
 	_hud.focus_requested.connect(_focus_mainbrain)
 	_hud.fit_requested.connect(_fit_map)
 	_hud.build_requested.connect(_request_build)
@@ -93,6 +104,9 @@ func _ready() -> void:
 	_hud.repair_all_requested.connect(_repair_all)
 	_settings.close_requested.connect(_close_settings)
 	_settings.settings_applied.connect(_apply_camera_settings)
+	_return_dialog.theme = $HUD/Root.theme
+	_return_dialog.confirmed.connect(_return_to_main_menu)
+	_return_dialog.canceled.connect(_cancel_return)
 	_apply_camera_settings(_settings.preferences())
 	_camera.set_play_area(_hud.battle_view_rect())
 	get_window().focus_exited.connect(_build.cancel_wall_drag)
@@ -195,7 +209,7 @@ func _stress_advance(delta: float) -> void:
 	_stress_timer = 0.0
 	_stress_step += 1
 	if _stress_step % 4 == 0:
-		var center: Vector2 = Vector2(SETTINGS.map_definition.mainbrain_origin) + Vector2(24, 0)
+		var center: Vector2 = Vector2(_session_settings.map_definition.mainbrain_origin) + Vector2(24, 0)
 		var roster: Array[StringName] = [&"builder", &"builder_worn", &"builder_veteran", &"recycler", &"provoker",
 			&"scavenger", &"deflector", &"strider", &"mortar", &"silencer"]
 		var offset: int = (_stress_step / 4 - 1) * 2
@@ -206,13 +220,13 @@ func _stress_advance(delta: float) -> void:
 		for entity: Dictionary in _state["entities"]:
 			if not entity.get("is_unit", false) or entity.get("team", 1) != 1:
 				continue
-			var goal: Vector2 = Vector2(SETTINGS.map_definition.mainbrain_origin)
+			var goal: Vector2 = Vector2(_session_settings.map_definition.mainbrain_origin)
 			goal += Vector2(40 if index % 2 == 0 else -40, 40 if (index / 2) % 2 == 0 else -40)
 			_commands.submit(MechCommand.new(MechCommand.Type.MOVE_ENTITY,
 				{"entity_id": entity["id"], "target": goal}))
 			index += 1
-	var origin: Vector2i = SETTINGS.map_definition.mainbrain_origin
-	var footprint: Vector2i = SETTINGS.map_definition.mainbrain_footprint
+	var origin: Vector2i = _session_settings.map_definition.mainbrain_origin
+	var footprint: Vector2i = _session_settings.map_definition.mainbrain_footprint
 	if _stress_step % 2 == 1:
 		var y: int = origin.y + footprint.y + 2 + (_stress_step % 8)
 		var cells: Array[Vector2i] = []
@@ -228,6 +242,8 @@ func _stress_advance(delta: float) -> void:
 
 
 func _input(event: InputEvent) -> void:
+	if _return_dialog.visible:
+		return
 	if _settings.is_open():
 		if event is InputEventKey and event.pressed and not event.echo and _event_key(event) == KEY_ESCAPE:
 			_close_settings()
@@ -253,7 +269,7 @@ func _input(event: InputEvent) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if _settings.is_open():
+	if _settings.is_open() or _return_dialog.visible:
 		return
 	if event is InputEventMouseButton and (not get_viewport().get_visible_rect().has_point(event.position) or _hud.blocks_point(event.position)):
 		if event.pressed and event.button_index == MOUSE_BUTTON_RIGHT and _build.building_id != &"":
@@ -361,7 +377,7 @@ func _toggle_pause() -> void:
 
 
 func _open_settings() -> void:
-	if _settings.is_open():
+	if _settings.is_open() or _return_dialog.visible:
 		return
 	_selection.cancel_drag()
 	_build.cancel()
@@ -394,6 +410,37 @@ func _restart() -> void:
 	_selection.cancel_drag()
 	_build.cancel()
 	_commands.submit(MechCommand.new(MechCommand.Type.RESET_SESSION))
+
+
+func _request_main_menu() -> void:
+	if _settings.is_open() or _return_dialog.visible:
+		return
+	_selection.cancel_drag()
+	_build.cancel()
+	_selection.attack_move_mode = false
+	_hud.dismiss_dialogs()
+	_resume_after_return = not _sim.is_paused() and not _sim.session_ended()
+	if _resume_after_return:
+		_commands.submit(MechCommand.new(MechCommand.Type.SET_PAUSED, {"paused": true}))
+	_camera.input_blocked = true
+	_return_dialog.popup_centered(Vector2i(600, 220))
+
+
+func _cancel_return() -> void:
+	_return_dialog.hide()
+	_camera.input_blocked = false
+	if _resume_after_return and not _sim.session_ended():
+		_commands.submit(MechCommand.new(MechCommand.Type.SET_PAUSED, {"paused": false}))
+	_resume_after_return = false
+
+
+func _return_to_main_menu() -> void:
+	get_tree().set_meta(&"mech_show_main_menu", true)
+	var error: Error = get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
+	if error != OK:
+		get_tree().remove_meta(&"mech_show_main_menu")
+		_cancel_return()
+		_hud.feedback("主菜单加载失败（%s），请重试。" % error_string(error))
 
 
 func _focus_mainbrain() -> void:
@@ -464,8 +511,8 @@ func _dispatch_regions() -> Array:
 func _create_dispatch_region() -> void:
 	if _sim.session_ended():
 		return
-	var origin: Vector2i = SETTINGS.map_definition.mainbrain_origin + Vector2i(-2, -2)
-	var footprint: Vector2i = SETTINGS.map_definition.mainbrain_footprint + Vector2i(4, 4)
+	var origin: Vector2i = _session_settings.map_definition.mainbrain_origin + Vector2i(-2, -2)
+	var footprint: Vector2i = _session_settings.map_definition.mainbrain_footprint + Vector2i(4, 4)
 	var cells: Array[Vector2i] = []
 	for y: int in range(footprint.y):
 		for x: int in range(footprint.x):

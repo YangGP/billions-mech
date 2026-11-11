@@ -9,13 +9,13 @@ signal focus_requested
 const DIRECTORY: JSON = preload("res://content/build_menu_catalog.json")
 const MATERIAL_LABELS: Array[String] = ["币", "矿", "燃", "合", "晶"]
 
-@export_enum("economy", "extraction", "energy", "defense", "military", "support") var initial_category: String = "economy"
+@export_enum("core", "extraction", "energy", "cooling", "defense", "military", "command") var initial_category: String = "core"
 
 var _entries: Dictionary[StringName, Dictionary] = {}
 var _buttons: Dictionary[StringName, Button] = {}
 var _category_buttons: Dictionary[StringName, Button] = {}
 var _catalog: Dictionary[StringName, Dictionary] = {}
-var _category: StringName = &"economy"
+var _category: StringName = &"core"
 var _active_build: StringName = &""
 var _ended: bool = false
 
@@ -66,8 +66,8 @@ func present_catalog(catalog: Array, ended: bool) -> void:
 		_catalog[id] = entry
 		if not _entries.has(id):
 			# 新的运行时定义即使尚未补充目录元数据也先给一个条目。
-			_add_entry({"id": id, "name": entry["name"], "category": "support", "description": ""})
-			_buttons[id].visible = _category == &"support"
+			_add_entry({"id": id, "name": entry["name"], "category": "command", "description": ""})
+			_buttons[id].visible = _category == &"command"
 	_refresh_buttons()
 
 

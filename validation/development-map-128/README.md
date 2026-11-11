@@ -2,7 +2,9 @@
 
 > 历史地图生成材料（0.5.25起）。JSON/导航/预览报告只证明各自记录版本，不是0.5.89重新生成的校验。当前地图/资源与运行规则见[地图专稿](../../docs/map-terrain.md)、[数值表](../../docs/values.md)，最近代码检查见[三维验证](../3d-interaction-performance.md)。`p1-bundle-validated.json`仍仅是P1阶段的校验快照；后续风口、水域和燃料已接入源/运行地图，不把旧截图、统计或哈希冒充当前。
 
-当前唯一入口 `content/development_128.tres`，使用正式 `mainbrain.tres`（5×5）、600币/80金属矿和2侦察机。下文的临时主脑、旧入口、旧钱包和旧训练场只作生成历史解释，不是可运行步骤。
+当前开发图入口`content/development_128.tres`，使用正式`mainbrain.tres`（5×5）、600币/80金属矿和2侦察机。另有两张[新关卡](../tutorial-maps/README.md)，不属于本历史记录。下文的临时主脑、旧入口、旧钱包和旧训练场只作生成历史解释，不是可运行步骤。
+
+2026-11-12已将当前源与原生地图改为等面积正方形展示边界，重新生成本目录`map-bundle.json`、`layout-report.json`：184×184包围网格、16042完整格、几何总面积保持原128×128＝16384平方格，1个可走连通区、34个锚点。其余旧bundle/nav/preview材料未重跑，仅对应旧布局，不能用于证明本次扩展后的路线。最新边界规则和验证见[地图规则](../../docs/map-terrain.md)、[新关卡与方形检查](../tutorial-maps/README.md)。
 
 2026-11-08，0.5.25-dev。新默认地图为“四隘盆地”，复用现有Godot灰盒地形/实体渲染，`art_source=existing`，未生成或替换美术。数据由手工编排的多边形布局经Pillow栅格化，再适配现有`Rect2i`地图格式；连通分析复用SciPy和generate2dmap工具，未编写运行时随机地图生成或寻路算法。
 

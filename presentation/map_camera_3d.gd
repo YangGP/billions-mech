@@ -23,6 +23,9 @@ var input_blocked: bool = false:
 			_stop_drag()
 
 var _bounds := Rect2()
+var _outline := PackedVector2Array()
+var _projected_bounds := Rect2()
+var _square_boundary: bool = false
 var _mainbrain := Vector2.ZERO
 var _focus := Vector2.ZERO
 var _factor: float = 0.7
@@ -48,6 +51,15 @@ func _ready() -> void:
 
 func configure_map(map_state: Dictionary) -> void:
 	_bounds = Rect2(Vector2.ZERO, Vector2(map_state["dimensions"]))
+	_outline = map_state["outline"].duplicate()
+	_projected_bounds = MechIsoGeometry.map_bounds(map_state["dimensions"], _outline)
+	# 轴对齐投影边界可按屏幕方向夹持；旧矩形地图仍沿用原有世界坐标夹持。
+	_square_boundary = true
+	for point: Vector2 in _outline:
+		var projected: Vector2 = MechIsoGeometry.project(point)
+		if not (is_equal_approx(projected.x, _projected_bounds.position.x) or is_equal_approx(projected.x, _projected_bounds.end.x)) \
+				or not (is_equal_approx(projected.y, _projected_bounds.position.y) or is_equal_approx(projected.y, _projected_bounds.end.y)):
+			_square_boundary = false
 	_mainbrain = Vector2(map_state["mainbrain_origin"]) + Vector2(map_state["mainbrain_footprint"]) * 0.5
 	_factor = 0.7
 	focus_mainbrain()
@@ -102,11 +114,11 @@ func focus_map(point: Vector2) -> void:
 
 func fit_map() -> void:
 	_stop_drag()
-	_focus = _bounds.get_center()
+	_focus = MechIsoGeometry.unproject(_projected_bounds.get_center())
 	_factor = 1.0
 	_update_transform()
-	var projected := Rect2(map_to_screen(_bounds.position), Vector2.ZERO)
-	for corner: Vector2 in [_bounds.end, Vector2(_bounds.end.x, _bounds.position.y), Vector2(_bounds.position.x, _bounds.end.y)]:
+	var projected := Rect2(map_to_screen(_outline[0]), Vector2.ZERO)
+	for corner: Vector2 in _outline:
 		projected = projected.expand(map_to_screen(corner))
 	var available: Vector2 = _play_area().size - Vector2(80, 80)
 	_factor = clampf(minf(available.x / projected.size.x, available.y / projected.size.y), OVERVIEW_MIN_ZOOM, MAX_ZOOM)
@@ -207,11 +219,26 @@ func _clamp_position() -> void:
 	var polygon: PackedVector2Array = visible_map_polygon()
 	if polygon.size() < 3:
 		return
+	if _square_boundary:
+		var projected_focus: Vector2 = MechIsoGeometry.project(_focus)
+		var projected_span := Rect2(MechIsoGeometry.project(polygon[0]) - projected_focus, Vector2.ZERO)
+		for point: Vector2 in polygon:
+			projected_span = projected_span.expand(MechIsoGeometry.project(point) - projected_focus)
+		var minimum: Vector2 = _projected_bounds.position - projected_span.position
+		var maximum: Vector2 = _projected_bounds.end - projected_span.end
+		projected_focus.x = clampf(projected_focus.x, minimum.x, maximum.x) if minimum.x <= maximum.x else _projected_bounds.get_center().x
+		projected_focus.y = clampf(projected_focus.y, minimum.y, maximum.y) if minimum.y <= maximum.y else _projected_bounds.get_center().y
+		_focus = MechIsoGeometry.unproject(projected_focus)
+		_update_transform()
+		return
 	var span := Rect2(polygon[0] - _focus, Vector2.ZERO)
 	for point: Vector2 in polygon:
 		span = span.expand(point - _focus)
 	var low: Vector2 = _bounds.position - span.position
 	var high: Vector2 = _bounds.end - span.end
+	# 边缘基地仍必须能居中；允许这侧显示地图外背景，避免主脑被HUD挡住。
+	low = low.min(_mainbrain)
+	high = high.max(_mainbrain)
 	_focus.x = clampf(_focus.x, low.x, high.x) if low.x <= high.x else _bounds.get_center().x
 	_focus.y = clampf(_focus.y, low.y, high.y) if low.y <= high.y else _bounds.get_center().y
 	_update_transform()

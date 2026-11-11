@@ -4,6 +4,7 @@ extends CanvasLayer
 
 signal pause_requested
 signal restart_requested
+signal main_menu_requested
 signal focus_requested
 signal fit_requested
 signal build_requested(id: StringName)
@@ -153,7 +154,9 @@ func _ready() -> void:
 	$Root/Toolbar/FocusCore.pressed.connect(focus_requested.emit)
 	$Root/System/Restart.pressed.connect(restart_requested.emit)
 	$Root/System/Settings.pressed.connect(settings_requested.emit)
+	$Root/System/MainMenu.pressed.connect(main_menu_requested.emit)
 	$Root/SessionResult/Restart.pressed.connect(restart_requested.emit)
+	$Root/SessionResult/MainMenu.pressed.connect(main_menu_requested.emit)
 	$Root/Inspector/Produce.pressed.connect(_produce_pressed)
 	$Root/Inspector/Produce.get_popup().id_pressed.connect(_produce_choice)
 	$Root/Inspector/CancelProduction.pressed.connect(_cancel_production_pressed)

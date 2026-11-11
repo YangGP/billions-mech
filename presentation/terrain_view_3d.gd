@@ -38,9 +38,10 @@ func present_map(map_state: Dictionary) -> void:
 			for y: int in range(cy, mini(cy + CHUNK_SIZE, dimensions.y)):
 				for x: int in range(cx, mini(cx + CHUNK_SIZE, dimensions.x)):
 					var index: int = y * dimensions.x + x
-					if playable[index] == 0:
-						continue
 					var tile := PackedVector2Array([Vector2(x, y), Vector2(x + 1, y), Vector2(x + 1, y + 1), Vector2(x, y + 1)])
+					var polygons: Array[PackedVector2Array] = Geometry2D.intersect_polygons(tile, outline)
+					if polygons.is_empty():
+						continue
 					var fill := Color("26414b") if (x + y) % 2 == 0 else Color("2a4650")
 					if not water.is_empty() and water[index] != 0:
 						fill = Color("265676")
@@ -49,13 +50,13 @@ func present_map(map_state: Dictionary) -> void:
 					elif terrain[index] == MechGridState.Terrain.OBSTACLE:
 						fill = Color("405563")
 						var center := Vector2(x + 0.5, y + 0.5)
-						if Geometry2D.is_point_in_polygon(center, outline):
+						if playable[index] != 0:
 							var height: float = 0.45 + float((x * 17 + y * 13) % 5) * 0.1
 							var transform := Transform3D(Basis(Vector3.UP, float((x + y) % 6)) * Basis.from_scale(Vector3(0.86, height, 0.86)), Vector3(center.x, height * 0.5, center.y))
 							MechInstanceBatches3D.append(rock_groups, "rocks_%d_%d" % [cx, cy], rock, transform, Color("4b606e"))
 					elif not wind.is_empty() and wind[index] != 0:
 						fill = Color("345c59")
-					for polygon: PackedVector2Array in Geometry2D.intersect_polygons(tile, outline):
+					for polygon: PackedVector2Array in polygons:
 						var triangles: PackedInt32Array = Geometry2D.triangulate_polygon(polygon)
 						for vertex: int in triangles:
 							surface.set_color(fill)

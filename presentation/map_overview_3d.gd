@@ -65,12 +65,16 @@ func _refresh() -> void:
 	environment.environment.ambient_light_color = Color("bbcbd1")
 	environment.environment.ambient_light_energy = 0.65
 	_generated.add_child(environment)
-	var center := Vector3(preview_map.dimensions.x * 0.5, 0, preview_map.dimensions.y * 0.5)
+	var projected: Rect2 = MechIsoGeometry.map_bounds(preview_map.dimensions, preview_map.outline())
+	var logical_center: Vector2 = MechIsoGeometry.unproject(projected.get_center())
+	var center := Vector3(logical_center.x, 0, logical_center.y)
 	var camera := Camera3D.new()
 	camera.projection = Camera3D.PROJECTION_ORTHOGONAL
-	camera.size = maxf(preview_map.dimensions.x, preview_map.dimensions.y) * 1.2
+	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+	var span: Vector2 = projected.size / (32.0 * sqrt(2.0))
+	camera.size = maxf(span.y, span.x * viewport_size.y / maxf(1.0, viewport_size.x)) * 1.1
 	camera.far = 1000
-	camera.position = center + Vector3(180, 288, 180)
+	camera.position = center + MechMapCamera3D.VIEW_BACK.normalized() * 300.0
 	_generated.add_child(camera)
 	camera.look_at(center)
 	camera.current = true

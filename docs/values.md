@@ -14,8 +14,8 @@
 
 | 项 | 当前配置 |
 | --- | --- |
-| 唯一玩法配置 | `content/development_128.tres` |
-| 地图/主脑 | 128×128“四隘盆地” / 各级5×5 |
+| 默认开发配置 | `content/development_128.tres`；新关卡差异见下表 |
+| 地图/主脑 | 四隘盆地184×184包围网格，几何面积16384平方格、16042完整格；主脑(89,89)，各级5×5 |
 | 模拟频率 | 30 Hz |
 | 启动库存 | 600币、80金属矿，其余0 |
 | 启动单位 | 2 侦察兵，无免费诊断实体 |
@@ -24,6 +24,17 @@
 | 默认模式 | 4波，全部出完并清除行军/交战敌后判胜 |
 | 战役候选 | `--campaign`；持续波次直到满足前置请求终波 |
 | 会话种子 | 1，用于波次与战斗随机序列，非全模拟存档/回放保证 |
+
+2026-11-11新增两关沿用相同钱包、单位和30Hz模拟，只覆盖地图、出生点与波次节奏；尚未完成整局平衡验收。主脑位置为占地左上格，均为5×5。
+
+| 新关卡配置 | 尺寸/主脑位置 | 预告/首波 | 出兵间隔/投放窗口 | 首波预算/总波数/种子 |
+| --- | --- | --- | --- | --- |
+| `content/tutorial_coast.tres` 西岸前哨 | 96×96网格，3927完整格 / (14,41)，距投影左边约2.9逻辑格 | 280s / 300s | 240s / 60s | 12 / 2 / 101 |
+| `content/validation_river.tres` 双桥河谷 | 127×127网格，7403完整格 / (113,69)，距投影右边约3.4逻辑格 | 160s / 180s | 180s / 90s | 25 / 4 / 202 |
+
+新关卡增长倍率仍为1.6，金属矿/碳晶/超导矿每点储量仍720/480/180。西岸前哨有4/3/2处矿点，双桥河谷有6/4/3处。两关固定为有限防守，不开放战役终波模式。
+
+两关正方形几何总面积分别保持原64×64＝4096、96×80＝7680平方格。面积包含装饰半格，不能与完整可玩格数混用；扩大的网格只是包围盒，不改变建筑占地、单位尺度或移动速度。
 
 ## 3. 主脑与节点
 
@@ -40,31 +51,31 @@
 
 ## 4. 基础建筑目录
 
-21类按菜单顺序列出；主脑也计1类。前置列为图纸要求的科技/主脑最低级别，额外历史产出门槛见下文。
+21类按 7 个菜单分类排序；主脑也计1类。前置列为图纸要求的科技/主脑最低级别，额外历史产出门槛见下文。
 
-| 建筑 | 占地 | 新建费（币/矿/合/晶） | 工期 | HP | 调度/电/冷需求 | 科技/主脑 |
-| --- | --- | --- | --- | --- | --- | --- |
-| [算力节点](../content/buildings/compute_node.tres) | 2×2 | 30/4/0/0 | 40 | 250 | 0/2/2 | 0/0 |
-| [金属采矿站](../content/buildings/mining_station.tres) | 2×2 | 40/0/0/0 | 30 | 250 | 1/2/0 | 0/0 |
-| [碳晶采集站](../content/buildings/fuel_extractor.tres) | 2×2 | 50/8/0/0 | 35 | 250 | 1/2/0 | 0/0 |
-| [超导矿采掘站](../content/buildings/crystal_extractor.tres) | 2×2 | 120/10/8/0 | 45 | 350 | 2/4/0 | 0/3 |
-| [风冷站](../content/buildings/wind_station.tres) | 1×1 | 60/8/0/0 | 30 | 250 | 0/0/0 | 0/0 |
-| [太阳能站](../content/buildings/solar_station.tres) | 2×2 | 50/6/0/0 | 30 | 250 | 0/0/0 | 0/0 |
-| [热能冶炼站](../content/buildings/thermal_smelter.tres) | 3×3 | 120/18/0/0 | 45 | 500 | 0/0/0 | 0/0 |
-| [中继节点](../content/buildings/relay_node.tres) | 1×1 | 15/2/0/0 | 10 | 150 | 0/1/0 | 0/0 |
-| [冷却塔](../content/buildings/cooling_tower.tres) | 2×2 | 50/6/0/0 | 25 | 250 | 0/1/0 | 0/0 |
-| [水冷站](../content/buildings/water_cooler.tres) | 2×2 | 60/6/0/0 | 25 | 250 | 0/1/0 | 0/0 |
-| [装甲墙](../content/buildings/armored_wall.tres) | 1×1 | 2/1/0/0 | 8 | 400 | 0/0/0 | 0/0 |
-| [闸门](../content/buildings/gate.tres) | 1×2 | 8/4/0/0 | 12 | 800 | 0/0/0 | 0/0 |
-| [驻防碉堡](../content/buildings/garrison_bunker.tres) | 2×2 | 60/10/0/0 | 35 | 600 | 0/0/0 | 0/0 |
-| [哨戒炮塔](../content/buildings/sentry_tower.tres) | 2×2 | 80/8/0/0 | 40 | 600 | 2/3/0 | 0/0 |
-| [电弧塔](../content/buildings/arc_tower.tres) | 2×2 | 220/10/18/0 | 65 | 750 | 3/7/0 | 2/2 |
-| [组装厂](../content/buildings/assembly_plant.tres) | 3×3 | 100/10/0/0 | 60 | 800 | 2/4/0 | 0/0 |
-| [重装工厂](../content/buildings/heavy_factory.tres) | 3×3 | 400/20/24/0 | 90 | 1000 | 4/8/0 | 2/2 |
-| [主脑 I](../content/buildings/mainbrain.tres) | 5×5 | 0/0/0/0 | 1 | 4000 | 0/0/0 | 0/0 |
-| [科技中心 I](../content/buildings/tech_center.tres) | 2×2 | 120/10/6/0 | 60 | 400 | 2/4/0 | 0/0 |
-| [雷达站](../content/buildings/radar_station.tres) | 2×2 | 120/8/4/0 | 45 | 300 | 1/4/0 | 2/2 |
-| [调度中心](../content/buildings/dispatch_center.tres) | 3×3 | 600/20/30/16 | 120 | 1200 | 4/6/0 | 3/3 |
+| 分类 | 建筑 | 占地 | 新建费（币/矿/合/晶） | 工期 | HP | 调度/电/冷需求 | 科技/主脑 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 核心 | [主脑 I](../content/buildings/mainbrain.tres) | 5×5 | 0/0/0/0 | 1 | 4000 | 0/0/0 | 0/0 |
+| 核心 | [算力节点](../content/buildings/compute_node.tres) | 2×2 | 30/4/0/0 | 40 | 250 | 0/2/2 | 0/0 |
+| 采集 | [金属采矿站](../content/buildings/mining_station.tres) | 2×2 | 40/0/0/0 | 30 | 250 | 1/2/0 | 0/0 |
+| 采集 | [碳晶采集站](../content/buildings/fuel_extractor.tres) | 2×2 | 50/8/0/0 | 35 | 250 | 1/2/0 | 0/0 |
+| 采集 | [超导矿采掘站](../content/buildings/crystal_extractor.tres) | 2×2 | 120/10/8/0 | 45 | 350 | 2/4/0 | 0/3 |
+| 能源 | [太阳能站](../content/buildings/solar_station.tres) | 2×2 | 50/6/0/0 | 30 | 250 | 0/0/0 | 0/0 |
+| 能源 | [热能冶炼站](../content/buildings/thermal_smelter.tres) | 3×3 | 120/18/0/0 | 45 | 500 | 0/0/0 | 0/0 |
+| 能源 | [中继节点](../content/buildings/relay_node.tres) | 1×1 | 15/2/0/0 | 10 | 150 | 0/1/0 | 0/0 |
+| 冷却 | [风冷站](../content/buildings/wind_station.tres) | 1×1 | 60/8/0/0 | 30 | 250 | 0/0/0 | 0/0 |
+| 冷却 | [冷却塔](../content/buildings/cooling_tower.tres) | 2×2 | 50/6/0/0 | 25 | 250 | 0/1/0 | 0/0 |
+| 冷却 | [水冷站](../content/buildings/water_cooler.tres) | 2×2 | 60/6/0/0 | 25 | 250 | 0/1/0 | 0/0 |
+| 防御 | [装甲墙](../content/buildings/armored_wall.tres) | 1×1 | 2/1/0/0 | 8 | 400 | 0/0/0 | 0/0 |
+| 防御 | [闸门](../content/buildings/gate.tres) | 1×2 | 8/4/0/0 | 12 | 800 | 0/0/0 | 0/0 |
+| 防御 | [驻防碉堡](../content/buildings/garrison_bunker.tres) | 2×2 | 60/10/0/0 | 35 | 600 | 0/0/0 | 0/0 |
+| 防御 | [哨戒炮塔](../content/buildings/sentry_tower.tres) | 2×2 | 80/8/0/0 | 40 | 600 | 2/3/0 | 0/0 |
+| 防御 | [电弧塔](../content/buildings/arc_tower.tres) | 2×2 | 220/10/18/0 | 65 | 750 | 3/7/0 | 2/2 |
+| 军工 | [组装厂](../content/buildings/assembly_plant.tres) | 3×3 | 100/10/0/0 | 60 | 800 | 2/4/0 | 0/0 |
+| 军工 | [重装工厂](../content/buildings/heavy_factory.tres) | 3×3 | 400/20/24/0 | 90 | 1000 | 4/8/0 | 2/2 |
+| 指挥 | [科技中心 I](../content/buildings/tech_center.tres) | 2×2 | 120/10/6/0 | 60 | 400 | 2/4/0 | 0/0 |
+| 指挥 | [雷达站](../content/buildings/radar_station.tres) | 2×2 | 120/8/4/0 | 45 | 300 | 1/4/0 | 2/2 |
+| 指挥 | [调度中心](../content/buildings/dispatch_center.tres) | 3×3 | 600/20/30/16 | 120 | 1200 | 4/6/0 | 3/3 |
 
 科技 I 需首次真实合金产出；科技 III 还需历史超导矿产出。首超导矿站需主脑 III，主脑升 III 和首站本身不耗超导矿。直接建造/升级/生产仍走模拟层前置，不能单看此列判断全部可用性。
 
@@ -214,11 +225,11 @@
 
 主脑占地安全半径28，开局散布和边缘回填共用。环境散兵为老旧建造者，基础1.2格/s，未交战倍率0.5，开阔地游荡/闻声为0.6格/s，锁定目标冲锋1.5格/s，丢锁保留1秒余速。无噪声每8s有50%概率在2格内挪动；崎岖及减速仍生效。
 
-开局94只为当前开发图启动记录，不是所有图固定数量。历史调速及性能测量从 Git 历史查询，不宣称精确复刻参考游戏速度。
+2026-11-12已扩大网格以保持原几何面积，散兵数量仍按实际可用区域计算。94只为早期矩形开发图记录，缩小裁切阶段的19/1/9也已失效，均不是固定数量。历史调速及性能测量从Git历史查询，不宣称精确复刻参考游戏速度。
 
 ## 16. 数据源与维护
 
-- `content/development_128.tres` 覆盖启动值，不能把 `foundation_settings.gd` 的兼容默认250币当作正常开局。
+- `content/development_128.tres`及两个新关卡Resource覆盖启动值，不能把`foundation_settings.gd`的兼容默认250币当作正常开局。新关卡的布局与会话覆盖字段同存于地图`.source.json`，按[编译步骤](../validation/tutorial-maps/README.md)生成地图与开局Resource。
 - 建筑、配方以对应 Resource 为依据；单位与敌种的运行数值以 `content/unit_balance.json` 为准，`content/units/`、`content/enemies/` 的 Resource 仅作回退。实例供电/光环/余数由模拟结算。
 - 新参数改动须同步本表和对应规则，旧测量只保留在明确版本的验证记录，不再逐批向本表追加另一套“当前值”。
 - 新敌人代码及资源已接入，环境散兵复用老旧建造者；引擎检查不等同于原生玩法或规模验收。

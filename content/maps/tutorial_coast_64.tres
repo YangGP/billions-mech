@@ -1,0 +1,87 @@
+[gd_resource type="Resource" script_class="MechMapDefinition" load_steps=12 format=3]
+
+[ext_resource type="Script" path="res://content/map_definition.gd" id="1"]
+[ext_resource type="Script" path="res://content/mineral_definition.gd" id="2"]
+
+[sub_resource type="Resource" id="metal_start"]
+script = ExtResource("2")
+mineral_id = &"metal_start"
+cell = Vector2i(12, 43)
+resource_kind = "metal_ore"
+amount = 720
+
+[sub_resource type="Resource" id="metal_mouth"]
+script = ExtResource("2")
+mineral_id = &"metal_mouth"
+cell = Vector2i(28, 55)
+resource_kind = "metal_ore"
+amount = 720
+
+[sub_resource type="Resource" id="metal_field"]
+script = ExtResource("2")
+mineral_id = &"metal_field"
+cell = Vector2i(37, 46)
+resource_kind = "metal_ore"
+amount = 720
+
+[sub_resource type="Resource" id="metal_east"]
+script = ExtResource("2")
+mineral_id = &"metal_east"
+cell = Vector2i(52, 52)
+resource_kind = "metal_ore"
+amount = 720
+
+[sub_resource type="Resource" id="fuel_near"]
+script = ExtResource("2")
+mineral_id = &"fuel_near"
+cell = Vector2i(21, 49)
+resource_kind = "fuel"
+amount = 480
+
+[sub_resource type="Resource" id="fuel_field"]
+script = ExtResource("2")
+mineral_id = &"fuel_field"
+cell = Vector2i(37, 32)
+resource_kind = "fuel"
+amount = 480
+
+[sub_resource type="Resource" id="fuel_east"]
+script = ExtResource("2")
+mineral_id = &"fuel_east"
+cell = Vector2i(43, 35)
+resource_kind = "fuel"
+amount = 480
+
+[sub_resource type="Resource" id="crystal_north"]
+script = ExtResource("2")
+mineral_id = &"crystal_north"
+cell = Vector2i(42, 34)
+resource_kind = "crystals"
+amount = 180
+
+[sub_resource type="Resource" id="crystal_south"]
+script = ExtResource("2")
+mineral_id = &"crystal_south"
+cell = Vector2i(36, 65)
+resource_kind = "crystals"
+amount = 180
+
+[resource]
+script = ExtResource("1")
+map_id = &"tutorial_coast_64"
+display_name = "西岸前哨 · 基础教程"
+dimensions = Vector2i(96, 96)
+wanderer_exclusion_radius = 28.0
+obstacle_rects = Array[Rect2i]([Rect2i(0, 0, 96, 4), Rect2i(0, 4, 43, 1), Rect2i(44, 4, 52, 1), Rect2i(0, 5, 42, 1), Rect2i(45, 5, 51, 1), Rect2i(0, 6, 41, 1), Rect2i(46, 6, 50, 1), Rect2i(0, 7, 40, 1), Rect2i(47, 7, 49, 1), Rect2i(0, 8, 39, 1), Rect2i(48, 8, 48, 1), Rect2i(0, 9, 38, 1), Rect2i(49, 9, 47, 1), Rect2i(0, 10, 37, 1), Rect2i(50, 10, 46, 1), Rect2i(0, 11, 36, 1), Rect2i(51, 11, 45, 1), Rect2i(0, 12, 35, 1), Rect2i(52, 12, 44, 1), Rect2i(0, 13, 34, 1), Rect2i(53, 13, 43, 1), Rect2i(0, 14, 33, 1), Rect2i(54, 14, 42, 1), Rect2i(0, 15, 32, 1), Rect2i(55, 15, 41, 1), Rect2i(0, 16, 31, 1), Rect2i(56, 16, 40, 1), Rect2i(0, 17, 30, 1), Rect2i(57, 17, 39, 1), Rect2i(0, 18, 29, 1), Rect2i(58, 18, 38, 1), Rect2i(0, 19, 28, 1), Rect2i(59, 19, 37, 1), Rect2i(0, 20, 27, 1), Rect2i(60, 20, 36, 1), Rect2i(61, 21, 35, 1), Rect2i(62, 22, 34, 1), Rect2i(63, 23, 33, 1), Rect2i(64, 24, 32, 1), Rect2i(65, 25, 31, 1), Rect2i(66, 26, 30, 1), Rect2i(67, 27, 29, 1), Rect2i(68, 28, 28, 1), Rect2i(69, 29, 27, 1), Rect2i(0, 21, 26, 10), Rect2i(40, 22, 9, 9), Rect2i(70, 30, 26, 1), Rect2i(0, 31, 16, 1), Rect2i(71, 31, 25, 1), Rect2i(72, 32, 24, 1), Rect2i(73, 33, 23, 1), Rect2i(74, 34, 22, 1), Rect2i(0, 32, 17, 4), Rect2i(75, 35, 21, 1), Rect2i(0, 36, 11, 1), Rect2i(76, 36, 20, 1), Rect2i(0, 37, 10, 1), Rect2i(77, 37, 19, 1), Rect2i(0, 38, 9, 1), Rect2i(78, 38, 18, 1), Rect2i(20, 31, 6, 9), Rect2i(0, 39, 8, 1), Rect2i(79, 39, 17, 1), Rect2i(0, 40, 7, 1), Rect2i(80, 40, 16, 1), Rect2i(0, 41, 8, 1), Rect2i(81, 41, 15, 1), Rect2i(0, 42, 9, 1), Rect2i(82, 42, 14, 1), Rect2i(0, 43, 10, 1), Rect2i(83, 43, 13, 1), Rect2i(0, 44, 11, 1), Rect2i(84, 44, 12, 1), Rect2i(0, 45, 12, 1), Rect2i(85, 45, 11, 1), Rect2i(0, 46, 13, 1), Rect2i(86, 46, 10, 1), Rect2i(0, 47, 14, 1), Rect2i(87, 47, 9, 1), Rect2i(0, 48, 15, 1), Rect2i(88, 48, 8, 1), Rect2i(0, 49, 16, 1), Rect2i(89, 49, 7, 1), Rect2i(0, 50, 17, 1), Rect2i(90, 50, 6, 1), Rect2i(0, 51, 18, 1), Rect2i(91, 51, 5, 1), Rect2i(0, 52, 19, 1), Rect2i(20, 52, 6, 1), Rect2i(92, 52, 4, 1), Rect2i(93, 53, 3, 2), Rect2i(92, 55, 4, 1), Rect2i(91, 56, 5, 1), Rect2i(90, 57, 6, 1), Rect2i(89, 58, 7, 1), Rect2i(0, 53, 26, 7), Rect2i(88, 59, 8, 1), Rect2i(0, 60, 27, 1), Rect2i(87, 60, 9, 1), Rect2i(0, 61, 28, 1), Rect2i(86, 61, 10, 1), Rect2i(0, 62, 29, 1), Rect2i(85, 62, 11, 1), Rect2i(0, 63, 30, 1), Rect2i(84, 63, 12, 1), Rect2i(43, 58, 10, 7), Rect2i(0, 64, 31, 1), Rect2i(83, 64, 13, 1), Rect2i(0, 65, 32, 1), Rect2i(82, 65, 14, 1), Rect2i(0, 66, 33, 1), Rect2i(81, 66, 15, 1), Rect2i(0, 67, 34, 1), Rect2i(80, 67, 16, 1), Rect2i(0, 68, 35, 1), Rect2i(79, 68, 17, 1), Rect2i(0, 69, 36, 1), Rect2i(78, 69, 18, 1), Rect2i(0, 70, 37, 1), Rect2i(77, 70, 19, 1), Rect2i(0, 71, 38, 1), Rect2i(76, 71, 20, 1), Rect2i(0, 72, 39, 1), Rect2i(75, 72, 21, 1), Rect2i(0, 73, 40, 1), Rect2i(74, 73, 22, 1), Rect2i(0, 74, 41, 1), Rect2i(73, 74, 23, 1), Rect2i(0, 75, 42, 1), Rect2i(72, 75, 24, 1), Rect2i(0, 76, 43, 1), Rect2i(71, 76, 25, 1), Rect2i(0, 77, 44, 1), Rect2i(70, 77, 26, 1), Rect2i(0, 78, 45, 1), Rect2i(69, 78, 27, 1), Rect2i(0, 79, 46, 1), Rect2i(68, 79, 28, 1), Rect2i(0, 80, 47, 1), Rect2i(67, 80, 29, 1), Rect2i(0, 81, 48, 1), Rect2i(66, 81, 30, 1), Rect2i(0, 82, 49, 1), Rect2i(65, 82, 31, 1), Rect2i(0, 83, 50, 1), Rect2i(64, 83, 32, 1), Rect2i(0, 84, 51, 1), Rect2i(63, 84, 33, 1), Rect2i(0, 85, 52, 1), Rect2i(62, 85, 34, 1), Rect2i(0, 86, 53, 1), Rect2i(61, 86, 35, 1), Rect2i(0, 87, 54, 1), Rect2i(60, 87, 36, 1), Rect2i(0, 88, 55, 1), Rect2i(59, 88, 37, 1), Rect2i(0, 89, 56, 1), Rect2i(58, 89, 38, 1), Rect2i(0, 90, 96, 6)])
+rough_rects = Array[Rect2i]([Rect2i(45, 37, 8, 7), Rect2i(27, 40, 8, 12)])
+wind_cells = Array[Vector2i]([Vector2i(15, 47), Vector2i(16, 47), Vector2i(17, 47), Vector2i(18, 47), Vector2i(19, 47), Vector2i(20, 47), Vector2i(21, 47), Vector2i(15, 48), Vector2i(16, 48), Vector2i(17, 48), Vector2i(18, 48), Vector2i(19, 48), Vector2i(20, 48), Vector2i(21, 48), Vector2i(15, 49), Vector2i(16, 49), Vector2i(17, 49), Vector2i(18, 49), Vector2i(19, 49), Vector2i(20, 49), Vector2i(21, 49), Vector2i(15, 50), Vector2i(16, 50), Vector2i(17, 50), Vector2i(18, 50), Vector2i(19, 50), Vector2i(20, 50), Vector2i(21, 50), Vector2i(16, 51), Vector2i(17, 51), Vector2i(18, 51), Vector2i(19, 51), Vector2i(20, 51), Vector2i(21, 51), Vector2i(17, 52), Vector2i(18, 52), Vector2i(19, 52), Vector2i(20, 52), Vector2i(21, 52), Vector2i(18, 53), Vector2i(19, 53), Vector2i(20, 53), Vector2i(21, 53)])
+water_cells = Array[Vector2i]([Vector2i(13, 32), Vector2i(14, 32), Vector2i(15, 32), Vector2i(16, 32), Vector2i(12, 33), Vector2i(13, 33), Vector2i(14, 33), Vector2i(15, 33), Vector2i(16, 33), Vector2i(12, 34), Vector2i(13, 34), Vector2i(14, 34), Vector2i(15, 34), Vector2i(16, 34), Vector2i(12, 35), Vector2i(13, 35), Vector2i(14, 35), Vector2i(15, 35), Vector2i(16, 35)])
+rough_movement_weight = 2.0
+mainbrain_origin = Vector2i(14, 41)
+mainbrain_footprint = Vector2i(5, 5)
+probe_cell = Vector2i(19, 48)
+main_gate = Vector2i(24, 43)
+flank = Vector2i(24, 49)
+minerals = Array[ExtResource("2")]([SubResource("metal_start"), SubResource("metal_mouth"), SubResource("metal_field"), SubResource("metal_east"), SubResource("fuel_near"), SubResource("fuel_field"), SubResource("fuel_east"), SubResource("crystal_north"), SubResource("crystal_south")])
+
+playable_polygon = PackedVector2Array(4.125, 40.25, 43.316835884531, 1.058164115469, 95.572617063905, 53.313945294844, 56.380781179374, 92.505781179374)

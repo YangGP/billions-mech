@@ -12,6 +12,8 @@ extends Resource
 @export var building_definitions: Array[MechBuildingDefinition] = []
 @export var starting_resources: Dictionary[StringName, int] = {&"coins": 250, &"metal_ore": 50}
 @export var scenario_name: String = "标准开局"
+## 关卡选择页的教学路线或验证重点；不替代模拟胜负条件。
+@export_multiline var scenario_brief: String = ""
 ## 集中单位/敌种数值表；文件存在时由 MechBalanceCatalog 在启动时覆盖下方数组。
 @export_file("*.json") var balance_data_path: String = "res://content/unit_balance.json"
 @export var unit_definitions: Array[MechUnitDefinition] = []

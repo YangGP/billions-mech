@@ -1,0 +1,8 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://presentation/map_overview_3d.gd" id="1"]
+[ext_resource type="Resource" path="res://content/maps/validation_river_96.tres" id="2"]
+
+[node name="ValidationRiverOverview" type="Node3D"]
+script = ExtResource("1")
+preview_map = ExtResource("2")

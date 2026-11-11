@@ -809,7 +809,7 @@ anchor_left = 1.0
 anchor_top = 0.0
 anchor_right = 1.0
 anchor_bottom = 0.0
-offset_left = -294.0
+offset_left = -390.0
 offset_top = 16.0
 offset_right = -16.0
 offset_bottom = 58.0
@@ -844,15 +844,25 @@ text = "设置"
 theme_override_font_sizes/font_size = 12
 tooltip_text = "基础设置 [F10]"
 
+[node name="MainMenu" type="Button" parent="Root/System"]
+layout_mode = 0
+offset_left = 214.0
+offset_top = 6.0
+offset_right = 304.0
+offset_bottom = 36.0
+focus_mode = 0
+text = "主菜单"
+theme_override_font_sizes/font_size = 12
+
 [node name="Help" type="Label" parent="Root/System"]
 layout_mode = 0
 anchor_left = 0.0
 anchor_top = 0.0
 anchor_right = 0.0
 anchor_bottom = 0.0
-offset_left = 216.0
+offset_left = 312.0
 offset_top = 10.0
-offset_right = 268.0
+offset_right = 364.0
 offset_bottom = 33.0
 mouse_filter = 0
 text = "操作 [?]"
@@ -952,12 +962,21 @@ horizontal_alignment = 1
 
 [node name="Restart" type="Button" parent="Root/SessionResult"]
 layout_mode = 0
-offset_left = 150.0
+offset_left = 24.0
 offset_top = 215.0
-offset_right = 370.0
+offset_right = 248.0
 offset_bottom = 263.0
 focus_mode = 0
 text = "重新开始 [R]"
+
+[node name="MainMenu" type="Button" parent="Root/SessionResult"]
+layout_mode = 0
+offset_left = 272.0
+offset_top = 215.0
+offset_right = 496.0
+offset_bottom = 263.0
+focus_mode = 0
+text = "返回主菜单"
 
 
 [node name="DemolitionDialog" type="ConfirmationDialog" parent="."]

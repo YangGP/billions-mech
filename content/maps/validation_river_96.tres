@@ -1,0 +1,115 @@
+[gd_resource type="Resource" script_class="MechMapDefinition" load_steps=16 format=3]
+
+[ext_resource type="Script" path="res://content/map_definition.gd" id="1"]
+[ext_resource type="Script" path="res://content/mineral_definition.gd" id="2"]
+
+[sub_resource type="Resource" id="metal_start_south"]
+script = ExtResource("2")
+mineral_id = &"metal_start_south"
+cell = Vector2i(110, 73)
+resource_kind = "metal_ore"
+amount = 720
+
+[sub_resource type="Resource" id="metal_start_north"]
+script = ExtResource("2")
+mineral_id = &"metal_start_north"
+cell = Vector2i(115, 66)
+resource_kind = "metal_ore"
+amount = 720
+
+[sub_resource type="Resource" id="metal_south_bridge"]
+script = ExtResource("2")
+mineral_id = &"metal_south_bridge"
+cell = Vector2i(104, 90)
+resource_kind = "metal_ore"
+amount = 720
+
+[sub_resource type="Resource" id="metal_north_bridge"]
+script = ExtResource("2")
+mineral_id = &"metal_north_bridge"
+cell = Vector2i(102, 60)
+resource_kind = "metal_ore"
+amount = 720
+
+[sub_resource type="Resource" id="metal_west"]
+script = ExtResource("2")
+mineral_id = &"metal_west"
+cell = Vector2i(79, 61)
+resource_kind = "metal_ore"
+amount = 720
+
+[sub_resource type="Resource" id="metal_far"]
+script = ExtResource("2")
+mineral_id = &"metal_far"
+cell = Vector2i(67, 67)
+resource_kind = "metal_ore"
+amount = 720
+
+[sub_resource type="Resource" id="fuel_near"]
+script = ExtResource("2")
+mineral_id = &"fuel_near"
+cell = Vector2i(108, 71)
+resource_kind = "fuel"
+amount = 480
+
+[sub_resource type="Resource" id="fuel_south_bridge"]
+script = ExtResource("2")
+mineral_id = &"fuel_south_bridge"
+cell = Vector2i(107, 87)
+resource_kind = "fuel"
+amount = 480
+
+[sub_resource type="Resource" id="fuel_north_bridge"]
+script = ExtResource("2")
+mineral_id = &"fuel_north_bridge"
+cell = Vector2i(108, 59)
+resource_kind = "fuel"
+amount = 480
+
+[sub_resource type="Resource" id="fuel_west"]
+script = ExtResource("2")
+mineral_id = &"fuel_west"
+cell = Vector2i(83, 83)
+resource_kind = "fuel"
+amount = 480
+
+[sub_resource type="Resource" id="crystal_west_north"]
+script = ExtResource("2")
+mineral_id = &"crystal_west_north"
+cell = Vector2i(74, 52)
+resource_kind = "crystals"
+amount = 180
+
+[sub_resource type="Resource" id="crystal_west_south"]
+script = ExtResource("2")
+mineral_id = &"crystal_west_south"
+cell = Vector2i(78, 80)
+resource_kind = "crystals"
+amount = 180
+
+[sub_resource type="Resource" id="crystal_far"]
+script = ExtResource("2")
+mineral_id = &"crystal_far"
+cell = Vector2i(63, 57)
+resource_kind = "crystals"
+amount = 180
+
+[resource]
+script = ExtResource("1")
+map_id = &"validation_river_96"
+display_name = "双桥河谷 · 玩法验证"
+dimensions = Vector2i(127, 127)
+wanderer_exclusion_radius = 28.0
+obstacle_rects = Array[Rect2i]([Rect2i(0, 0, 127, 3), Rect2i(0, 3, 53, 1), Rect2i(55, 3, 72, 1), Rect2i(0, 4, 52, 1), Rect2i(56, 4, 71, 1), Rect2i(0, 5, 51, 1), Rect2i(57, 5, 70, 1), Rect2i(0, 6, 50, 1), Rect2i(58, 6, 69, 1), Rect2i(0, 7, 49, 1), Rect2i(59, 7, 68, 1), Rect2i(0, 8, 48, 1), Rect2i(60, 8, 67, 1), Rect2i(0, 9, 47, 1), Rect2i(61, 9, 66, 1), Rect2i(0, 10, 46, 1), Rect2i(62, 10, 65, 1), Rect2i(0, 11, 45, 1), Rect2i(63, 11, 64, 1), Rect2i(0, 12, 44, 1), Rect2i(64, 12, 63, 1), Rect2i(0, 13, 43, 1), Rect2i(65, 13, 62, 1), Rect2i(0, 14, 42, 1), Rect2i(66, 14, 61, 1), Rect2i(0, 15, 41, 1), Rect2i(67, 15, 60, 1), Rect2i(0, 16, 40, 1), Rect2i(68, 16, 59, 1), Rect2i(0, 17, 39, 1), Rect2i(69, 17, 58, 1), Rect2i(0, 18, 38, 1), Rect2i(70, 18, 57, 1), Rect2i(0, 19, 37, 1), Rect2i(71, 19, 56, 1), Rect2i(0, 20, 36, 1), Rect2i(72, 20, 55, 1), Rect2i(0, 21, 35, 1), Rect2i(73, 21, 54, 1), Rect2i(0, 22, 34, 1), Rect2i(74, 22, 53, 1), Rect2i(0, 23, 33, 1), Rect2i(75, 23, 52, 1), Rect2i(0, 24, 32, 1), Rect2i(76, 24, 51, 1), Rect2i(0, 25, 31, 1), Rect2i(77, 25, 50, 1), Rect2i(0, 26, 30, 1), Rect2i(78, 26, 49, 1), Rect2i(0, 27, 29, 1), Rect2i(79, 27, 48, 1), Rect2i(0, 28, 28, 1), Rect2i(80, 28, 47, 1), Rect2i(0, 29, 27, 1), Rect2i(81, 29, 46, 1), Rect2i(0, 30, 26, 1), Rect2i(82, 30, 45, 1), Rect2i(0, 31, 25, 1), Rect2i(83, 31, 44, 1), Rect2i(0, 32, 24, 1), Rect2i(84, 32, 43, 1), Rect2i(0, 33, 23, 1), Rect2i(85, 33, 42, 1), Rect2i(0, 34, 22, 1), Rect2i(86, 34, 41, 1), Rect2i(0, 35, 21, 1), Rect2i(87, 35, 40, 1), Rect2i(0, 36, 20, 1), Rect2i(88, 36, 39, 1), Rect2i(0, 37, 19, 1), Rect2i(89, 37, 38, 1), Rect2i(0, 38, 18, 1), Rect2i(0, 39, 17, 1), Rect2i(0, 40, 16, 1), Rect2i(0, 41, 15, 1), Rect2i(0, 42, 14, 1), Rect2i(90, 38, 37, 6), Rect2i(0, 43, 13, 1), Rect2i(0, 44, 12, 1), Rect2i(96, 44, 31, 1), Rect2i(0, 45, 11, 1), Rect2i(97, 45, 30, 1), Rect2i(0, 46, 10, 1), Rect2i(98, 46, 29, 1), Rect2i(0, 47, 9, 1), Rect2i(99, 47, 28, 1), Rect2i(0, 48, 8, 1), Rect2i(100, 48, 27, 1), Rect2i(58, 41, 12, 9), Rect2i(0, 49, 7, 1), Rect2i(101, 49, 26, 1), Rect2i(0, 50, 6, 1), Rect2i(102, 50, 25, 1), Rect2i(0, 51, 5, 1), Rect2i(103, 51, 24, 1), Rect2i(0, 52, 4, 1), Rect2i(104, 52, 23, 1), Rect2i(0, 53, 3, 1), Rect2i(105, 53, 22, 1), Rect2i(90, 44, 5, 11), Rect2i(0, 54, 2, 1), Rect2i(106, 54, 21, 1), Rect2i(0, 55, 3, 1), Rect2i(107, 55, 20, 1), Rect2i(0, 56, 4, 1), Rect2i(108, 56, 19, 1), Rect2i(0, 57, 5, 1), Rect2i(109, 57, 18, 1), Rect2i(0, 58, 6, 1), Rect2i(110, 58, 17, 1), Rect2i(0, 59, 7, 1), Rect2i(111, 59, 16, 1), Rect2i(0, 60, 8, 1), Rect2i(112, 60, 15, 1), Rect2i(0, 61, 9, 1), Rect2i(113, 61, 14, 1), Rect2i(0, 62, 10, 1), Rect2i(114, 62, 13, 1), Rect2i(0, 63, 11, 1), Rect2i(115, 63, 12, 1), Rect2i(0, 64, 12, 1), Rect2i(116, 64, 11, 1), Rect2i(0, 65, 13, 1), Rect2i(117, 65, 10, 1), Rect2i(0, 66, 14, 1), Rect2i(118, 66, 9, 1), Rect2i(0, 67, 15, 1), Rect2i(119, 67, 8, 1), Rect2i(0, 68, 16, 1), Rect2i(120, 68, 7, 1), Rect2i(0, 69, 17, 1), Rect2i(121, 69, 6, 1), Rect2i(0, 70, 18, 1), Rect2i(122, 70, 5, 1), Rect2i(0, 71, 19, 1), Rect2i(123, 71, 4, 1), Rect2i(0, 72, 20, 1), Rect2i(124, 72, 3, 1), Rect2i(0, 73, 21, 1), Rect2i(123, 73, 4, 1), Rect2i(0, 74, 22, 1), Rect2i(122, 74, 5, 1), Rect2i(0, 75, 23, 1), Rect2i(121, 75, 6, 1), Rect2i(0, 76, 24, 1), Rect2i(120, 76, 7, 1), Rect2i(0, 77, 25, 1), Rect2i(119, 77, 8, 1), Rect2i(0, 78, 26, 1), Rect2i(68, 72, 9, 8), Rect2i(106, 76, 5, 4), Rect2i(0, 79, 27, 1), Rect2i(0, 80, 28, 1), Rect2i(0, 81, 29, 1), Rect2i(0, 82, 30, 1), Rect2i(0, 83, 31, 1), Rect2i(90, 61, 5, 24), Rect2i(112, 78, 15, 7), Rect2i(0, 84, 32, 1), Rect2i(0, 85, 33, 1), Rect2i(111, 85, 16, 1), Rect2i(0, 86, 34, 1), Rect2i(110, 86, 17, 1), Rect2i(0, 87, 35, 1), Rect2i(109, 87, 18, 1), Rect2i(0, 88, 36, 1), Rect2i(108, 88, 19, 1), Rect2i(0, 89, 37, 1), Rect2i(107, 89, 20, 1), Rect2i(0, 90, 38, 1), Rect2i(106, 90, 21, 1), Rect2i(0, 91, 39, 1), Rect2i(105, 91, 22, 1), Rect2i(0, 92, 40, 1), Rect2i(104, 92, 23, 1), Rect2i(0, 93, 41, 1), Rect2i(103, 93, 24, 1), Rect2i(0, 94, 42, 1), Rect2i(102, 94, 25, 1), Rect2i(0, 95, 43, 1), Rect2i(101, 95, 26, 1), Rect2i(0, 96, 44, 1), Rect2i(100, 96, 27, 1), Rect2i(0, 97, 45, 1), Rect2i(99, 97, 28, 1), Rect2i(0, 98, 46, 1), Rect2i(97, 98, 30, 1), Rect2i(90, 91, 5, 9), Rect2i(0, 99, 47, 1), Rect2i(96, 99, 31, 1), Rect2i(0, 100, 48, 1), Rect2i(0, 101, 49, 1), Rect2i(0, 102, 50, 1), Rect2i(0, 103, 51, 1), Rect2i(0, 104, 52, 1), Rect2i(90, 100, 37, 6), Rect2i(0, 105, 53, 1), Rect2i(0, 106, 54, 1), Rect2i(89, 106, 38, 1), Rect2i(0, 107, 55, 1), Rect2i(88, 107, 39, 1), Rect2i(0, 108, 56, 1), Rect2i(87, 108, 40, 1), Rect2i(0, 109, 57, 1), Rect2i(86, 109, 41, 1), Rect2i(0, 110, 58, 1), Rect2i(85, 110, 42, 1), Rect2i(0, 111, 59, 1), Rect2i(84, 111, 43, 1), Rect2i(0, 112, 60, 1), Rect2i(83, 112, 44, 1), Rect2i(0, 113, 61, 1), Rect2i(82, 113, 45, 1), Rect2i(0, 114, 62, 1), Rect2i(81, 114, 46, 1), Rect2i(0, 115, 63, 1), Rect2i(80, 115, 47, 1), Rect2i(0, 116, 64, 1), Rect2i(79, 116, 48, 1), Rect2i(0, 117, 65, 1), Rect2i(78, 117, 49, 1), Rect2i(0, 118, 66, 1), Rect2i(77, 118, 50, 1), Rect2i(0, 119, 67, 1), Rect2i(76, 119, 51, 1), Rect2i(0, 120, 68, 1), Rect2i(75, 120, 52, 1), Rect2i(0, 121, 69, 1), Rect2i(74, 121, 53, 1), Rect2i(0, 122, 70, 1), Rect2i(73, 122, 54, 1), Rect2i(0, 123, 71, 1), Rect2i(72, 123, 55, 1), Rect2i(0, 124, 127, 3)])
+rough_rects = Array[Rect2i]([Rect2i(84, 54, 6, 1), Rect2i(95, 54, 6, 1), Rect2i(84, 55, 17, 6), Rect2i(103, 61, 8, 6), Rect2i(84, 84, 6, 1), Rect2i(95, 84, 6, 1), Rect2i(84, 85, 17, 6), Rect2i(66, 90, 9, 7)])
+wind_cells = Array[Vector2i]([Vector2i(103, 52), Vector2i(104, 52), Vector2i(103, 53), Vector2i(104, 53), Vector2i(105, 53), Vector2i(103, 54), Vector2i(104, 54), Vector2i(105, 54), Vector2i(106, 54), Vector2i(103, 55), Vector2i(104, 55), Vector2i(105, 55), Vector2i(106, 55), Vector2i(107, 55), Vector2i(103, 56), Vector2i(104, 56), Vector2i(105, 56), Vector2i(106, 56), Vector2i(107, 56), Vector2i(108, 56), Vector2i(103, 57), Vector2i(104, 57), Vector2i(105, 57), Vector2i(106, 57), Vector2i(107, 57), Vector2i(108, 57), Vector2i(109, 57), Vector2i(103, 58), Vector2i(104, 58), Vector2i(105, 58), Vector2i(106, 58), Vector2i(107, 58), Vector2i(108, 58), Vector2i(109, 58), Vector2i(110, 63), Vector2i(111, 63), Vector2i(112, 63), Vector2i(113, 63), Vector2i(114, 63), Vector2i(115, 63), Vector2i(110, 64), Vector2i(111, 64), Vector2i(112, 64), Vector2i(113, 64), Vector2i(114, 64), Vector2i(115, 64), Vector2i(110, 65), Vector2i(111, 65), Vector2i(112, 65), Vector2i(113, 65), Vector2i(114, 65), Vector2i(115, 65), Vector2i(110, 66), Vector2i(111, 66), Vector2i(112, 66), Vector2i(113, 66), Vector2i(114, 66), Vector2i(115, 66), Vector2i(110, 67), Vector2i(111, 67), Vector2i(112, 67), Vector2i(113, 67), Vector2i(114, 67), Vector2i(115, 67), Vector2i(110, 68), Vector2i(111, 68), Vector2i(112, 68), Vector2i(113, 68), Vector2i(114, 68), Vector2i(115, 68)])
+water_cells = Array[Vector2i]([Vector2i(90, 38), Vector2i(90, 39), Vector2i(91, 39), Vector2i(90, 40), Vector2i(91, 40), Vector2i(92, 40), Vector2i(90, 41), Vector2i(91, 41), Vector2i(92, 41), Vector2i(93, 41), Vector2i(90, 42), Vector2i(91, 42), Vector2i(92, 42), Vector2i(93, 42), Vector2i(94, 42), Vector2i(90, 43), Vector2i(91, 43), Vector2i(92, 43), Vector2i(93, 43), Vector2i(94, 43), Vector2i(90, 44), Vector2i(91, 44), Vector2i(92, 44), Vector2i(93, 44), Vector2i(94, 44), Vector2i(90, 45), Vector2i(91, 45), Vector2i(92, 45), Vector2i(93, 45), Vector2i(94, 45), Vector2i(90, 46), Vector2i(91, 46), Vector2i(92, 46), Vector2i(93, 46), Vector2i(94, 46), Vector2i(90, 47), Vector2i(91, 47), Vector2i(92, 47), Vector2i(93, 47), Vector2i(94, 47), Vector2i(90, 48), Vector2i(91, 48), Vector2i(92, 48), Vector2i(93, 48), Vector2i(94, 48), Vector2i(90, 49), Vector2i(91, 49), Vector2i(92, 49), Vector2i(93, 49), Vector2i(94, 49), Vector2i(90, 50), Vector2i(91, 50), Vector2i(92, 50), Vector2i(93, 50), Vector2i(94, 50), Vector2i(90, 51), Vector2i(91, 51), Vector2i(92, 51), Vector2i(93, 51), Vector2i(94, 51), Vector2i(90, 52), Vector2i(91, 52), Vector2i(92, 52), Vector2i(93, 52), Vector2i(94, 52), Vector2i(90, 53), Vector2i(91, 53), Vector2i(92, 53), Vector2i(93, 53), Vector2i(94, 53), Vector2i(90, 54), Vector2i(91, 54), Vector2i(92, 54), Vector2i(93, 54), Vector2i(94, 54), Vector2i(90, 61), Vector2i(91, 61), Vector2i(92, 61), Vector2i(93, 61), Vector2i(94, 61), Vector2i(90, 62), Vector2i(91, 62), Vector2i(92, 62), Vector2i(93, 62), Vector2i(94, 62), Vector2i(90, 63), Vector2i(91, 63), Vector2i(92, 63), Vector2i(93, 63), Vector2i(94, 63), Vector2i(90, 64), Vector2i(91, 64), Vector2i(92, 64), Vector2i(93, 64), Vector2i(94, 64), Vector2i(90, 65), Vector2i(91, 65), Vector2i(92, 65), Vector2i(93, 65), Vector2i(94, 65), Vector2i(90, 66), Vector2i(91, 66), Vector2i(92, 66), Vector2i(93, 66), Vector2i(94, 66), Vector2i(90, 67), Vector2i(91, 67), Vector2i(92, 67), Vector2i(93, 67), Vector2i(94, 67), Vector2i(90, 68), Vector2i(91, 68), Vector2i(92, 68), Vector2i(93, 68), Vector2i(94, 68), Vector2i(90, 69), Vector2i(91, 69), Vector2i(92, 69), Vector2i(93, 69), Vector2i(94, 69), Vector2i(90, 70), Vector2i(91, 70), Vector2i(92, 70), Vector2i(93, 70), Vector2i(94, 70), Vector2i(90, 71), Vector2i(91, 71), Vector2i(92, 71), Vector2i(93, 71), Vector2i(94, 71), Vector2i(90, 72), Vector2i(91, 72), Vector2i(92, 72), Vector2i(93, 72), Vector2i(94, 72), Vector2i(90, 73), Vector2i(91, 73), Vector2i(92, 73), Vector2i(93, 73), Vector2i(94, 73), Vector2i(90, 74), Vector2i(91, 74), Vector2i(92, 74), Vector2i(93, 74), Vector2i(94, 74), Vector2i(90, 75), Vector2i(91, 75), Vector2i(92, 75), Vector2i(93, 75), Vector2i(94, 75), Vector2i(90, 76), Vector2i(91, 76), Vector2i(92, 76), Vector2i(93, 76), Vector2i(94, 76), Vector2i(106, 76), Vector2i(107, 76), Vector2i(108, 76), Vector2i(109, 76), Vector2i(110, 76), Vector2i(90, 77), Vector2i(91, 77), Vector2i(92, 77), Vector2i(93, 77), Vector2i(94, 77), Vector2i(106, 77), Vector2i(107, 77), Vector2i(108, 77), Vector2i(109, 77), Vector2i(110, 77), Vector2i(90, 78), Vector2i(91, 78), Vector2i(92, 78), Vector2i(93, 78), Vector2i(94, 78), Vector2i(106, 78), Vector2i(107, 78), Vector2i(108, 78), Vector2i(109, 78), Vector2i(110, 78), Vector2i(90, 79), Vector2i(91, 79), Vector2i(92, 79), Vector2i(93, 79), Vector2i(94, 79), Vector2i(106, 79), Vector2i(107, 79), Vector2i(108, 79), Vector2i(109, 79), Vector2i(110, 79), Vector2i(90, 80), Vector2i(91, 80), Vector2i(92, 80), Vector2i(93, 80), Vector2i(94, 80), Vector2i(90, 81), Vector2i(91, 81), Vector2i(92, 81), Vector2i(93, 81), Vector2i(94, 81), Vector2i(90, 82), Vector2i(91, 82), Vector2i(92, 82), Vector2i(93, 82), Vector2i(94, 82), Vector2i(90, 83), Vector2i(91, 83), Vector2i(92, 83), Vector2i(93, 83), Vector2i(94, 83), Vector2i(90, 84), Vector2i(91, 84), Vector2i(92, 84), Vector2i(93, 84), Vector2i(94, 84), Vector2i(90, 91), Vector2i(91, 91), Vector2i(92, 91), Vector2i(93, 91), Vector2i(94, 91), Vector2i(90, 92), Vector2i(91, 92), Vector2i(92, 92), Vector2i(93, 92), Vector2i(94, 92), Vector2i(90, 93), Vector2i(91, 93), Vector2i(92, 93), Vector2i(93, 93), Vector2i(94, 93), Vector2i(90, 94), Vector2i(91, 94), Vector2i(92, 94), Vector2i(93, 94), Vector2i(94, 94), Vector2i(90, 95), Vector2i(91, 95), Vector2i(92, 95), Vector2i(93, 95), Vector2i(94, 95), Vector2i(90, 96), Vector2i(91, 96), Vector2i(92, 96), Vector2i(93, 96), Vector2i(94, 96), Vector2i(90, 97), Vector2i(91, 97), Vector2i(92, 97), Vector2i(93, 97), Vector2i(94, 97), Vector2i(90, 98), Vector2i(91, 98), Vector2i(92, 98), Vector2i(93, 98), Vector2i(94, 98), Vector2i(90, 99), Vector2i(91, 99), Vector2i(92, 99), Vector2i(93, 99), Vector2i(94, 99), Vector2i(90, 100), Vector2i(91, 100), Vector2i(92, 100), Vector2i(93, 100), Vector2i(94, 100), Vector2i(90, 101), Vector2i(91, 101), Vector2i(92, 101), Vector2i(93, 101), Vector2i(94, 101), Vector2i(90, 102), Vector2i(91, 102), Vector2i(92, 102), Vector2i(93, 102), Vector2i(94, 102), Vector2i(90, 103), Vector2i(91, 103), Vector2i(92, 103), Vector2i(93, 103), Vector2i(90, 104), Vector2i(91, 104), Vector2i(92, 104), Vector2i(90, 105), Vector2i(91, 105), Vector2i(90, 106)])
+rough_movement_weight = 2.0
+mainbrain_origin = Vector2i(113, 69)
+mainbrain_footprint = Vector2i(5, 5)
+probe_cell = Vector2i(111, 74)
+main_gate = Vector2i(92, 57)
+flank = Vector2i(92, 87)
+minerals = Array[ExtResource("2")]([SubResource("metal_start_south"), SubResource("metal_start_north"), SubResource("metal_south_bridge"), SubResource("metal_north_bridge"), SubResource("metal_west"), SubResource("metal_far"), SubResource("fuel_near"), SubResource("fuel_south_bridge"), SubResource("fuel_north_bridge"), SubResource("fuel_west"), SubResource("crystal_west_north"), SubResource("crystal_west_south"), SubResource("crystal_far")])
+
+playable_polygon = PackedVector2Array(0.905193260012, 54.361456180002, 54.570824720007, 0.695824720007, 126.125, 72.25, 72.459368540005, 125.915631459995)

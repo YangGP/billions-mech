@@ -61,3 +61,9 @@ script = ExtResource("9")
 [node name="HUD" parent="." instance=ExtResource("6")]
 
 [node name="Settings" parent="." instance=ExtResource("7")]
+
+[node name="ReturnDialog" type="ConfirmationDialog" parent="."]
+title = "返回主菜单"
+dialog_text = "返回主菜单将结束本局，当前进度不会保存。\n确定离开战场吗？"
+ok_button_text = "结束本局并返回"
+cancel_button_text = "继续本局"

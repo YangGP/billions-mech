@@ -1,33 +1,40 @@
 {
   "categories": [
-    {"id": "economy", "name": "经济"},
+    {"id": "core", "name": "核心"},
     {"id": "extraction", "name": "采集"},
     {"id": "energy", "name": "能源"},
+    {"id": "cooling", "name": "冷却"},
     {"id": "defense", "name": "防御"},
     {"id": "military", "name": "军工"},
-    {"id": "support", "name": "科技支援"}
+    {"id": "command", "name": "指挥"}
   ],
   "buildings": [
-    {"id": "compute_node", "category": "economy", "name": "算力节点", "shortcut": "Q", "description": "产出算力币，提供可调度容量。"},
+    {"id": "mainbrain", "category": "core", "name": "主脑", "action": "focus_core", "description": "唯一基地核心；点击定位，不能重复建造。"},
+    {"id": "compute_node", "category": "core", "name": "算力节点", "shortcut": "Q", "description": "产出算力币，提供可调度容量。"},
+
     {"id": "mining_station", "category": "extraction", "name": "金属采矿站", "description": "绑定金属矿点，采集基础建设材料。"},
     {"id": "fuel_extractor", "category": "extraction", "name": "碳晶采集站", "description": "采集碳晶，支持热能发电与合金冶炼。"},
     {"id": "crystal_extractor", "category": "extraction", "name": "超导矿采掘站", "description": "末期采集超导矿。"},
-    {"id": "wind_station", "category": "energy", "name": "风冷站", "description": "利用风力提供全基地冷却，零耗电、不发电；占地1×1，同类采集区排他。"},
+
     {"id": "solar_station", "category": "energy", "name": "太阳能站", "description": "利用周围开阔地发电；占地2×2，同类采集区排他。"},
     {"id": "thermal_smelter", "category": "energy", "name": "热能冶炼站", "description": "燃烧碳晶发电，同时可将金属矿加工为合金。"},
     {"id": "relay_node", "category": "energy", "name": "中继节点", "description": "扩展与主脑连通的供电覆盖，不发电。"},
-    {"id": "cooling_tower", "category": "energy", "name": "冷却塔", "description": "为全基地算力节点提供冷却。"},
-    {"id": "water_cooler", "category": "energy", "name": "水冷站", "description": "在水边提供更高效率的冷却。"},
+
+    {"id": "wind_station", "category": "cooling", "name": "风冷站", "description": "利用风力提供全基地冷却，零耗电、不发电；占地1×1，同类采集区排他。"},
+    {"id": "cooling_tower", "category": "cooling", "name": "冷却塔", "description": "为全基地算力节点提供冷却。"},
+    {"id": "water_cooler", "category": "cooling", "name": "水冷站", "description": "在水边提供更高效率的冷却。"},
+
     {"id": "armored_wall", "category": "defense", "name": "装甲墙", "shortcut": "W", "description": "阻挡敌人；Shift拖动可连续铺设墙线。"},
     {"id": "gate", "category": "defense", "name": "闸门", "description": "允许友军通行，阻挡敌人。"},
     {"id": "garrison_bunker", "category": "defense", "name": "驻防碉堡", "description": "容纳轻型射击单位，提供保护和额外射程。"},
     {"id": "sentry_tower", "category": "defense", "name": "哨戒炮塔", "shortcut": "E", "description": "自动攻击射程内可见的敌人。"},
     {"id": "arc_tower", "category": "defense", "name": "电弧塔", "description": "对密集敌群造成范围伤害。"},
+
     {"id": "assembly_plant", "category": "military", "name": "组装厂", "description": "生产基础部队；各工厂拥有独立队列与集结点。"},
     {"id": "heavy_factory", "category": "military", "name": "重装工厂", "description": "生产重型作战单位。"},
-    {"id": "mainbrain", "category": "support", "name": "主脑", "action": "focus_core", "description": "唯一基地核心；点击定位，不能重复建造。"},
-    {"id": "tech_center", "category": "support", "name": "科技中心", "description": "升级科技等级，开放后续建筑和军备。"},
-    {"id": "radar_station", "category": "support", "name": "雷达站", "description": "扩展侦察，提前获得更精确的来袭方向。"},
-    {"id": "dispatch_center", "category": "support", "name": "调度中心", "description": "授权区域管理与重复事务，不增加资源或战斗加成。"}
+
+    {"id": "tech_center", "category": "command", "name": "科技中心", "description": "升级科技等级，开放后续建筑和军备。"},
+    {"id": "radar_station", "category": "command", "name": "雷达站", "description": "扩展侦察，提前获得更精确的来袭方向。"},
+    {"id": "dispatch_center", "category": "command", "name": "调度中心", "description": "授权区域管理与重复事务，不增加资源或战斗加成。"}
   ]
 }

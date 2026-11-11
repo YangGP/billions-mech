@@ -1,0 +1,590 @@
+{
+  "schema": "billions-mech.development-map.v1",
+  "id": "validation_river_96",
+  "name": "双桥河谷 · 玩法验证",
+  "dimensions": [
+    127,
+    127
+  ],
+  "layout_mode": "authored_grid",
+  "art_source": "existing",
+  "art_route": "existing Godot terrain/entity renderers; no new generated art",
+  "mainbrain": {
+    "origin": [
+      113,
+      69
+    ],
+    "footprint": [
+      5,
+      5
+    ]
+  },
+  "probe_cell": [
+    111,
+    74
+  ],
+  "wanderer_exclusion_radius": 28,
+  "gates": {
+    "north": [
+      92,
+      57
+    ],
+    "east": [
+      92,
+      87
+    ]
+  },
+  "edge_routes": {
+    "north": [
+      28,
+      28
+    ],
+    "west": [
+      37,
+      89
+    ]
+  },
+  "obstacle_polygons": [
+    [
+      [
+        90,
+        27
+      ],
+      [
+        94,
+        27
+      ],
+      [
+        94,
+        54
+      ],
+      [
+        90,
+        54
+      ]
+    ],
+    [
+      [
+        90,
+        61
+      ],
+      [
+        94,
+        61
+      ],
+      [
+        94,
+        84
+      ],
+      [
+        90,
+        84
+      ]
+    ],
+    [
+      [
+        90,
+        91
+      ],
+      [
+        94,
+        91
+      ],
+      [
+        94,
+        112
+      ],
+      [
+        90,
+        112
+      ]
+    ],
+    [
+      [
+        112,
+        78
+      ],
+      [
+        120,
+        78
+      ],
+      [
+        120,
+        87
+      ],
+      [
+        112,
+        87
+      ]
+    ],
+    [
+      [
+        106,
+        76
+      ],
+      [
+        110,
+        76
+      ],
+      [
+        110,
+        79
+      ],
+      [
+        106,
+        79
+      ]
+    ],
+    [
+      [
+        58,
+        41
+      ],
+      [
+        69,
+        41
+      ],
+      [
+        69,
+        49
+      ],
+      [
+        58,
+        49
+      ]
+    ],
+    [
+      [
+        68,
+        72
+      ],
+      [
+        76,
+        72
+      ],
+      [
+        76,
+        79
+      ],
+      [
+        68,
+        79
+      ]
+    ],
+    [
+      [
+        112,
+        42
+      ],
+      [
+        122,
+        42
+      ],
+      [
+        122,
+        49
+      ],
+      [
+        112,
+        49
+      ]
+    ]
+  ],
+  "rough_polygons": [
+    [
+      [
+        84,
+        54
+      ],
+      [
+        100,
+        54
+      ],
+      [
+        100,
+        60
+      ],
+      [
+        84,
+        60
+      ]
+    ],
+    [
+      [
+        84,
+        84
+      ],
+      [
+        100,
+        84
+      ],
+      [
+        100,
+        90
+      ],
+      [
+        84,
+        90
+      ]
+    ],
+    [
+      [
+        103,
+        61
+      ],
+      [
+        110,
+        61
+      ],
+      [
+        110,
+        66
+      ],
+      [
+        103,
+        66
+      ]
+    ],
+    [
+      [
+        66,
+        90
+      ],
+      [
+        74,
+        90
+      ],
+      [
+        74,
+        96
+      ],
+      [
+        66,
+        96
+      ]
+    ]
+  ],
+  "wind_polygons": [
+    [
+      [
+        110,
+        63
+      ],
+      [
+        115,
+        63
+      ],
+      [
+        115,
+        68
+      ],
+      [
+        110,
+        68
+      ]
+    ],
+    [
+      [
+        103,
+        52
+      ],
+      [
+        109,
+        52
+      ],
+      [
+        109,
+        58
+      ],
+      [
+        103,
+        58
+      ]
+    ]
+  ],
+  "water_reservations": [
+    {
+      "id": "river_2",
+      "polygon_index": 0,
+      "shore_test_cell": [
+        95,
+        47
+      ]
+    },
+    {
+      "id": "river_3",
+      "polygon_index": 1,
+      "shore_test_cell": [
+        95,
+        72
+      ]
+    },
+    {
+      "id": "river_4",
+      "polygon_index": 2,
+      "shore_test_cell": [
+        95,
+        97
+      ]
+    },
+    {
+      "id": "river_6",
+      "polygon_index": 4,
+      "shore_test_cell": [
+        111,
+        77
+      ]
+    }
+  ],
+  "development_sites": [
+    {
+      "id": "solar_start",
+      "building": "solar",
+      "origin": [
+        111,
+        64
+      ],
+      "footprint": [
+        2,
+        2
+      ],
+      "minimum_score": 28
+    },
+    {
+      "id": "wind_start",
+      "building": "wind",
+      "origin": [
+        113,
+        66
+      ],
+      "footprint": [
+        1,
+        1
+      ],
+      "minimum_score": 24
+    },
+    {
+      "id": "assembly_yard",
+      "origin": [
+        118,
+        70
+      ],
+      "footprint": [
+        3,
+        3
+      ]
+    },
+    {
+      "id": "cooler_shore",
+      "origin": [
+        111,
+        76
+      ],
+      "footprint": [
+        2,
+        2
+      ]
+    },
+    {
+      "id": "relay_fuel",
+      "origin": [
+        109,
+        72
+      ],
+      "footprint": [
+        1,
+        1
+      ]
+    },
+    {
+      "id": "west_industry",
+      "origin": [
+        79,
+        80
+      ],
+      "footprint": [
+        3,
+        3
+      ]
+    }
+  ],
+  "resource_sites": [
+    {
+      "id": "metal_start_south",
+      "kind": "metal_ore",
+      "cell": [
+        110,
+        73
+      ],
+      "amount": 720,
+      "runtime_kind": "metal_ore"
+    },
+    {
+      "id": "metal_start_north",
+      "kind": "metal_ore",
+      "cell": [
+        115,
+        66
+      ],
+      "amount": 720,
+      "runtime_kind": "metal_ore"
+    },
+    {
+      "id": "metal_south_bridge",
+      "kind": "metal_ore",
+      "cell": [
+        104,
+        90
+      ],
+      "amount": 720,
+      "runtime_kind": "metal_ore"
+    },
+    {
+      "id": "metal_north_bridge",
+      "kind": "metal_ore",
+      "cell": [
+        102,
+        60
+      ],
+      "amount": 720,
+      "runtime_kind": "metal_ore"
+    },
+    {
+      "id": "metal_west",
+      "kind": "metal_ore",
+      "cell": [
+        79,
+        61
+      ],
+      "amount": 720,
+      "runtime_kind": "metal_ore"
+    },
+    {
+      "id": "metal_far",
+      "kind": "metal_ore",
+      "cell": [
+        67,
+        67
+      ],
+      "amount": 720,
+      "runtime_kind": "metal_ore"
+    },
+    {
+      "id": "fuel_near",
+      "kind": "fuel",
+      "cell": [
+        108,
+        71
+      ],
+      "amount": 480,
+      "runtime_kind": "fuel"
+    },
+    {
+      "id": "fuel_south_bridge",
+      "kind": "fuel",
+      "cell": [
+        107,
+        87
+      ],
+      "amount": 480,
+      "runtime_kind": "fuel"
+    },
+    {
+      "id": "fuel_north_bridge",
+      "kind": "fuel",
+      "cell": [
+        108,
+        59
+      ],
+      "amount": 480,
+      "runtime_kind": "fuel"
+    },
+    {
+      "id": "fuel_west",
+      "kind": "fuel",
+      "cell": [
+        83,
+        83
+      ],
+      "amount": 480,
+      "runtime_kind": "fuel"
+    },
+    {
+      "id": "crystal_west_north",
+      "kind": "crystals",
+      "cell": [
+        74,
+        52
+      ],
+      "amount": 180,
+      "runtime_kind": "crystals"
+    },
+    {
+      "id": "crystal_west_south",
+      "kind": "crystals",
+      "cell": [
+        78,
+        80
+      ],
+      "amount": 180,
+      "runtime_kind": "crystals"
+    },
+    {
+      "id": "crystal_far",
+      "kind": "crystals",
+      "cell": [
+        63,
+        57
+      ],
+      "amount": 180,
+      "runtime_kind": "crystals"
+    }
+  ],
+  "session": {
+    "scenario_brief": "验证重点：从东南边缘向两座陆桥扩张，分别建立防线；用河岸水冷与中继测试断链恢复，跨河采集超导矿并推进完整科技链，守住四波。",
+    "starting_unit_cells": [
+      [
+        112,
+        68
+      ],
+      [
+        116,
+        67
+      ]
+    ],
+    "session_seed": 202,
+    "silence_seconds": 160.0,
+    "wave_announce_seconds": 20.0,
+    "wave_interval_seconds": 180.0,
+    "wave_release_seconds": 90.0,
+    "first_wave_budget": 25.0,
+    "total_waves": 4
+  },
+  "playable_polygon": [
+    [
+      0.905193260012,
+      54.361456180002
+    ],
+    [
+      54.570824720007,
+      0.695824720007
+    ],
+    [
+      126.125,
+      72.25
+    ],
+    [
+      72.459368540005,
+      125.915631459995
+    ]
+  ],
+  "closed_edges": [
+    1,
+    2
+  ],
+  "original_dimensions": [
+    96,
+    80
+  ],
+  "target_playable_area": 7680
+}

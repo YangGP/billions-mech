@@ -270,3 +270,7 @@ Agent-Reach 不可用，使用网页检索。先核对高星候选 [Mindustry](h
 在第28–29节已评估的Godot示例/RTS框架边界下，继续核对[Godot TriangleMesh](https://docs.godotengine.org/en/stable/classes/class_trianglemesh.html)及[引擎TriangleMesh源码](https://github.com/godotengine/godot/blob/master/core/math/triangle_mesh.cpp)。实际直接调用Mesh.get_faces、TriangleMesh.create_from_faces/intersect_ray和Transform3D.affine_inverse；BVH构建和三角形求交均由引擎执行。项目只按共享模型懒建缓存、转换实例空间、过滤迷雾及选择最近命中；不新建自写BVH/射线求解器，也不复制外部源码。
 
 性能侧继续使用已接入的Crusade Steering和MechMarchField，不替换导航/积分/分离算法。改动为既有空间桶的区域索引、原方向结果按格记忆和vendor半径外邻居的预过滤；候选顺序、距离/LOS和最终分离判定保留。碰撞查询直接读取原网格权威数组，将原占用→地形→穿越检查合为一次，结果用整型分类传递；原圆格碰撞与受阻回退顺序不变。压力预置调用现有敌军创建接口，用原生hash/sort给出固定分布；计时沿用Time/Performance。没有新增vendor或测试脚本。检查范围及尚未达到的2000敌军预算见[记录](../validation/3d-interaction-performance.md)。
+
+## 等面积正方形边界（2026-11-12）
+
+沿用已安装的SciPy 1.18.1与原有Pillow/NumPy编译链，直接调用[ConvexHull](https://docs.scipy.org/doc/scipy/reference/generated/scipy.spatial.ConvexHull.html)的equations/volume：Qhull提供分数顶点半平面与二维面积，项目只将网格角点代入并组合四角掩码。Pillow继续处理原有地形；不对分数边界使用会取整的栅格判定，不自写凸包、寻路或面积求解器，不新增依赖或移植源码。运行时仍使用Godot Geometry2D与原有地图/导航/建造校验；新增的是投影边界夹持和开局数据平移。

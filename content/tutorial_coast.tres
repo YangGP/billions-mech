@@ -1,0 +1,67 @@
+[gd_resource type="Resource" script_class="MechFoundationSettings" load_steps=42 format=3]
+
+[ext_resource type="Script" path="res://content/foundation_settings.gd" id="1"]
+[ext_resource type="Resource" path="res://content/maps/tutorial_coast_64.tres" id="2"]
+[ext_resource type="Resource" path="res://content/buildings/mainbrain.tres" id="3"]
+[ext_resource type="Resource" path="res://content/buildings/compute_node.tres" id="4"]
+[ext_resource type="Resource" path="res://content/buildings/armored_wall.tres" id="5"]
+[ext_resource type="Resource" path="res://content/buildings/sentry_tower.tres" id="6"]
+[ext_resource type="Script" path="res://content/building_definition.gd" id="7"]
+[ext_resource type="Resource" path="res://content/buildings/mining_station.tres" id="8"]
+[ext_resource type="Resource" path="res://content/buildings/assembly_plant.tres" id="9"]
+[ext_resource type="Resource" path="res://content/units/sentinel.tres" id="10"]
+[ext_resource type="Script" path="res://content/enemy_definition.gd" id="11"]
+[ext_resource type="Resource" path="res://content/enemies/builder.tres" id="12"]
+[ext_resource type="Resource" path="res://content/enemies/recycler.tres" id="14"]
+[ext_resource type="Resource" path="res://content/enemies/deflector.tres" id="15"]
+[ext_resource type="Resource" path="res://content/enemies/builder_worn.tres" id="46"]
+[ext_resource type="Resource" path="res://content/enemies/builder_veteran.tres" id="47"]
+[ext_resource type="Resource" path="res://content/enemies/scavenger.tres" id="48"]
+[ext_resource type="Resource" path="res://content/enemies/strider.tres" id="49"]
+[ext_resource type="Resource" path="res://content/enemies/mortar.tres" id="50"]
+[ext_resource type="Resource" path="res://content/enemies/silencer.tres" id="51"]
+
+[ext_resource type="Script" path="res://content/unit_definition.gd" id="16"]
+[ext_resource type="Resource" path="res://content/buildings/relay_node.tres" id="17"]
+[ext_resource type="Resource" path="res://content/buildings/cooling_tower.tres" id="18"]
+[ext_resource type="Resource" path="res://content/buildings/wind_station.tres" id="19"]
+[ext_resource type="Resource" path="res://content/buildings/solar_station.tres" id="20"]
+[ext_resource type="Resource" path="res://content/units/scout.tres" id="21"]
+[ext_resource type="Resource" path="res://content/buildings/fuel_extractor.tres" id="22"]
+[ext_resource type="Resource" path="res://content/buildings/thermal_smelter.tres" id="23"]
+[ext_resource type="Resource" path="res://content/buildings/tech_center.tres" id="24"]
+[ext_resource type="Resource" path="res://content/buildings/water_cooler.tres" id="25"]
+[ext_resource type="Resource" path="res://content/buildings/gate.tres" id="26"]
+[ext_resource type="Resource" path="res://content/buildings/arc_tower.tres" id="30"]
+[ext_resource type="Resource" path="res://content/buildings/heavy_factory.tres" id="32"]
+[ext_resource type="Resource" path="res://content/units/heavy_mech.tres" id="33"]
+[ext_resource type="Resource" path="res://content/buildings/radar_station.tres" id="35"]
+[ext_resource type="Resource" path="res://content/buildings/garrison_bunker.tres" id="39"]
+[ext_resource type="Resource" path="res://content/buildings/crystal_extractor.tres" id="43"]
+[ext_resource type="Resource" path="res://content/units/rail_mech.tres" id="44"]
+[ext_resource type="Resource" path="res://content/buildings/dispatch_center.tres" id="45"]
+[ext_resource type="Resource" path="res://content/units/grenadier.tres" id="52"]
+[ext_resource type="Resource" path="res://content/units/fortress_mech.tres" id="53"]
+
+[resource]
+script = ExtResource("1")
+simulation_hz = 30
+scenario_name = "西岸前哨 · 基础教程"
+map_definition = ExtResource("2")
+building_definitions = Array[ExtResource("7")]([ExtResource("3"), ExtResource("4"), ExtResource("5"), ExtResource("6"), ExtResource("8"), ExtResource("9"), ExtResource("17"), ExtResource("18"), ExtResource("19"), ExtResource("20"), ExtResource("22"), ExtResource("23"), ExtResource("24"), ExtResource("25"), ExtResource("26"), ExtResource("30"), ExtResource("32"), ExtResource("35"), ExtResource("39"), ExtResource("43"), ExtResource("45")])
+unit_definitions = Array[ExtResource("16")]([ExtResource("10"), ExtResource("21"), ExtResource("52"), ExtResource("33"), ExtResource("44"), ExtResource("53")])
+starting_resources = Dictionary[StringName, int]({&"coins": 600, &"metal_ore": 80})
+starting_unit_id = &"scout"
+starting_unit_cells = Array[Vector2i]([Vector2i(20, 41), Vector2i(20, 46)])
+probe_speed = 2.5
+enemy_definitions = Array[ExtResource("11")]([ExtResource("12"), ExtResource("14"), ExtResource("46"), ExtResource("47"), ExtResource("48"), ExtResource("15"), ExtResource("49"), ExtResource("50"), ExtResource("51")])
+threat_enabled = true
+wave_trigger_mode = 1
+silence_seconds = 280.0
+wave_announce_seconds = 20.0
+scenario_brief = "教学路线：先用节点扩充调度，再建设采矿、太阳能与风冷；沿西岸腹地建立军工，最后在东侧单隘口布置墙、门和炮塔，守住两波。"
+session_seed = 101
+wave_interval_seconds = 240.0
+wave_release_seconds = 60.0
+first_wave_budget = 12.0
+total_waves = 2
